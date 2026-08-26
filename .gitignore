@@ -1,0 +1,10 @@
+# Operating System
+.DS_Store
+Thumbs.db
+
+# IDE & Editor files
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
