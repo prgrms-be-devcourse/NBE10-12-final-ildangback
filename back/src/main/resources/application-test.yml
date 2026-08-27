@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:gommit;MODE=MySQL
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  h2:
+    console:
+      enabled: false
+
+auth-token:
+  secret-key: test-secret-key-for-gommit-unit-testing-minimum-32bytes-required
+
+cors:
+  allowed-origins: http://localhost:5173
