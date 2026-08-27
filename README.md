@@ -34,6 +34,47 @@ pnpm dev
 | API 문서 (Swagger) | http://localhost:8080/swagger-ui.html |
 | H2 콘솔            | http://localhost:8080/h2-console      |
 
+### 테스트
+
+```bash
+cd back && ./gradlew test     # 테스트 + 커버리지 리포트
+cd back && ./gradlew check    # CI와 동일 (테스트 + Checkstyle + 커버리지 검증)
+```
+
+커버리지 리포트는 `back/build/reports/jacoco/test/html/index.html`에 생성됩니다.
+프론트엔드 테스트는 아직 설정되어 있지 않습니다.
+
+---
+
+## 코드 스타일 (Lint & Format)
+
+커밋 전에 프로젝트 루트에서 실행하면 고칠 수 있는 위반은 자동으로 수정됩니다.
+
+```bash
+(cd back  && ./gradlew spotlessApply)         # Java 포맷 자동 수정
+(cd front && pnpm format && pnpm lint:fix)    # Prettier + ESLint 자동 수정
+```
+
+수정 없이 확인만 하려면 (CI와 동일한 검사):
+
+```bash
+(cd back  && ./gradlew spotlessCheck checkstyleMain)
+(cd front && pnpm format:check && pnpm lint)
+```
+
+Checkstyle은 자동 수정 기능이 없어 네이밍·복잡도 같은 위반은 직접 고쳐야 합니다.
+
+| 대상        | 도구                                   | 설정 파일                                   |
+|-----------|--------------------------------------|-----------------------------------------|
+| 백엔드 포맷    | Spotless + Google Java Format (AOSP) | `back/build.gradle`                     |
+| 백엔드 정적 분석 | Checkstyle                           | `back/config/checkstyle/checkstyle.xml` |
+| 프론트엔드 린트  | ESLint                               | `front/eslint.config.js`                |
+| 프론트엔드 포맷  | Prettier                             | `front/.prettierrc`                     |
+| 에디터 공통    | EditorConfig                         | `.editorconfig`                         |
+
+> CI에서 머지를 막는 검사는 **백엔드 테스트(`./gradlew check`)와 프론트엔드 빌드(`pnpm build`)** 입니다.
+> 포맷·린트 검사는 `continue-on-error`로 실행되어 PR에 리포트 코멘트만 남기고 머지를 막지 않습니다.
+
 ---
 
 ## 핵심 기능
