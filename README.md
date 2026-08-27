@@ -11,19 +11,18 @@
 
 로컬 개발 환경은 **H2 파일 기반 데이터베이스**를 사용합니다. 별도 설정이 필요 없습니다.
 
+아래 명령은 모두 **프로젝트 루트에서** 실행합니다. 각 명령은 서브셸에서 돌아가므로 실행 후 루트로 돌아옵니다.
+
 ### 1. 백엔드 실행
 
 ```bash
-cd back
-./gradlew bootRun
+(cd back && ./gradlew bootRun)
 ```
 
 ### 2. 프론트엔드 실행
 
 ```bash
-cd front
-pnpm install
-pnpm dev
+(cd front && pnpm install && pnpm dev)
 ```
 
 ### 엔드포인트
@@ -37,8 +36,13 @@ pnpm dev
 ### 테스트
 
 ```bash
-cd back && ./gradlew test     # 테스트 + 커버리지 리포트
-cd back && ./gradlew check    # CI와 동일 (테스트 + Checkstyle + 커버리지 검증)
+(cd back && ./gradlew test)
+```
+
+CI와 동일하게 Checkstyle·커버리지 검증까지 포함하려면:
+
+```bash
+(cd back && ./gradlew check)
 ```
 
 커버리지 리포트는 `back/build/reports/jacoco/test/html/index.html`에 생성됩니다.
@@ -48,17 +52,23 @@ cd back && ./gradlew check    # CI와 동일 (테스트 + Checkstyle + 커버리
 
 ## 코드 스타일 (Lint & Format)
 
-커밋 전에 프로젝트 루트에서 실행하면 고칠 수 있는 위반은 자동으로 수정됩니다.
+커밋 전에 실행하면 고칠 수 있는 위반은 자동으로 수정됩니다.
 
 ```bash
-(cd back  && ./gradlew spotlessApply)         # Java 포맷 자동 수정
-(cd front && pnpm format && pnpm lint:fix)    # Prettier + ESLint 자동 수정
+(cd back && ./gradlew spotlessApply)
+```
+
+```bash
+(cd front && pnpm format && pnpm lint:fix)
 ```
 
 수정 없이 확인만 하려면 (CI와 동일한 검사):
 
 ```bash
-(cd back  && ./gradlew spotlessCheck checkstyleMain)
+(cd back && ./gradlew spotlessCheck checkstyleMain)
+```
+
+```bash
 (cd front && pnpm format:check && pnpm lint)
 ```
 
