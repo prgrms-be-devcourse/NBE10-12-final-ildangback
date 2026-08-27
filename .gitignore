@@ -8,3 +8,6 @@ Thumbs.db
 *.iws
 *.ipr
 .vscode/
+
+# 로컬 H2 파일 (dev 프로파일)
+data/

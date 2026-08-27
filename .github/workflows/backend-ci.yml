@@ -1,0 +1,301 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+    paths:
+      - 'back/**'
+      - '.github/workflows/backend-ci.yml'
+  pull_request:
+    branches: [ "main", "dev" ]
+    paths:
+      - 'back/**'
+      - '.github/workflows/backend-ci.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    defaults:
+      run:
+        working-directory: ./back
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          build-root-directory: ./back
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Run Tests with Coverage
+        run: ./gradlew check
+
+      - name: Check Formatting
+        id: spotless
+        continue-on-error: true
+        run: ./gradlew spotlessCheck
+
+      - name: Publish Test Report
+        if: always()
+        uses: mikepenz/action-junit-report@v5
+        with:
+          report_paths: 'back/build/test-results/test/*.xml'
+          check_name: 'Test Results'
+          detailed_summary: true
+          include_passed: false
+
+      - name: Upload Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: back/build/reports/jacoco/test/html/
+
+      - name: Generate Lint Summary
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          SPOTLESS_OUTCOME: ${{ steps.spotless.outcome }}
+        with:
+          script: |
+            const fs = require('fs');
+
+            const MARKER = '## 🧹 코드 스타일 리포트';
+
+            // Checkstyle XML 파싱. 위반이 없으면 <file> 안에 <error>가 없다.
+            const readViolations = (file) => {
+              if (!fs.existsSync(file)) return [];
+              const xml = fs.readFileSync(file, 'utf-8');
+              const out = [];
+              const fileRe = /<file name="([^"]+)">([\s\S]*?)<\/file>/g;
+              let fm;
+              while ((fm = fileRe.exec(xml)) !== null) {
+                const name = fm[1].split('/src/').pop();
+                const errRe = /<error line="(\d+)"[^>]*severity="([^"]*)"[^>]*message="([^"]*)"/g;
+                let em;
+                while ((em = errRe.exec(fm[2])) !== null) {
+                  out.push({
+                    file: name,
+                    line: em[1],
+                    severity: em[2],
+                    message: em[3]
+                      .replace(/&quot;/g, '"')
+                      .replace(/&apos;/g, "'")
+                      .replace(/&lt;/g, '<')
+                      .replace(/&gt;/g, '>')
+                      .replace(/&amp;/g, '&')
+                      .replace(/\|/g, '\\|'),
+                  });
+                }
+              }
+              return out;
+            };
+
+            const violations = [
+              ...readViolations('./back/build/reports/checkstyle/main.xml'),
+              ...readViolations('./back/build/reports/checkstyle/test.xml'),
+            ];
+
+            const formatFailed = process.env.SPOTLESS_OUTCOME === 'failure';
+
+            let body = `${MARKER}\n\n`;
+
+            if (formatFailed) {
+              body += `⚠️ **포맷 위반이 있습니다.** \`./gradlew spotlessApply\` 를 실행한 뒤 커밋해주세요.\n\n`;
+            } else {
+              body += `✅ 포맷 통과\n\n`;
+            }
+
+            if (violations.length === 0) {
+              body += `✅ Checkstyle 통과\n`;
+            } else {
+              const shown = violations.slice(0, 20);
+              body += `### Checkstyle 위반 ${violations.length}건\n`;
+              body += `| 파일 | 라인 | 내용 |\n|------|------|------|\n`;
+              shown.forEach(v => {
+                body += `| \`${v.file}\` | ${v.line} | ${v.message} |\n`;
+              });
+              if (violations.length > shown.length) {
+                body += `\n_외 ${violations.length - shown.length}건_\n`;
+              }
+            }
+
+            body += `\n> 이 리포트는 경고입니다. 머지를 막지 않습니다.`;
+
+            const comments = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const existing = comments.data.find(
+              c => c.user.type === 'Bot' && c.body.includes(MARKER)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                comment_id: existing.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body,
+              });
+            }
+
+      - name: Generate Jacoco Report Summary
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            const htmlFile = './back/build/reports/jacoco/test/html/index.html';
+            if (!fs.existsSync(htmlFile)) {
+              console.log('Jacoco report not found');
+              return;
+            }
+
+            const html = fs.readFileSync(htmlFile, 'utf-8');
+
+            const commitSha = context.payload.pull_request.head.sha.substring(0, 7);
+            const commit = await github.rest.repos.getCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.payload.pull_request.head.sha
+            });
+            const commitMessage = commit.data.commit.message.split('\n')[0];
+
+            // jacoco html의 <td>는 내용이 없으면(예: 분기 0개일 때 Missed Branches 바) self-closing으로 나온다
+            // (<td class="bar" id="d27"/>). </td> 짝만 찾는 정규식은 이 셀을 건너뛰고 다음 셀과 합쳐버려서
+            // 그 뒤 모든 컬럼이 한 칸씩 밀리므로, self-closing 형태도 명시적으로 매치해야 한다.
+            const CELL_RE = /<td\b[^>]*\/>|<td\b[^>]*>(.*?)<\/td>/gs;
+            const cellsOf = row => [...row.matchAll(CELL_RE)].map(m => m[1] ?? '');
+            const num = s => parseInt(String(s).replace(/,/g, ''), 10);
+
+            // Missed Branches 바 셀은 텍스트 없이 <img title="N"> 두 개(빨강=missed, 초록=covered)만 담고 있다.
+            const branchCounts = cell => {
+              if (!cell.trim()) return null;
+              let missed = 0;
+              let covered = 0;
+              for (const m of cell.matchAll(/(red|green)bar\.gif"[^>]*title="(\d+)"/g)) {
+                if (m[1] === 'red') missed = num(m[2]);
+                else covered = num(m[2]);
+              }
+              return { missed, total: missed + covered };
+            };
+
+            // 컬럼 순서(고정): Element, MissedInstr, Instr%, MissedBranch, Branch%|n/a,
+            //                  MissedCxty, Cxty, MissedLines, Lines, MissedMethods, Methods, MissedClasses, Classes
+            // 실제 Line%는 jacoco가 텍스트로 주지 않으므로 MissedLines/Lines로 직접 계산한다.
+            const totalRow = html.match(/<tfoot>.*?<tr>(.*?)<\/tr>.*?<\/tfoot>/s)?.[1];
+            const totalCells = totalRow ? cellsOf(totalRow) : [];
+
+            let overallReport = '';
+            if (totalCells.length >= 9) {
+              const missedLines = num(totalCells[7]);
+              const totalLines = num(totalCells[8]);
+              const linesPercent = Math.round((totalLines - missedLines) / totalLines * 100);
+              const branchesPercent = parseInt(totalCells[4]);
+              const [branchesCovered, branchesTotal] = totalCells[3].split(' of ').map(num);
+
+              const linesStatus = linesPercent >= 80 ? '✅' : '⚠️';
+              const branchesStatus = branchesPercent >= 70 ? '✅' : '⚠️';
+
+              overallReport = `### ✅ 전체 커버리지 현황\n| 메트릭 | 커버리지 | 라인 수 | 상태 | 목표 |\n|--------|---------|--------|------|------|\n| **라인** | ${linesPercent}% | ${totalLines - missedLines}/${totalLines} | ${linesStatus} | 80% |\n| **브랜치** | ${branchesPercent}% | ${branchesCovered}/${branchesTotal} | ${branchesStatus} | 70% |\n`;
+            }
+
+            const rows = html.match(/<tbody>.*?<\/tbody>/s)?.[0].match(/<tr>.*?<\/tr>/g) || [];
+
+            const packages = [];
+            rows.forEach(row => {
+              const cells = cellsOf(row);
+              if (cells.length < 9) return;
+
+              const nameMatch = cells[0].match(/<a[^>]*>([^<]+)<\/a>/);
+              if (!nameMatch) return;
+
+              const missedLines = num(cells[7]);
+              const totalLines = num(cells[8]);
+              const lineCov = totalLines > 0 ? Math.round((totalLines - missedLines) / totalLines * 100) : 100;
+
+              // 분기가 0개인 클래스는 jacoco가 "n/a"를 준다 — 0%가 아니라 "커버할 게 없다"는 뜻이다.
+              const branchCell = cells[4].trim();
+              const branchCov = branchCell === 'n/a' ? null : parseInt(branchCell);
+
+              packages.push({
+                name: nameMatch[1].replace(/com\.gommit\.domain\./, ''),
+                line: lineCov,
+                branch: branchCov,
+                branchCounts: branchCounts(cells[3]),
+              });
+            });
+
+            packages.sort((a, b) => b.line - a.line);
+
+            let packageReport = '';
+            if (packages.length > 0) {
+              packageReport = `### 📦 패키지별 커버리지\n| 패키지 | 라인 | 브랜치 |\n|--------|------|--------|\n`;
+              packages.forEach(pkg => {
+                const lineStatus = pkg.line >= 80 ? '✅' : pkg.line >= 70 ? '⚠️' : '❌';
+                let branchCell = 'n/a';
+                if (pkg.branch !== null) {
+                  const branchStatus = pkg.branch >= 70 ? '✅' : pkg.branch >= 60 ? '⚠️' : '❌';
+                  const counts = pkg.branchCounts ? ` (${pkg.branchCounts.total - pkg.branchCounts.missed}/${pkg.branchCounts.total})` : '';
+                  branchCell = `${pkg.branch}% ${branchStatus}${counts}`;
+                }
+                packageReport += `| ${pkg.name} | ${pkg.line}% ${lineStatus} | ${branchCell} |\n`;
+              });
+            }
+
+            const repoPath = `${context.repo.owner}/${context.repo.repo}`;
+            const comment = `## 📊 Jacoco 커버리지 리포트\n📌 **기준 커밋**: [\`${commitSha}\`](https://github.com/${repoPath}/commit/${context.payload.pull_request.head.sha}) - ${commitMessage}\n\n${overallReport}\n\n${packageReport}\n\n💬 [상세 리포트 보기](https://github.com/${repoPath}/actions/runs/${context.runId})`;
+
+            const comments = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+
+            const existingComment = comments.data.find(
+              c => c.user.type === 'Bot' && c.body.includes('📊 Jacoco 커버리지 리포트')
+            );
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                comment_id: existingComment.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            }
