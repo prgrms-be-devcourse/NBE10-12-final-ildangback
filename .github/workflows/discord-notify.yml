@@ -109,22 +109,17 @@ jobs:
             }
 
             // watchWorkflows 중 아직 목록 API에 안 잡힌 게 있으면 "완료"로 오판 -> 그 워크플로
-            // 결과가 알림에서 누락될 수 있음. 전부 잡힐 때까지 잠깐 대기한다.
+            // 결과가 알림에서 누락될 수 있음. 그래서 한 번 대기 후 재조회한다.
             // 실무상 push 시 워크플로들은 거의 동시에 큐잉되고 가장 빠른 CI도 완료까지 30초+
-            // 걸리므로, 어떤 CI가 완료되는 시점엔 나머지가 이미 목록에 잡혀 있다. 그래서 대기는
-            // 리스트 API 지연을 흡수할 정도(재조회 1회)로만 짧게 잡는다. API 호출도 절약된다.
+            // 걸리므로, 어떤 CI가 완료되는 시점엔 나머지가 이미 목록에 잡혀 있다. 남은 위험은
+            // 리스트 API의 짧은 인덱싱 지연뿐이라 재조회 1회로 충분하다 (API 호출도 절약).
             // 단, 경로 필터로 아예 트리거되지 않는 워크플로는 "아직 큐잉 안 됨"과 구분이 불가능해
-            // (트리거 안 되면 run 자체가 안 생김) maxWaitMs를 다 채우고 넘어간다.
-            const maxWaitMs = 15 * 1000;
-            const intervalMs = 15 * 1000;
-            const waitStartedAt = Date.now();
+            // (트리거 안 되면 run 자체가 안 생김) 이 대기시간만 소모하고 넘어간다.
+            const retryWaitMs = 15 * 1000;
             let latestByName = await fetchLatestRuns();
-            while (
-              Object.keys(latestByName).length < watchWorkflows.length &&
-              Date.now() - waitStartedAt < maxWaitMs
-            ) {
-              core.info(`아직 시작되지 않은 워크플로 대기 중... (${Object.keys(latestByName).length}/${watchWorkflows.length})`);
-              await new Promise(r => setTimeout(r, intervalMs));
+            if (Object.keys(latestByName).length < watchWorkflows.length) {
+              core.info(`아직 목록에 안 잡힌 워크플로 대기 중... (${Object.keys(latestByName).length}/${watchWorkflows.length})`);
+              await new Promise(r => setTimeout(r, retryWaitMs));
               latestByName = await fetchLatestRuns();
             }
 
@@ -192,6 +187,10 @@ jobs:
             core.setOutput("notify_title", notifyTitle);
             core.setOutput("ci_line", ciLine);
             core.setOutput("pr_number", prNumber ? String(prNumber) : "");
+            // workflow_run.display_title은 PR 제목이 아니라 마지막 커밋 메시지로 채워질 때가
+            // 있어, pulls.get으로 이미 확보한 실제 PR 제목을 넘긴다. pr이 없으면(번호 못 얻음)
+            // 빈 값 -> 알림 스텝에서 display_title로 폴백한다.
+            core.setOutput("pr_title", pr ? pr.title : "");
 
       - name: 유저 매핑 파싱
         id: map
@@ -246,7 +245,7 @@ jobs:
         if: steps.check.outputs.ready == 'true' && steps.check.outputs.success == 'true'
         env:
           NOTIFY_TITLE: ${{ steps.check.outputs.notify_title }}
-          PR_TITLE: ${{ github.event.workflow_run.display_title }}
+          PR_TITLE: ${{ steps.check.outputs.pr_title || github.event.workflow_run.display_title }}
           BRANCH: ${{ github.event.workflow_run.head_branch }}
           CI_LINE: ${{ steps.check.outputs.ci_line }}
           CODEREVIEW_LINE: ${{ steps.check.outputs.codereview_line }}
@@ -278,7 +277,7 @@ jobs:
         if: steps.check.outputs.ready == 'true' && steps.check.outputs.success == 'false'
         env:
           MENTION: ${{ steps.map.outputs.mention }}
-          PR_TITLE: ${{ github.event.workflow_run.display_title }}
+          PR_TITLE: ${{ steps.check.outputs.pr_title || github.event.workflow_run.display_title }}
           BRANCH: ${{ github.event.workflow_run.head_branch }}
           FAILED: ${{ steps.check.outputs.failed_workflows }}
           CODEREVIEW_LINE: ${{ steps.check.outputs.codereview_line }}
