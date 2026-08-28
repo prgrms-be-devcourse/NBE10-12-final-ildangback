@@ -211,7 +211,8 @@ jobs:
             -H "Content-Type: application/json" -d @payload.json
 
       - name: 발송 완료 마커 등록
-        # 실제 발송이 끝난 뒤에만. curl 실패 시 이 스텝이 스킵돼 다음 트리거가 재시도한다.
+        # 발송이 실제로 성공했을 때만 마커를 남긴다. notify가 실패(curl 오류)하거나
+        # 스킵(ready=false)이면 마커가 안 남아 다음 트리거가 재시도한다.
         if: steps.notify.outcome == 'success'
         uses: actions/github-script@v7
         env:
