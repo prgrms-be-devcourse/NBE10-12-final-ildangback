@@ -17,7 +17,12 @@ jobs:
     timeout-minutes: 5
     concurrency:
       group: discord-notify-${{ github.event.workflow_run.head_sha }}
-      cancel-in-progress: true
+      # 조율/중복방지가 목적인 워크플로라 취소하지 않고 큐잉해 순차 실행한다.
+      # cancel-in-progress: true면 curl 발송 직후 "발송 완료 마커 등록" 전에 취소될 때
+      # 마커가 안 남아 다음 트리거가 중복 발송할 수 있다. 순차 실행하면 앞 job이
+      # 마커를 남긴 뒤 뒤 job이 그걸 보고 스킵한다. (그룹 키에 head_sha가 있어
+      # 서로 다른 커밋끼리는 어차피 큐잉되지 않는다.)
+      cancel-in-progress: false
     permissions:
       actions: read
       # 리뷰 중간에 추가된 커밋에서는 성공 알림을 건너뛰기 위해 PR에 discord-ci-passed
@@ -66,11 +71,11 @@ jobs:
             }
 
             // 중복 발송 방지: 이 워크플로는 watchWorkflows(Backend/Frontend/AI 코드리뷰) 각각이
-            // 완료될 때마다 별도의 workflow_run 이벤트로 다시 트리거된다. concurrency의
-            // cancel-in-progress는 "동시에 겹쳐서 실행되는" job만 막아주고, 이미 끝난 job이
-            // 알림을 보낸 뒤 나중에 또 다른 workflow_run이 뒤이어 완료돼 새 job이 도는 경우
-            // (예: Backend/Frontend는 빨리 끝나서 먼저 알림을 보냈는데, AI 코드리뷰는 LLM 호출
-            // 때문에 60초 넘게 걸려 뒤늦게 완료되며 다시 트리거되는 경우)까지는 못 막는다.
+            // 완료될 때마다 별도의 workflow_run 이벤트로 다시 트리거된다. concurrency는
+            // 같은 head_sha의 job을 순차 실행시켜줄 뿐, 이미 알림을 보내고 끝난 job 뒤에
+            // 새 workflow_run이 완료돼 새 job이 도는 것(예: Backend/Frontend는 빨리 끝나
+            // 먼저 알림을 보냈는데, AI 코드리뷰는 LLM 호출로 60초 넘게 걸려 뒤늦게 완료되며
+            // 다시 트리거되는 경우)까지는 막지 못한다.
             // 그래서 head_sha에 커밋 상태(commit status)를 "발송 완료" 마커로 남겨 영속적으로
             // 확인한다. 이 마커가 이미 있으면 무조건 건너뛰어 절대 중복 발송하지 않는다.
             const notifyContext = "discord-notify";
@@ -108,7 +113,7 @@ jobs:
             // 완벽히 구분하려면 각 CI의 paths 필터를 여기서도 복제해야 하는데 유지보수 부담이 커서
             // 최대 대기시간을 짧게 잡아 그 경우의 지연을 줄이는 선에서 타협함.
             const maxWaitMs = 60 * 1000;
-            const intervalMs = 10 * 1000;
+            const intervalMs = 15 * 1000;
             const waitStartedAt = Date.now();
             let latestByName = await fetchLatestRuns();
             while (
@@ -173,10 +178,10 @@ jobs:
               .map(r => `❌ ${r.name}: ${r.html_url}`)
               .join("\n");
 
-            // "발송 완료" 마커는 여기서 바로 남기지 않는다. concurrency(cancel-in-progress)로
-            // 이 job이 취소될 경우, 실제 Discord 발송 전에 마커만 찍히면 뒤이은 job이 그 마커만
-            // 보고 스킵해버려 알림이 통째로 유실된다. 그래서 마커는 실제 curl 발송이 끝난 뒤
-            // 마지막 스텝("발송 완료 마커 등록")에서 남긴다.
+            // "발송 완료" 마커는 여기서 바로 남기지 않는다. 이 job이 중간에 실패/타임아웃하거나
+            // curl 발송이 실패했는데 마커만 먼저 찍히면, 뒤이은 job이 그 마커만 보고 스킵해버려
+            // 알림이 통째로 유실된다. 그래서 마커는 실제 curl 발송이 끝난 뒤 마지막
+            // 스텝("발송 완료 마커 등록")에서 남긴다.
             core.setOutput("ready", "true");
             core.setOutput("success", allSuccess ? "true" : "false");
             core.setOutput("codereview_line", codeReviewLine);
