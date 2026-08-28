@@ -159,8 +159,9 @@ jobs:
             // 리뷰 중간에 커밋을 추가해 CI가 다시 통과해도, 이미 한 번 성공 알림을 보낸
             // PR이면 또 보내지 않는다(리뷰어에게 매번 알림이 가는 걸 막기 위함).
             // 실패 알림은 이 라벨과 무관하게 항상 보낸다 — 리뷰 중 CI가 깨진 건 계속 알아야 함.
-            // "보낸 적 있음" 마커는 라벨(discord-ci-passed)로 남기고, 실제로 성공 알림을
-            // 보낸 시점("발송 완료 마커 등록" 스텝)에 붙인다.
+            // "보낸 적 있음" 마커는 라벨(discord-ci-passed)로 남긴다. 성공 알림을 보낸 시점에
+            // 붙이고, CI 실패 알림을 보낸 시점에 뗀다("발송 완료 마커 등록" 스텝). 그래야
+            // 실패 후 재수정으로 다시 통과했을 때 "복구" 성공 알림이 정상적으로 나간다.
             // TODO: 나중에 필요해지면, 이 경우(리뷰 중 커밋 추가로 재통과)에도 다른 제목의
             // 알림을 보내도록 확장한다.
             const CI_PASSED_LABEL = "discord-ci-passed";
@@ -351,38 +352,41 @@ jobs:
                 : "Discord 알림 발송됨 (CI 실패 — 위 CI 체크 확인)",
             });
 
-            // 성공 알림을 실제로 보낸 경우에만 "이 PR엔 성공 알림을 보냈다" 라벨을 남긴다.
-            // 다음에 리뷰 중 커밋이 추가되어 다시 통과해도 위쪽 "check" 스텝이 이 라벨을 보고
-            // 성공 알림을 건너뛴다. 라벨링은 부가 기능이라 실패해도 마커 등록 자체는 막지 않는다.
-            if (allSuccess && prNumber) {
-              const label = "discord-ci-passed";
-              const addLabel = () => github.rest.issues.addLabels({
-                owner,
-                repo,
-                issue_number: Number(prNumber),
-                labels: [label],
+            // discord-ci-passed 라벨 = "이 PR에 성공 알림을 이미 보냈음" 마커.
+            // 위쪽 "check" 스텝이 이 라벨을 보고 리뷰 중 커밋 추가에 따른 성공 재알림을 건너뛴다.
+            // - 성공 알림을 보냈으면 붙이고
+            // - 실패 알림을 보냈으면 뗀다 (재수정 후 다시 통과 시 복구 알림이 나가도록)
+            // 라벨 조작은 부가 기능이라 실패해도 마커 등록 자체는 막지 않는다.
+            const CI_PASSED_LABEL = "discord-ci-passed";
+
+            const addCiPassedLabel = (issueNumber) => {
+              const add = () => github.rest.issues.addLabels({
+                owner, repo, issue_number: issueNumber, labels: [CI_PASSED_LABEL],
               });
+              // 보통 라벨은 이미 존재하므로(최초 1회 이후) 부여만 시도해 호출을 1번으로 끝낸다.
+              // 라벨 자체가 없을 때(404)만 만들고 재시도한다.
+              return add().catch(async (err) => {
+                if (err.status !== 404) throw err;
+                await github.rest.issues.createLabel({
+                  owner, repo, name: CI_PASSED_LABEL, color: "0e8a16",
+                  description: "성공 알림을 이미 보낸 PR (리뷰 중 재알림 방지용)",
+                });
+                await add();
+              });
+            };
+
+            const removeCiPassedLabel = (issueNumber) =>
+              github.rest.issues
+                .removeLabel({ owner, repo, issue_number: issueNumber, name: CI_PASSED_LABEL })
+                // 404 = 원래 안 붙어 있던 라벨. 정상.
+                .catch((err) => { if (err.status !== 404) throw err; });
+
+            if (prNumber) {
+              const issueNumber = Number(prNumber);
               try {
-                // 보통은 라벨이 이미 존재하므로(최초 1회 이후) 바로 부여만 시도해서
-                // API 호출을 1번으로 끝낸다. 라벨 자체가 없을 때(404)만 만들고 재시도한다.
-                await addLabel();
+                await (allSuccess ? addCiPassedLabel(issueNumber) : removeCiPassedLabel(issueNumber));
               } catch (err) {
-                if (err.status !== 404) {
-                  core.warning(`discord-ci-passed 라벨 추가 실패: ${err.message}`);
-                } else {
-                  try {
-                    await github.rest.issues.createLabel({
-                      owner,
-                      repo,
-                      name: label,
-                      color: "0e8a16",
-                      description: "성공 알림을 이미 보낸 PR (리뷰 중 재알림 방지용)",
-                    });
-                    await addLabel();
-                  } catch (err2) {
-                    core.warning(`discord-ci-passed 라벨 추가 실패: ${err2.message}`);
-                  }
-                }
+                core.warning(`discord-ci-passed 라벨 조작 실패: ${err.message}`);
               }
             }
 
