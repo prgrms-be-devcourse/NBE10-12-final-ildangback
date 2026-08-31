@@ -1,12 +1,7 @@
 package com.gommit.domain.user.entity;
 
 import com.gommit.global.base.BaseEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -29,4 +24,18 @@ public class RefreshToken extends BaseEntity {
     private LocalDateTime expiresAt;
 
     private LocalDateTime revokedAt;
+
+    public RefreshToken(User user, String tokenHash, LocalDateTime expiresAt) {
+        this.user = user;
+        this.tokenHash = tokenHash;
+        this.expiresAt = expiresAt;
+    }
+
+    public boolean isExpired() {
+        return expiresAt.isBefore(LocalDateTime.now());
+    }
+
+    public boolean isRevoked() {
+        return revokedAt != null;
+    }
 }
