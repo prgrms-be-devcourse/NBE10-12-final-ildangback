@@ -64,14 +64,14 @@ public class RefreshTokenService {
 
         if (!token.isRevoked()) {
             refreshTokenRepository.revokeIfActive(token.getId(), now);
-            return findNotDeleted(userId);
+            return getActiveUser(userId);
         }
 
-        if (isRecentlyRevoked(token, now)) {
-            return findNotDeleted(userId);
+        if (isRevokedInGracePeriod(token, now)) {
+            return getActiveUser(userId);
         }
 
-        throw rejectAsReuse(userId);
+        throw reuseException(userId);
     }
 
     // RT 1건 폐기
@@ -90,20 +90,20 @@ public class RefreshTokenService {
     }
 
     // 재사용으로 보고 거부
-    private BusinessException rejectAsReuse(Long userId) {
+    private BusinessException reuseException(Long userId) {
         log.warn("RT 재사용 판정: userId={}", userId);
         return new BusinessException(ErrorCode.REFRESH_TOKEN_INVALID);
     }
 
     // 탈퇴하지 않은 사용자 조회
-    private User findNotDeleted(Long userId) {
+    private User getActiveUser(Long userId) {
         return userRepository
                 .findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.REFRESH_TOKEN_INVALID));
     }
 
     // 폐기 후 유예 시간 이내인지
-    private boolean isRecentlyRevoked(RefreshToken token, LocalDateTime now) {
+    private boolean isRevokedInGracePeriod(RefreshToken token, LocalDateTime now) {
         LocalDateTime revokedAt = token.getRevokedAt();
         if (revokedAt == null) {
             return false;
