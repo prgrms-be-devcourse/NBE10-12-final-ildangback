@@ -4,10 +4,13 @@ import com.gommit.domain.challenge.dto.request.InitialChallengeSettingRequest;
 import com.gommit.domain.challenge.dto.response.ChallengeSummaryResponse;
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.ChallengeMember;
+import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.challenge.entity.Weekday;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.checkin.entity.CheckInType;
+import com.gommit.global.exception.BusinessException;
+import com.gommit.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +27,10 @@ public class ChallengeService {
 
     // 그룹 생성 시 첫 챌린지 생성
     public Challenge createInitialChallenge(Long groupId, Long userId,InitialChallengeSettingRequest setting) {
+
+        // 유효성 체크
+        validateInitialChallengeSetting(setting);
+
         // 챌린지 기간 동안 실제 인증해야하는 날짜 수 계산
         int requiredDayCount = calculateRequiredDayCount(setting);
 
@@ -100,4 +107,54 @@ public class ChallengeService {
         };
     }
 
+    private void validateInitialChallengeSetting(
+        InitialChallengeSettingRequest setting
+    ) {
+        // 챌린지 시작일 검증(당일시작은 불가능)
+        validateStartDate(setting.startDate());
+        // 챌린지 기간 검증
+        validatePeriod(setting.startDate(), setting.endDate());
+        // WEEKDAYS 검증
+        validateWeekdays(setting);
+        // N일마다 검증
+        validateFrequencyValue(setting);
+
+        // 인증방식 검증
+        validateAllowTypes(setting.allowedTypes());
+    }
+
+    // 챌린지 시작일 검증
+    private void validateStartDate(LocalDate startDate) {
+        if(!startDate.isAfter(LocalDate.now())) {
+            throw new BusinessException(ErrorCode.INVALID_START_DATE);
+        }
+    }
+
+    // 챌린지 종료일 검증
+    private void validatePeriod(LocalDate startDate, LocalDate endDate) {
+        if(endDate.isBefore(startDate)) {
+            throw new BusinessException(ErrorCode.INVALID_PERIOD);
+        }
+    }
+
+    // WEEKDAYS 필수 검증 체크
+    private void validateWeekdays(InitialChallengeSettingRequest setting) {
+        if (setting.frequencyType() == FrequencyType.WEEKDAYS && (setting.weekdays() == null || setting.weekdays().isEmpty())) {
+            throw new BusinessException(ErrorCode.INVALID_FREQUENCY);
+        }
+    }
+
+    // N일마다 필수 검증 체크
+    private void validateFrequencyValue(InitialChallengeSettingRequest setting) {
+        if (setting.frequencyType() == FrequencyType.EVERY_N_DAYS && (setting.frequencyValue() == null || setting.frequencyValue() <= 0)) {
+            throw new BusinessException(ErrorCode.INVALID_FREQUENCY);
+        }
+    }
+
+    // 인증방식 검증 체크
+    private void validateAllowTypes(List<CheckInType> allowedTypes) {
+        if (allowedTypes == null || allowedTypes.isEmpty()) {
+            throw new BusinessException(ErrorCode.NO_CHECK_IN_METHOD);
+        }
+    }
 }

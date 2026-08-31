@@ -15,8 +15,11 @@ import com.gommit.domain.group.dto.response.GroupMemberResponse;
 import com.gommit.domain.group.dto.response.GroupResponse;
 import com.gommit.domain.group.entity.ChallengeGroup;
 import com.gommit.domain.group.entity.GroupMember;
+import com.gommit.domain.group.entity.MapType;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
 import com.gommit.domain.group.repository.GroupMemberRepository;
+import com.gommit.global.exception.BusinessException;
+import com.gommit.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +33,8 @@ public class GroupService {
 
     @Transactional
     public GroupDetailResponse createGroup(Long userId, GroupCreateRequest request) {
+        validateCategoryMapType(request);
+
         // 챌린지 그룹 초기 저장
         ChallengeGroup group = createGroupEntity(userId, request);
 
@@ -79,6 +84,24 @@ public class GroupService {
             .build();
 
         return groupMemberRepository.save(groupMember);
+    }
+
+    private void validateCategoryMapType(GroupCreateRequest request) {
+        boolean valid = switch (request.category()) {
+            case DEV -> request.mapType() == MapType.STUDY_ROOM;
+            case READING -> request.mapType() == MapType.STUDY_ROOM;
+            case JOB -> request.mapType() == MapType.STUDY_ROOM;
+            case STUDY -> request.mapType() == MapType.STUDY_ROOM;
+            case EXERCISE -> request.mapType() == MapType.GYM;
+            case HEALTH -> request.mapType() == MapType.GYM;
+            case LIFE -> request.mapType() == MapType.STUDY_ROOM;
+            case ETC -> request.mapType() == MapType.STUDY_ROOM;
+        };
+
+        if (!valid) {
+            throw new BusinessException(ErrorCode.INVALID_CATEGORY_MAP_TYPE);
+        }
+
     }
 
 
