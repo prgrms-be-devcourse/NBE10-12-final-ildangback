@@ -354,6 +354,9 @@ jobs:
 
             if (state === "changes_requested") {
               // 변경 요청은 매번 알린다 — 작성자가 블록된 상태라 놓치면 안 된다.
+              // 본문은 미리보기만(280자). 전체는 리뷰 링크로 넘긴다.
+              const raw = (review.body || "").trim().replace(/\n{3,}/g, "\n\n");
+              const preview = raw.length > 280 ? raw.slice(0, 280).trimEnd() + " …" : raw;
               await send({
                 embeds: [{
                   title: "🔴 변경 요청",
@@ -362,9 +365,8 @@ jobs:
                     prField,
                     { name: "👤 리뷰어", value: review.user.login, inline: true },
                     { name: "✍️ 작성자", value: mention(pr.user.login), inline: true },
-                    ...(review.body
-                      ? [{ name: "💬 내용", value: review.body.slice(0, 500), inline: false }]
-                      : []),
+                    ...(preview ? [{ name: "💬 내용", value: preview, inline: false }] : []),
+                    { name: "🔗 리뷰", value: `[GitHub에서 보기](${review.html_url})`, inline: false },
                   ],
                 }],
               });
