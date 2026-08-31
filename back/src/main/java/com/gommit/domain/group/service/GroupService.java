@@ -40,14 +40,16 @@ public class GroupService {
         InitialChallengeSettingRequest setting = request.challenge();
 
         // 첫 챌린지 생성
-        ChallengeSummaryResponse challenge = challengeService.createInitialChallenge(group.getId(), userId, setting);
+        Challenge challenge = challengeService.createInitialChallenge(group.getId(), userId, setting);
+
+        ChallengeSummaryResponse challengeResponse = new ChallengeSummaryResponse(challenge, setting);
 
         // TODO: User 도메인 연동 후 실제 nickname 조회
         String nickname = "임시닉네임";
 
         return new GroupDetailResponse(
             new GroupResponse(group, 1),
-            challenge,
+            challengeResponse,
             new GroupMemberResponse(groupMember, nickname)
         );
 

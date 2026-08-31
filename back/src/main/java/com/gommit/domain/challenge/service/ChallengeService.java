@@ -23,7 +23,7 @@ public class ChallengeService {
     private final ChallengeMemberRepository challengeMemberRepository;
 
     // 그룹 생성 시 첫 챌린지 생성
-    public ChallengeSummaryResponse createInitialChallenge(Long groupId, Long userId,InitialChallengeSettingRequest setting) {
+    public Challenge createInitialChallenge(Long groupId, Long userId,InitialChallengeSettingRequest setting) {
         // 챌린지 기간 동안 실제 인증해야하는 날짜 수 계산
         int requiredDayCount = calculateRequiredDayCount(setting);
 
@@ -49,7 +49,7 @@ public class ChallengeService {
 
         createChallengeOwner(savedChallenge, userId);
 
-        return new ChallengeSummaryResponse(savedChallenge, setting);
+        return savedChallenge;
     }
 
     // 그룹 생성자를 첫 챌린지의 OWNER로 등록
