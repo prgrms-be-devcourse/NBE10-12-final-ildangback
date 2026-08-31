@@ -26,7 +26,8 @@ public enum ErrorCode {
 
     // ===== group =====
     GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "그룹을 찾을 수 없습니다."),
-    NOT_GROUP_MEMVER(HttpStatus.FORBIDDEN, "해당 그룹의 멤버가 아닙니다."),
+    NOT_GROUP_MEMBER(HttpStatus.FORBIDDEN, "해당 그룹의 멤버가 아닙니다."),
+    CHALLENGE_NOT_FOUND(HttpStatus.FORBIDDEN, "챌린지를 찾을 수 없습니다."),
 
     // ===== item =====
 

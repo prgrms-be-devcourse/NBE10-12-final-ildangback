@@ -2,6 +2,9 @@ package com.gommit.domain.group.controller;
 
 import com.gommit.domain.group.dto.request.GroupCreateRequest;
 import com.gommit.domain.group.dto.response.GroupDetailResponse;
+import com.gommit.domain.group.dto.response.GroupSummaryCursorResponse;
+import com.gommit.domain.group.entity.GroupCategory;
+import com.gommit.domain.group.entity.GroupSort;
 import com.gommit.domain.group.service.GroupService;
 import com.gommit.global.security.CurrentUser;
 import com.gommit.global.security.SecurityUser;
@@ -29,6 +32,19 @@ public class GroupController {
         Long userId = actor.getId();
 
         return ResponseEntity.status(HttpStatus.CREATED).body(groupService.createGroup(userId, request));
+    }
+
+    @GetMapping
+    public ResponseEntity<GroupSummaryCursorResponse> getPublicGroups(
+        @RequestParam(required = false) String keyword,
+        @RequestParam(required = false) GroupCategory category,
+        @RequestParam(defaultValue = "LATEST") GroupSort sort,
+        @RequestParam(required = false) Long cursor,
+        @RequestParam(defaultValue = "20") int size
+    ) {
+        GroupSummaryCursorResponse response = groupService.getPublicGroups(keyword, category, sort, cursor, size);
+
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{groupId}")
