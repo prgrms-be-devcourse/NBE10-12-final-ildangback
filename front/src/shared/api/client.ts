@@ -47,6 +47,13 @@ export function setSessionExpiredHandler(handler: () => void): void {
 // ---------------------------------------------------------------------------
 let refreshInFlight: Promise<string> | null = null;
 
+/**
+ * 재발급에만 시한을 건다. single-flight 라 이 호출이 물리면 뒤따르는 요청이 전부
+ * 같은 Promise 에 매달려 함께 멈춘다 — 일반 요청 하나가 늦는 것과 무게가 다르다.
+ * 시한이 지나면 fetch 가 거부되고 아래 일반 네트워크 오류와 같은 길로 간다.
+ */
+const REFRESH_TIMEOUT_MS = 10_000;
+
 async function requestNewTokens(): Promise<string> {
   const refreshToken = tokenStore.getRefreshToken();
   if (!refreshToken) throw new SessionExpiredError();
@@ -55,6 +62,7 @@ async function requestNewTokens(): Promise<string> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ refreshToken }),
+    signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS),
   });
 
   if (!response.ok) {

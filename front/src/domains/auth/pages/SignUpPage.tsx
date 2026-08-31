@@ -64,10 +64,14 @@ export function SignUpPage() {
   const checkDuplicate = async (
     field: "email" | "nickname",
     value: string,
+    format: z.ZodType<string>,
     check: (v: string) => Promise<{ available: boolean }>,
     takenMessage: string,
   ) => {
-    if (!value || errors[field]) return;
+    // errors[field] 만으로는 첫 blur 를 막지 못한다. react-hook-form 이 커스텀 onBlur 를
+    // zod 리졸버보다 먼저 부르기 때문에 이 시점의 errors 는 아직 비어 있다.
+    // 그래서 형식 검사를 여기서 한 번 더 한다 — 규칙은 validation.ts 한 곳에서 가져온다.
+    if (!value || errors[field] || !format.safeParse(value).success) return;
     try {
       const { available } = await check(value);
       if (!available) setError(field, { message: takenMessage });
@@ -144,6 +148,7 @@ export function SignUpPage() {
                   checkDuplicate(
                     "email",
                     e.target.value,
+                    emailField,
                     checkEmail,
                     "이미 사용 중인 이메일입니다.",
                   ),
@@ -181,6 +186,7 @@ export function SignUpPage() {
                   checkDuplicate(
                     "nickname",
                     e.target.value,
+                    nicknameField,
                     checkNickname,
                     "이미 사용 중인 닉네임입니다.",
                   ),
