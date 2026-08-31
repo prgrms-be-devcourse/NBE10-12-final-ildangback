@@ -7,14 +7,10 @@ import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.challenge.service.ChallengeService;
 import com.gommit.domain.group.dto.request.GroupCreateRequest;
 import com.gommit.domain.challenge.dto.request.InitialChallengeSettingRequest;
-import com.gommit.domain.group.dto.response.GroupDetailResponse;
-import com.gommit.domain.group.dto.response.GroupMemberResponse;
-import com.gommit.domain.group.dto.response.GroupResponse;
-import com.gommit.domain.group.entity.ChallengeGroup;
-import com.gommit.domain.group.entity.GroupMember;
-import com.gommit.domain.group.entity.GroupMemberStatus;
-import com.gommit.domain.group.entity.MapType;
+import com.gommit.domain.group.dto.response.*;
+import com.gommit.domain.group.entity.*;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
+import com.gommit.domain.group.repository.GroupMemberCount;
 import com.gommit.domain.group.repository.GroupMemberRepository;
 import com.gommit.domain.user.entity.User;
 import com.gommit.domain.user.repository.UserRepository;
@@ -24,7 +20,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -60,7 +59,6 @@ public class GroupService {
             challengeResponse,
             new GroupMemberResponse(groupMember, user)
         );
-
     }
 
     // 그룹 생성
@@ -107,6 +105,138 @@ public class GroupService {
 
     }
 
+    @Transactional(readOnly = true)
+    public GroupSummaryCursorResponse getPublicGroups(String keyword, GroupCategory category, GroupSort sort, Long cursor, int size) {
+
+        // 공개 + 모집 중인 그룹 조회
+        List<ChallengeGroup> groups = challengeGroupRepository.findAllByVisibilityAndStatus(Visibility.PUBLIC, GroupStatus.READY);
+
+        // 그룹명 검색
+        if (keyword != null && !keyword.isBlank()) {
+            String searchKeyword = keyword.trim().toLowerCase();
+
+            groups = groups.stream().filter(group -> group.getName().toLowerCase().contains(searchKeyword)).toList();
+        }
+
+        // 카테고리 필터
+        if(category != null) {
+            groups = groups.stream().filter(group -> group.getCategory() == category).toList();
+        }
+
+        // 조회 결과가 없을경우 빈 응답
+        if(groups.isEmpty()) {
+            return new GroupSummaryCursorResponse(
+                List.of(),
+                new CursorMetaResponse(null, false, 0)
+            );
+        }
+
+        // 그룹 ID 목록 추출
+        List<Long> groupIds = groups.stream().map(ChallengeGroup::getId).toList();
+
+        // 각 그룹의 READY Challenge 한번에 조회
+        List<Challenge> challenges = challengeRepository.findAllByGroupIdInAndStatus(
+            groupIds,
+            ChallengeStatus.READY
+        );
+
+        // groupId -> Challenges
+        Map<Long, Challenge> challengeMap = challenges.stream().collect(Collectors.toMap(Challenge::getGroupId, challenge -> challenge));
+
+
+        // 각 그룹의 ACTIVE 멤버 수를 한 번에 조회
+        List<GroupMemberCount> memberCounts = groupMemberRepository.countByGroupIdsAndStatus(groupIds, GroupMemberStatus.ACTIVE);
+
+        // groupId -> currentMembers
+        Map<Long, Long> memberCountMap = memberCounts.stream().collect(Collectors.toMap(GroupMemberCount::getGroupId, GroupMemberCount::getCount));
+
+        // GroupSummaryResponse로 변환
+        List<GroupSummaryResponse> summaries = groups.stream().map(group -> {
+            Challenge challenge = challengeMap.get(group.getId());
+
+            if(challenge == null) {
+                throw new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND);
+            }
+
+            int currentMembers = memberCountMap.getOrDefault(group.getId(), 0L).intValue();
+
+            return new GroupSummaryResponse(group, challenge, currentMembers);
+        }).toList();
+
+        // 정렬하기
+        summaries = sortGroupSummaries(summaries, sort);
+
+        // cursor 적용
+        if(cursor != null) {
+            summaries = summaries.stream().filter(summary -> summary.id() < cursor).toList();
+        }
+
+        // size + 1 방식으로 다음 페이지 존재 여부 확인
+        boolean hasNext = summaries.size() > size;
+
+        List<GroupSummaryResponse> content = summaries.stream().limit(size).toList();
+
+        // 다음 cursor 계산
+        Long nextCursor = null;
+
+        if(hasNext && !content.isEmpty()) {
+            nextCursor = content.get(content.size() - 1).id();
+        }
+
+        // cursor meta 생성
+        CursorMetaResponse meta = new CursorMetaResponse(
+            nextCursor,
+            hasNext,
+            content.size()
+        );
+
+        return new GroupSummaryCursorResponse(content, meta);
+    }
+
+    private List<GroupSummaryResponse> sortGroupSummaries(
+        List<GroupSummaryResponse> summaries,
+        GroupSort sort
+    ) {
+
+        return switch (sort) {
+
+            // 최신 생성 그룹
+            case LATEST -> summaries.stream()
+                .sorted(
+                    Comparator.comparing(GroupSummaryResponse::id)
+                        .reversed()
+                )
+                .toList();
+
+            // 현재 참여 인원이 많은 그룹
+            case POPULAR -> summaries.stream()
+                .sorted(
+                    Comparator.comparingInt(
+                            GroupSummaryResponse::currentMembers
+                        )
+                        .reversed()
+                        .thenComparing(
+                            GroupSummaryResponse::id,
+                            Comparator.reverseOrder()
+                        )
+                )
+                .toList();
+
+            // 시작일이 가까운 그룹
+            case START_SOON -> summaries.stream()
+                .sorted(
+                    Comparator.comparing(
+                            GroupSummaryResponse::startDate
+                        )
+                        .thenComparing(
+                            GroupSummaryResponse::id,
+                            Comparator.reverseOrder()
+                        )
+                )
+                .toList();
+        };
+    }
+
 
     @Transactional(readOnly = true)
     public GroupDetailResponse getGroupDetail(Long groupId) {
@@ -119,9 +249,18 @@ public class GroupService {
         // 현재 그룹 멤버 조회
         List<GroupMember> members = groupMemberRepository.findAllByGroupIdAndStatus(groupId, GroupMemberStatus.ACTIVE);
 
+        List<Long> userIds = members.stream().map(GroupMember::getUserId).toList();
+
+        Map<Long, User> userMap = userRepository.findAllById(userIds).stream().collect(Collectors.toMap(User::getId, user -> user));
+
         // 그룹정보랑 유저정보 -> 응답 DTO
         List<GroupMemberResponse> memberResponses = members.stream().map(member -> {
-            User user = userRepository.findById(member.getUserId()).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+            User user = userMap.get(member.getUserId());
+
+            if(user == null) {
+                throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+            }
+
             return new GroupMemberResponse(member, user);
         }).toList();
 
