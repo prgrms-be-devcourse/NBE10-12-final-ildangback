@@ -6,6 +6,10 @@ on:
     types: [completed]
   pull_request:
     types: [closed]
+  # 리뷰 "제출"마다 1회 트리거(인라인 코멘트 개수와 무관). 단순 코멘트 리뷰는
+  # review-notify job의 if에서 걸러 approve / 변경 요청만 알린다.
+  pull_request_review:
+    types: [submitted]
 
 env:
   DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
@@ -264,20 +268,160 @@ jobs:
     permissions: {}
     steps:
       - name: 머지 알림
-        if: env.DISCORD_WEBHOOK != ''
+        uses: actions/github-script@v7
         env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-        run: |
-          jq -n --arg pr "$PR_TITLE" --arg head "$HEAD_REF" --arg base "$BASE_REF" '{
-            embeds: [{
-              title: "🎉 PR 머지됨", color: 5793266,
-              fields: [
-                { name: "🏷️ PR", value: $pr, inline: false },
-                { name: "➡️ 브랜치", value: ($head + " → " + $base), inline: false }
-              ]
-            }]
-          }' > payload.json
-          curl -sS -f --connect-timeout 5 --max-time 15 -X POST "$DISCORD_WEBHOOK" \
-            -H "Content-Type: application/json" -d @payload.json
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        with:
+          script: |
+            if (!process.env.DISCORD_WEBHOOK) {
+              core.warning("DISCORD_WEBHOOK 시크릿이 없어 Discord 알림을 건너뜁니다.");
+              return;
+            }
+            const pr = context.payload.pull_request;
+            const res = await fetch(process.env.DISCORD_WEBHOOK, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                embeds: [{
+                  title: "🎉 PR 머지됨",
+                  color: 5793266,
+                  fields: [
+                    { name: "🏷️ PR", value: pr.title, inline: false },
+                    { name: "➡️ 브랜치", value: `${pr.head.ref} → ${pr.base.ref}`, inline: false },
+                  ],
+                }],
+              }),
+            });
+            if (!res.ok) throw new Error(`Discord 응답 ${res.status}`);
+
+  review-notify:
+    # Approve / 변경 요청 리뷰가 제출됐을 때 알림. 단순 코멘트 리뷰와 draft PR은 제외.
+    if: >
+      github.event_name == 'pull_request_review' &&
+      github.event.review.state != 'commented' &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      # 같은 PR에 리뷰가 몰릴 때 approve 카운트와 마커 등록이 경쟁하지 않도록 직렬화.
+      group: discord-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: read  # pulls.listReviews
+      statuses: write       # "머지 가능" 알림 1회 발송 마커
+    steps:
+      - name: 리뷰 알림 판정 및 발송
+        uses: actions/github-script@v7
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          DISCORD_USER_MAP: ${{ secrets.DISCORD_USER_MAP }}
+        with:
+          script: |
+            if (!process.env.DISCORD_WEBHOOK) {
+              core.warning("DISCORD_WEBHOOK 시크릿이 없어 Discord 알림을 건너뜁니다.");
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+            const review = context.payload.review;
+            const pr = context.payload.pull_request;
+            const state = review.state; // 웹훅 페이로드는 소문자: "approved" | "changes_requested"
+            const headSha = pr.head.sha;
+
+            // login -> DISCORD_USER_MAP[login] -> <@id>. 맵이 없거나 깨졌으면 @login으로 폴백.
+            let userMap = {};
+            if (process.env.DISCORD_USER_MAP) {
+              try {
+                userMap = JSON.parse(process.env.DISCORD_USER_MAP);
+              } catch {
+                core.warning("DISCORD_USER_MAP JSON 파싱 실패 — @login으로 폴백합니다.");
+              }
+            }
+            const mention = (login) => (userMap[login] ? `<@${userMap[login]}>` : `@${login}`);
+
+            const send = async (payload) => {
+              const res = await fetch(process.env.DISCORD_WEBHOOK, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                // 리뷰 본문을 그대로 싣기 때문에 @everyone/@here·역할 멘션은 막고 유저 멘션만 허용.
+                body: JSON.stringify({ allowed_mentions: { parse: ["users"] }, ...payload }),
+              });
+              if (!res.ok) throw new Error(`Discord 응답 ${res.status}`);
+            };
+
+            const prField = { name: "🔖 PR", value: `[${pr.title}](${pr.html_url})`, inline: false };
+
+            if (state === "changes_requested") {
+              // 변경 요청은 매번 알린다 — 작성자가 블록된 상태라 놓치면 안 된다.
+              await send({
+                embeds: [{
+                  title: "🔴 변경 요청",
+                  color: 15548997,
+                  fields: [
+                    prField,
+                    { name: "👤 리뷰어", value: review.user.login, inline: true },
+                    { name: "✍️ 작성자", value: mention(pr.user.login), inline: true },
+                    ...(review.body
+                      ? [{ name: "💬 내용", value: review.body.slice(0, 500), inline: false }]
+                      : []),
+                  ],
+                }],
+              });
+              core.info("변경 요청 알림 발송 완료.");
+              return;
+            }
+
+            // state === "approved": 유저별 최신 리뷰 기준 approve가 2명 이상이면 "머지 가능" 알림.
+            const { data: reviews } = await github.rest.pulls.listReviews({
+              owner, repo, pull_number: pr.number, per_page: 100,
+            });
+            // listReviews는 시간순. 유저별 마지막 상태만 남긴다(REST는 대문자 상태값).
+            const latestByUser = new Map();
+            for (const r of reviews) {
+              if (!["APPROVED", "CHANGES_REQUESTED", "DISMISSED"].includes(r.state)) continue;
+              if (r.user.login === pr.user.login) continue; // 셀프 리뷰 제외
+              latestByUser.set(r.user.login, r.state);
+            }
+            // 방금 트리거된 승인이 API 목록에 아직 안 잡혔을 수 있어 직접 반영.
+            if (review.user.login !== pr.user.login) latestByUser.set(review.user.login, "APPROVED");
+            const approvers = [...latestByUser].filter(([, s]) => s === "APPROVED").map(([u]) => u);
+            if (approvers.length < 2) {
+              core.info(`approve ${approvers.length}명 — 2명 미만이라 건너뜁니다.`);
+              return;
+            }
+
+            // 중복 방지: head_sha에 커밋 상태 "discord-review-approved"가 있으면 이미 보낸 것.
+            // 새 커밋 후 다시 2명이 승인하면 마커가 없어 재알림된다(변경분 재확인 의미라 의도된 동작).
+            const { data: combined } = await github.rest.repos.getCombinedStatusForRef({
+              owner, repo, ref: headSha,
+            });
+            if (combined.statuses.some((s) => s.context === "discord-review-approved")) {
+              core.info("이 커밋에 이미 머지 가능 알림을 보냈습니다. 건너뜁니다.");
+              return;
+            }
+
+            await send({
+              embeds: [{
+                title: "🟢 리뷰 통과 — 머지 가능",
+                color: 5763719,
+                fields: [
+                  prField,
+                  { name: "✅ 승인", value: `${approvers.length}명 (${approvers.join(", ")})`, inline: false },
+                  { name: "✍️ 작성자", value: mention(pr.user.login), inline: true },
+                ],
+              }],
+            });
+
+            // 마커는 발송 성공 후에만. 실패해도 부가 기능이라 job은 통과시킨다(다음 승인 때 재시도).
+            try {
+              await github.rest.repos.createCommitStatus({
+                owner, repo, sha: headSha,
+                state: "success",
+                context: "discord-review-approved",
+                description: "Discord 머지 가능 알림 발송됨",
+              });
+            } catch (err) {
+              core.warning(`머지 가능 알림 마커 등록 실패: ${err.message}`);
+            }
+            core.info(`머지 가능 알림 발송 완료 (approve ${approvers.length}명).`);
