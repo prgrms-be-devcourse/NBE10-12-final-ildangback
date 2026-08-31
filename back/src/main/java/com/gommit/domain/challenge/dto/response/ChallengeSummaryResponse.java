@@ -39,4 +39,27 @@ public record ChallengeSummaryResponse(
             setting.allowedTypes()
         );
     }
+
+    public ChallengeSummaryResponse(Challenge challenge) {
+        this(
+            challenge.getId(),
+            challenge.getSeqNo(),
+            challenge.getStatus(),
+            challenge.getStartDate(),
+            challenge.getEndDate(),
+            challenge.getFrequencyType(),
+            challenge.getFrequencyValue(),
+            parseWeekdays(challenge.getWeekdays()),
+            challenge.getDailyCheckInCount(),
+            challenge.isAllowPhoto() ? List.of(CheckInType.PHOTO) : List.of()
+        );
+    }
+
+    private static List<Weekday> parseWeekdays(String weekdays) {
+        if(weekdays == null || weekdays.isEmpty()) {
+            return null;
+        }
+
+        return List.of(weekdays.split(",")).stream().map(String::trim).map(Weekday::valueOf).toList();
+    }
 }

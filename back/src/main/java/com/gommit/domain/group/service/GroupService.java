@@ -2,12 +2,9 @@ package com.gommit.domain.group.service;
 
 import com.gommit.domain.challenge.dto.response.ChallengeSummaryResponse;
 import com.gommit.domain.challenge.entity.Challenge;
-import com.gommit.domain.challenge.entity.ChallengeMember;
-import com.gommit.domain.challenge.entity.Weekday;
-import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
+import com.gommit.domain.challenge.entity.ChallengeStatus;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.challenge.service.ChallengeService;
-import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.domain.group.dto.request.GroupCreateRequest;
 import com.gommit.domain.challenge.dto.request.InitialChallengeSettingRequest;
 import com.gommit.domain.group.dto.response.GroupDetailResponse;
@@ -15,14 +12,19 @@ import com.gommit.domain.group.dto.response.GroupMemberResponse;
 import com.gommit.domain.group.dto.response.GroupResponse;
 import com.gommit.domain.group.entity.ChallengeGroup;
 import com.gommit.domain.group.entity.GroupMember;
+import com.gommit.domain.group.entity.GroupMemberStatus;
 import com.gommit.domain.group.entity.MapType;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
 import com.gommit.domain.group.repository.GroupMemberRepository;
+import com.gommit.domain.user.entity.User;
+import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +32,8 @@ public class GroupService {
     private final ChallengeGroupRepository challengeGroupRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final ChallengeService challengeService;
+    private final ChallengeRepository challengeRepository;
+    private final UserRepository userRepository;
 
     @Transactional
     public GroupDetailResponse createGroup(Long userId, GroupCreateRequest request) {
@@ -49,13 +53,12 @@ public class GroupService {
 
         ChallengeSummaryResponse challengeResponse = new ChallengeSummaryResponse(challenge, setting);
 
-        // TODO: User 도메인 연동 후 실제 nickname 조회
-        String nickname = "임시닉네임";
+        User user = userRepository.findById(userId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         return new GroupDetailResponse(
             new GroupResponse(group, 1),
             challengeResponse,
-            new GroupMemberResponse(groupMember, nickname)
+            new GroupMemberResponse(groupMember, user)
         );
 
     }
@@ -105,4 +108,27 @@ public class GroupService {
     }
 
 
+    @Transactional(readOnly = true)
+    public GroupDetailResponse getGroupDetail(Long groupId) {
+
+        // 그룹 조회
+        ChallengeGroup group = challengeGroupRepository.findById(groupId).orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+        // 현재 챌린지 조회
+        Challenge currentChallenge = challengeRepository.findFirstByGroupIdAndStatus(groupId, ChallengeStatus.ACTIVE).orElseGet(() -> challengeRepository.findFirstByGroupIdAndStatus(groupId, ChallengeStatus.READY).orElse(null));
+
+        // 현재 그룹 멤버 조회
+        List<GroupMember> members = groupMemberRepository.findAllByGroupIdAndStatus(groupId, GroupMemberStatus.ACTIVE);
+
+        // 그룹정보랑 유저정보 -> 응답 DTO
+        List<GroupMemberResponse> memberResponses = members.stream().map(member -> {
+            User user = userRepository.findById(member.getUserId()).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+            return new GroupMemberResponse(member, user);
+        }).toList();
+
+        return new GroupDetailResponse(
+            new GroupResponse(group, members.size()),
+            currentChallenge == null ? null : new ChallengeSummaryResponse(currentChallenge),
+            memberResponses
+        );
+    }
 }
