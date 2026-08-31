@@ -59,7 +59,7 @@ dependencies {
 spotless {
     java {
         target 'src/**/*.java'
-        googleJavaFormat().aosp()
+        palantirJavaFormat()
         removeUnusedImports()
         trimTrailingWhitespace()
         endWithNewline()

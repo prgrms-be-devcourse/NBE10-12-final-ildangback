@@ -25,30 +25,27 @@ public class SwaggerConfig {
 
     @Bean
     public OpenAPI openAPI() {
-        SecurityScheme bearerAuth =
-                new SecurityScheme()
-                        .type(SecurityScheme.Type.HTTP)
-                        .scheme("bearer")
-                        .bearerFormat("JWT")
-                        .in(SecurityScheme.In.HEADER)
-                        .name("Authorization");
+        SecurityScheme bearerAuth = new SecurityScheme()
+                .type(SecurityScheme.Type.HTTP)
+                .scheme("bearer")
+                .bearerFormat("JWT")
+                .in(SecurityScheme.In.HEADER)
+                .name("Authorization");
 
         return new OpenAPI()
-                .info(
-                        new Info()
-                                .title("꼬밋 API")
-                                .description("소그룹(1~6인) 목표 챌린지 서비스 '꼬밋(Go!mmit)' REST API")
-                                .version("v1.0.0"))
+                .info(new Info()
+                        .title("꼬밋 API")
+                        .description("소그룹(1~6인) 목표 챌린지 서비스 '꼬밋(Go!mmit)' REST API")
+                        .version("v1.0.0"))
                 .components(new Components().addSecuritySchemes(BEARER_SCHEME_NAME, bearerAuth))
                 .addSecurityItem(new SecurityRequirement().addList(BEARER_SCHEME_NAME));
     }
 
     @Bean
     public OpenApiCustomizer swaggerPageableCustomizer() {
-        return openApi ->
-                openApi.getPaths().values().stream()
-                        .flatMap(pathItem -> pathItem.readOperations().stream())
-                        .forEach(this::replacePageableParameters);
+        return openApi -> openApi.getPaths().values().stream()
+                .flatMap(pathItem -> pathItem.readOperations().stream())
+                .forEach(this::replacePageableParameters);
     }
 
     private void replacePageableParameters(Operation operation) {
@@ -66,10 +63,8 @@ public class SwaggerConfig {
 
     private List<Parameter> pageableParameters() {
         return List.of(
-                queryParameter("page", "페이지 번호 (0부터 시작)")
-                        .schema(new IntegerSchema().example(EXAMPLE_PAGE_NUMBER)),
-                queryParameter("size", "한 번에 가져올 개수")
-                        .schema(new IntegerSchema().example(EXAMPLE_PAGE_SIZE)));
+                queryParameter("page", "페이지 번호 (0부터 시작)").schema(new IntegerSchema().example(EXAMPLE_PAGE_NUMBER)),
+                queryParameter("size", "한 번에 가져올 개수").schema(new IntegerSchema().example(EXAMPLE_PAGE_SIZE)));
     }
 
     private Parameter queryParameter(String name, String description) {
