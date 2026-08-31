@@ -22,10 +22,9 @@ jobs:
       cancel-in-progress: false
     permissions:
       actions: read
-      contents: read        # 일부 읽기 API가 저장소 접근 권한을 요구
-      pull-requests: write  # discord-ci-passed 라벨 부여/제거
-      issues: write         # 라벨 최초 생성
-      statuses: write       # 발송 완료 커밋 상태(마커)
+      contents: read       # 커밋/상태 조회
+      pull-requests: read  # PR 조회 (draft 여부, 제목)
+      statuses: write      # 발송 완료 커밋 상태(마커 겸 재알림 판정 기준)
     steps:
       # watchWorkflows/judgeWorkflows는 각 CI yml의 `name:` 문자열과 일치해야 한다.
       - name: 관련 CI 전체 완료 여부 확인
@@ -47,7 +46,7 @@ jobs:
             }
 
             // workflow_run.pull_requests[]는 비어 올 수 있다(fork/타이밍). 비면 커밋으로 PR 조회.
-            // PR 번호가 없으면 draft 스킵과 discord-ci-passed 라벨 dedup이 동작하지 않는다.
+            // PR을 못 얻으면 draft 스킵과 성공 알림 재알림 방지 판정이 동작하지 않는다.
             let prNumber = context.payload.workflow_run.pull_requests?.[0]?.number;
             if (!prNumber) {
               const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
@@ -67,7 +66,7 @@ jobs:
             }
 
             // Draft PR은 알림하지 않는다(페이로드에 draft 필드가 없어 API로 조회). pr 객체는
-            // 아래 라벨 판정에도 재사용한다. 번호를 못 얻으면 draft 판단 불가 -> 그냥 진행.
+            // 아래 재알림 판정/제목에도 재사용한다. 번호를 못 얻으면 draft 판단 불가 -> 그냥 진행.
             let pr = null;
             if (prNumber) {
               ({ data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber }));
@@ -119,13 +118,22 @@ jobs:
             const failedRuns = judgeRuns.filter(r => !isPass(r.conclusion));
             const allSuccess = failedRuns.length === 0;
 
-            // discord-ci-passed 라벨 = "성공 알림을 이미 보냄". 리뷰 중 커밋 추가로 CI가 다시
-            // 통과해도 재알림하지 않기 위한 마커. 실패 알림은 라벨과 무관하게 항상 보낸다.
-            const alreadyPassed = !!pr && pr.labels.some(l => l.name === "discord-ci-passed");
-            if (allSuccess && alreadyPassed) {
-              core.info("이미 성공 알림을 보낸 PR이라 건너뜁니다.");
-              core.setOutput("ready", "false");
-              return;
+            // 리뷰 중 커밋을 추가해 CI가 계속 통과해도 성공 알림(리뷰어 핑)은 PR당 한 번만.
+            // 판정 기준은 부모 커밋의 discord-notify 상태 — success면 이미 보낸 것이므로 건너뛴다.
+            // (라벨 대신 커밋 상태를 재사용 → PR엔 아무것도 안 붙는다. 실패 알림은 항상 보낸다.)
+            // 부모가 failure면 직전 커밋에서 CI가 깨졌다 복구된 것이므로 그대로 성공 알림을 보낸다.
+            if (allSuccess && pr) {
+              const { data: headCommit } = await github.rest.repos.getCommit({ owner, repo, ref: headSha });
+              const parentSha = headCommit.parents[0]?.sha;
+              if (parentSha) {
+                const { data: parentStatus } = await github.rest.repos.getCombinedStatusForRef({ owner, repo, ref: parentSha });
+                const marker = parentStatus.statuses.find(s => s.context === "discord-notify");
+                if (marker?.state === "success") {
+                  core.info("직전 커밋에서 이미 성공 알림을 보낸 PR이라 건너뜁니다.");
+                  core.setOutput("ready", "false");
+                  return;
+                }
+              }
             }
 
             const notifyTitle = judgeRan ? "✅ PR 오픈 (CI 통과)" : "📝 PR 오픈 (CI 해당X)";
@@ -159,7 +167,6 @@ jobs:
             core.setOutput("ci_line", ciLine);
             core.setOutput("codereview_line", codeReviewLine);
             core.setOutput("failed_workflows", failedRuns.map(r => `❌ ${r.name}: ${r.html_url}`).join("\n"));
-            core.setOutput("pr_number", prNumber ? String(prNumber) : "");
             core.setOutput("mention", mention);
             // display_title은 PR 제목이 아닐 수 있어 pulls.get의 pr.title을 쓴다(없으면 폴백).
             core.setOutput("pr_title", pr ? pr.title : "");
@@ -217,45 +224,19 @@ jobs:
         uses: actions/github-script@v7
         env:
           ALL_SUCCESS: ${{ steps.check.outputs.success }}
-          PR_NUMBER: ${{ steps.check.outputs.pr_number }}
         with:
           script: |
             const { owner, repo } = context.repo;
             const allSuccess = process.env.ALL_SUCCESS === "true";
-            const prNumber = process.env.PR_NUMBER;
-            const LABEL = "discord-ci-passed";
 
-            // 마커는 PR 체크 목록에 노출되므로 실제 CI 결과를 state에 반영한다
-            // (중복 판정은 context 존재 여부만 봄).
+            // 이 커밋 상태가 발송 마커 겸 "직전 성공 알림 여부" 판정 기준이다(위 check 스텝).
+            // PR 체크 목록에 노출되므로 실제 CI 결과를 state에 반영한다.
             await github.rest.repos.createCommitStatus({
               owner, repo, sha: context.payload.workflow_run.head_sha,
               state: allSuccess ? "success" : "failure",
               context: "discord-notify",
               description: allSuccess ? "Discord 알림 발송됨 (CI 통과)" : "Discord 알림 발송됨 (CI 실패)",
             });
-
-            // 성공 알림 -> 라벨 부여 / 실패 알림 -> 라벨 제거(재통과 시 복구 알림이 나가도록).
-            // 부가 기능이라 실패해도 무시한다.
-            if (!prNumber) return;
-            const issue_number = Number(prNumber);
-            try {
-              if (allSuccess) {
-                await github.rest.issues.addLabels({ owner, repo, issue_number, labels: [LABEL] })
-                  .catch(async (err) => {
-                    if (err.status !== 404) throw err; // 라벨 미존재 시 1회 생성 후 재시도
-                    await github.rest.issues.createLabel({
-                      owner, repo, name: LABEL, color: "0e8a16",
-                      description: "성공 알림을 이미 보낸 PR (재알림 방지용)",
-                    });
-                    await github.rest.issues.addLabels({ owner, repo, issue_number, labels: [LABEL] });
-                  });
-              } else {
-                await github.rest.issues.removeLabel({ owner, repo, issue_number, name: LABEL })
-                  .catch((err) => { if (err.status !== 404) throw err; });
-              }
-            } catch (err) {
-              core.warning(`${LABEL} 라벨 조작 실패: ${err.message}`);
-            }
 
   merge-notify:
     if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
