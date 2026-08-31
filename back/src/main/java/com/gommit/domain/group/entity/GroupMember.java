@@ -11,6 +11,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -32,4 +33,12 @@ public class GroupMember extends BaseEntity {
     private GroupMemberStatus status;
 
     private LocalDateTime leftAt;
+
+    @Builder
+    public GroupMember(ChallengeGroup group, Long userId, LocalDateTime leftAt) {
+        this.group = group;
+        this.userId = userId;
+        this.leftAt = null;
+        this.status = GroupMemberStatus.ACTIVE; // 첫 생성 ACTIVE
+    }
 }
