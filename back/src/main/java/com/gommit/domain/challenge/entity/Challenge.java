@@ -4,6 +4,7 @@ import com.gommit.global.base.BaseEntity;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -52,4 +53,22 @@ public class Challenge extends BaseEntity {
 
     @Column(nullable = false)
     private boolean allowPhoto;
+
+
+    @Builder
+    public Challenge(Long groupId, int seqNo, LocalDate startDate, LocalDate endDate, FrequencyType frequencyType, Integer frequencyValue, String weekdays, int dailyCheckInCount, int requiredDayCount, int groupCurrentStreak, int groupBestStreak, boolean allowPhoto) {
+        this.groupId = groupId;
+        this.seqNo = 1;
+        this.startDate = startDate;
+        this.endDate = endDate;
+        this.status = ChallengeStatus.READY;
+        this.frequencyType = frequencyType;
+        this.frequencyValue = frequencyValue;
+        this.weekdays = weekdays;
+        this.dailyCheckInCount = dailyCheckInCount;
+        this.requiredDayCount = requiredDayCount;
+        this.groupCurrentStreak = 0;
+        this.groupBestStreak = 0;
+        this.allowPhoto = allowPhoto;
+    }
 }
