@@ -290,6 +290,21 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
         }
 
         @Test
+        @DisplayName("그룹의 이력이면 상세를 반환한다")
+        void returnsHistory() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+            Long groupId = insertTestGroup(userIdOf(EMAIL));
+
+            pointService.rewardGroup(groupId, 100, GroupPointReason.DAILY_ALL_COMPLETE, "오운완");
+            Long historyId = jdbcTemplate.queryForObject("select max(id) from group_point_histories", Long.class);
+
+            getGroupHistoryDetail(tokens.accessToken(), groupId, historyId)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.sourceName").value("오운완"))
+                    .andExpect(jsonPath("$.balanceAfter").value(100));
+        }
+
+        @Test
         @DisplayName("다른 그룹의 이력이면 존재해도 404다")
         void returns404ForOtherGroupsHistory() throws Exception {
             var tokens = loginAs(EMAIL, NICKNAME);

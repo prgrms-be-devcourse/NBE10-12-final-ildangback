@@ -78,6 +78,13 @@ class PointServiceTest {
         return history;
     }
 
+    private GroupPointHistory groupHistory(Long id, Long groupId, int amount, int balanceAfter) {
+        GroupPointHistory history = GroupPointHistory.of(
+                groupId, "오운완", amount, GroupPointReason.DAILY_ALL_COMPLETE, balanceAfter);
+        ReflectionTestUtils.setField(history, "id", id);
+        return history;
+    }
+
     @Nested
     @DisplayName("reward - 개인 포인트 지급")
     class Reward {
@@ -270,6 +277,46 @@ class PointServiceTest {
             assertThat(result.hasNext()).isFalse();
             assertThat(result.nextCursor()).isNull();
         }
+
+        @Test
+        @DisplayName("THIS_MONTH면 이번 달 시작(영업일 04:00 기준) 이후만 조회하고 종료는 제한하지 않는다")
+        void filtersFromStartOfThisBusinessMonth() {
+            // given
+            when(userPointHistoryRepository.findHistories(any(), any(), any(), any(), any(), any(), any()))
+                    .thenReturn(List.of());
+
+            // when
+            pointService.getMyHistories(1L, PeriodFilter.THIS_MONTH, PointChangeType.ALL, null, null, 20);
+
+            // then
+            ArgumentCaptor<LocalDateTime> from = ArgumentCaptor.forClass(LocalDateTime.class);
+            ArgumentCaptor<LocalDateTime> to = ArgumentCaptor.forClass(LocalDateTime.class);
+            verify(userPointHistoryRepository)
+                    .findHistories(any(), any(), from.capture(), to.capture(), any(), any(), any());
+            LocalDate expectedFirstDay = PointService.businessMonthFirstDay(LocalDateTime.now());
+            assertThat(from.getValue()).isEqualTo(expectedFirstDay.atTime(4, 0));
+            assertThat(to.getValue()).isNull();
+        }
+
+        @Test
+        @DisplayName("LAST_MONTH면 지난 달 영업일 04:00부터 이번 달 영업일 04:00 전까지만 조회한다")
+        void filtersLastBusinessMonthRange() {
+            // given
+            when(userPointHistoryRepository.findHistories(any(), any(), any(), any(), any(), any(), any()))
+                    .thenReturn(List.of());
+
+            // when
+            pointService.getMyHistories(1L, PeriodFilter.LAST_MONTH, PointChangeType.ALL, null, null, 20);
+
+            // then
+            ArgumentCaptor<LocalDateTime> from = ArgumentCaptor.forClass(LocalDateTime.class);
+            ArgumentCaptor<LocalDateTime> to = ArgumentCaptor.forClass(LocalDateTime.class);
+            verify(userPointHistoryRepository)
+                    .findHistories(any(), any(), from.capture(), to.capture(), any(), any(), any());
+            LocalDate thisMonthFirstDay = PointService.businessMonthFirstDay(LocalDateTime.now());
+            assertThat(from.getValue()).isEqualTo(thisMonthFirstDay.minusMonths(1).atTime(4, 0));
+            assertThat(to.getValue()).isEqualTo(thisMonthFirstDay.atTime(4, 0));
+        }
     }
 
     @Nested
@@ -297,6 +344,51 @@ class PointServiceTest {
 
             // when & then
             assertThatThrownBy(() -> pointService.getMyHistoryDetail(1L, 105L))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.POINT_HISTORY_NOT_FOUND);
+        }
+    }
+
+    @Nested
+    @DisplayName("getGroupHistoryDetail - 그룹 포인트 이력 상세")
+    class GetGroupHistoryDetail {
+
+        @Test
+        @DisplayName("정상 조회하면 이력을 반환한다")
+        void returnsHistory() {
+            // given
+            when(groupPointHistoryRepository.findById(50L)).thenReturn(Optional.of(groupHistory(50L, 12L, 100, 500)));
+
+            // when
+            var response = pointService.getGroupHistoryDetail(12L, 50L);
+
+            // then
+            assertThat(response.amount()).isEqualTo(100);
+            assertThat(response.balanceAfter()).isEqualTo(500);
+        }
+
+        @Test
+        @DisplayName("존재하지 않으면 POINT_HISTORY_NOT_FOUND")
+        void throwsWhenNotFound() {
+            // given
+            when(groupPointHistoryRepository.findById(999L)).thenReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> pointService.getGroupHistoryDetail(12L, 999L))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.POINT_HISTORY_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("다른 그룹의 이력이면 존재해도 POINT_HISTORY_NOT_FOUND")
+        void throwsWhenOwnedByAnotherGroup() {
+            // given
+            when(groupPointHistoryRepository.findById(50L)).thenReturn(Optional.of(groupHistory(50L, 99L, 100, 500)));
+
+            // when & then
+            assertThatThrownBy(() -> pointService.getGroupHistoryDetail(12L, 50L))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.POINT_HISTORY_NOT_FOUND);
