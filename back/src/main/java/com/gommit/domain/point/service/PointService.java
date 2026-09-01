@@ -55,7 +55,7 @@ public class PointService {
     public void deduct(Long userId, int amount, UserPointReason reason, String sourceName) {
         UserPoint point = lockOrCreateUserPoint(userId);
         if (point.getBalance() < amount) {
-            throw new BusinessException(ErrorCode.INSUFFICIENT_POINTS);
+            throw new BusinessException(ErrorCode.POINT_INSUFFICIENT);
         }
         point.add(-amount);
         userPointHistoryRepository.save(
@@ -73,7 +73,7 @@ public class PointService {
     public void deductGroup(Long groupId, int amount, GroupPointReason reason, String sourceName) {
         GroupPoint point = lockOrCreateGroupPoint(groupId);
         if (point.getBalance() < amount) {
-            throw new BusinessException(ErrorCode.INSUFFICIENT_POINTS);
+            throw new BusinessException(ErrorCode.POINT_INSUFFICIENT);
         }
         point.add(-amount);
         groupPointHistoryRepository.save(
@@ -83,7 +83,7 @@ public class PointService {
     // ===== 조회: 개인 포인트 =====
 
     public PointBalanceResponse getMyBalance(Long userId) {
-        LocalDateTime startOfThisMonth = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        LocalDateTime startOfThisMonth = startOfBusinessMonth(currentBusinessMonthFirstDay());
         int balance = userPointRepository
                 .findByUserId(userId)
                 .map(UserPoint::getBalance)
@@ -174,12 +174,28 @@ public class PointService {
         if (period == null || period == PeriodFilter.ALL) {
             return new LocalDateTime[] {null, null};
         }
-        LocalDate startOfThisMonth = LocalDate.now().withDayOfMonth(1);
+        LocalDate thisMonthFirstDay = currentBusinessMonthFirstDay();
+        LocalDateTime startOfThisMonth = startOfBusinessMonth(thisMonthFirstDay);
         if (period == PeriodFilter.THIS_MONTH) {
-            return new LocalDateTime[] {startOfThisMonth.atStartOfDay(), null};
+            return new LocalDateTime[] {startOfThisMonth, null};
         }
         // LAST_MONTH
-        LocalDate startOfLastMonth = startOfThisMonth.minusMonths(1);
-        return new LocalDateTime[] {startOfLastMonth.atStartOfDay(), startOfThisMonth.atStartOfDay()};
+        LocalDateTime startOfLastMonth = startOfBusinessMonth(thisMonthFirstDay.minusMonths(1));
+        return new LocalDateTime[] {startOfLastMonth, startOfThisMonth};
+    }
+
+    // 하루 경계 04:00 기준. 매달 1일 00:00~03:59는 지난달로 집계한다.
+    private static final int BUSINESS_DAY_CUTOFF_HOUR = 4;
+
+    private static LocalDate currentBusinessMonthFirstDay() {
+        return businessMonthFirstDay(LocalDateTime.now());
+    }
+
+    static LocalDate businessMonthFirstDay(LocalDateTime now) {
+        return now.minusHours(BUSINESS_DAY_CUTOFF_HOUR).toLocalDate().withDayOfMonth(1);
+    }
+
+    private static LocalDateTime startOfBusinessMonth(LocalDate monthFirstDay) {
+        return monthFirstDay.atTime(BUSINESS_DAY_CUTOFF_HOUR, 0);
     }
 }

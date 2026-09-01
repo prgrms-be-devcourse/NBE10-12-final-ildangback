@@ -24,6 +24,7 @@ import com.gommit.domain.point.repository.UserPointRepository;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -136,7 +137,7 @@ class PointServiceTest {
         }
 
         @Test
-        @DisplayName("잔액이 부족하면 INSUFFICIENT_POINTS 예외가 발생하고 저장하지 않는다")
+        @DisplayName("잔액이 부족하면 POINT_INSUFFICIENT 예외가 발생하고 저장하지 않는다")
         void throwsWhenBalanceIsInsufficient() {
             // given
             when(userPointRepository.findWithLockByUserId(1L)).thenReturn(Optional.of(userPoint(100)));
@@ -145,7 +146,7 @@ class PointServiceTest {
             assertThatThrownBy(() -> pointService.deduct(1L, 300, UserPointReason.ITEM_PURCHASE, "핑크 왕리본"))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.INSUFFICIENT_POINTS);
+                    .isEqualTo(ErrorCode.POINT_INSUFFICIENT);
 
             verify(userPointHistoryRepository, never()).save(any());
         }
@@ -171,7 +172,7 @@ class PointServiceTest {
         }
 
         @Test
-        @DisplayName("그룹 포인트도 잔액 부족이면 INSUFFICIENT_POINTS")
+        @DisplayName("그룹 포인트도 잔액 부족이면 POINT_INSUFFICIENT")
         void throwsWhenGroupBalanceInsufficient() {
             // given
             when(groupPointRepository.findWithLockByGroupId(12L)).thenReturn(Optional.of(groupPoint(1000)));
@@ -181,7 +182,7 @@ class PointServiceTest {
                             () -> pointService.deductGroup(12L, 3000, GroupPointReason.BACKGROUND_PURCHASE, "루프탑 운동장"))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.INSUFFICIENT_POINTS);
+                    .isEqualTo(ErrorCode.POINT_INSUFFICIENT);
         }
     }
 
@@ -299,6 +300,39 @@ class PointServiceTest {
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.POINT_HISTORY_NOT_FOUND);
+        }
+    }
+
+    @Nested
+    @DisplayName("영업월(새벽 4시 기준) 경계 계산")
+    class BusinessMonthBoundary {
+
+        @Test
+        @DisplayName("1일 04:00 이전이면 지난달로 친다")
+        void beforeCutoffOnFirstDayBelongsToLastMonth() {
+            LocalDate result = PointService.businessMonthFirstDay(LocalDateTime.of(2026, 9, 1, 3, 59, 59));
+            assertThat(result).isEqualTo(LocalDate.of(2026, 8, 1));
+        }
+
+        @Test
+        @DisplayName("1일 04:00 정각부터는 이번달로 친다")
+        void atCutoffOnFirstDayBelongsToThisMonth() {
+            LocalDate result = PointService.businessMonthFirstDay(LocalDateTime.of(2026, 9, 1, 4, 0, 0));
+            assertThat(result).isEqualTo(LocalDate.of(2026, 9, 1));
+        }
+
+        @Test
+        @DisplayName("월 중간이면 그냥 이번달 1일")
+        void midMonthBelongsToThisMonth() {
+            LocalDate result = PointService.businessMonthFirstDay(LocalDateTime.of(2026, 9, 15, 14, 0, 0));
+            assertThat(result).isEqualTo(LocalDate.of(2026, 9, 1));
+        }
+
+        @Test
+        @DisplayName("연도가 바뀌는 경계도 정상 처리한다")
+        void handlesYearBoundary() {
+            LocalDate result = PointService.businessMonthFirstDay(LocalDateTime.of(2026, 1, 1, 1, 0, 0));
+            assertThat(result).isEqualTo(LocalDate.of(2025, 12, 1));
         }
     }
 }
