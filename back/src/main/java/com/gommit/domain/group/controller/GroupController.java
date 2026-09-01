@@ -2,6 +2,7 @@ package com.gommit.domain.group.controller;
 
 import com.gommit.domain.group.dto.request.GroupCreateRequest;
 import com.gommit.domain.group.dto.response.GroupDetailResponse;
+import com.gommit.domain.group.dto.response.GroupJoinResponse;
 import com.gommit.domain.group.dto.response.GroupSummaryCursorResponse;
 import com.gommit.domain.group.entity.GroupCategory;
 import com.gommit.domain.group.entity.GroupSort;
@@ -52,5 +53,16 @@ public class GroupController {
         @PathVariable Long groupId
     ) {
         return ResponseEntity.ok(groupService.getGroupDetail(groupId));
+    }
+
+    // 그릅 참여
+    @PostMapping("/{groupId}/members")
+    public ResponseEntity<GroupJoinResponse> joinGroup(
+        @PathVariable Long groupId,
+        @CurrentUser SecurityUser actor
+    ) {
+        GroupJoinResponse response =  groupService.joinGroup(groupId, actor.getId());
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }

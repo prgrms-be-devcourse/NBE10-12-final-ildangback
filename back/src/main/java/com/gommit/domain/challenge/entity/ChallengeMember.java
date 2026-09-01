@@ -49,10 +49,10 @@ public class ChallengeMember extends BaseEntity {
     private ExtensionChoice extensionChoice;
 
     @Builder
-    public ChallengeMember(Challenge challenge, Long userId, ExtensionChoice extensionChoice) {
+    public ChallengeMember(Challenge challenge, Long userId, ChallengeMemberRole role) {
         this.challenge = challenge;
         this.userId = userId;
-        this.role = ChallengeMemberRole.OWNER;
+        this.role = role;
         this.status = ChallengeMemberStatus.ACTIVE;
         this.currentStreak = 0;
         this.bestStreak = 0;

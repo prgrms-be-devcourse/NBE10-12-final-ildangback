@@ -28,6 +28,10 @@ public enum ErrorCode {
     GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "그룹을 찾을 수 없습니다."),
     NOT_GROUP_MEMBER(HttpStatus.FORBIDDEN, "해당 그룹의 멤버가 아닙니다."),
     CHALLENGE_NOT_FOUND(HttpStatus.FORBIDDEN, "챌린지를 찾을 수 없습니다."),
+    GROUP_NOT_JOINABLE(HttpStatus.CONFLICT, "현재 참여할 수 없는 그룹입니다."),
+    INVITE_CODE_REQUIRED(HttpStatus.FORBIDDEN, "초대코드가 필요한 그룹입니다."),
+    ALREADY_JOINED(HttpStatus.CONFLICT, "이미 참여한 그룹입니다."),
+    GROUP_FULL(HttpStatus.CONFLICT, "그룹 정원이 가득 찼습니다."),
 
     // ===== item =====
 

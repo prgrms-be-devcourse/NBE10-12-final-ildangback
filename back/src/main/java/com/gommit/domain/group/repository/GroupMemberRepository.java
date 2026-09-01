@@ -12,6 +12,10 @@ import java.util.List;
 public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> {
     List<GroupMember> findAllByGroupIdAndStatus(Long groupId, GroupMemberStatus groupMemberStatus);
 
+    boolean existsByGroupIdAndUserId(Long groupId, Long userId);
+
+    long countByGroupIdAndStatus(Long groupId, GroupMemberStatus status);
+
     @Query("""
         SELECT gm.group.id as groupId,
                COUNT(gm.id) as count
@@ -21,6 +25,4 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
         GROUP BY gm.group.id
     """)
     List<GroupMemberCount> countByGroupIdsAndStatus(@Param("groupIds") List<Long> groupIds, @Param("status") GroupMemberStatus status);
-
-    List<Long> group(ChallengeGroup group);
 }

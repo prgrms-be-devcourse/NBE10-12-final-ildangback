@@ -2,7 +2,10 @@ package com.gommit.domain.group.service;
 
 import com.gommit.domain.challenge.dto.response.ChallengeSummaryResponse;
 import com.gommit.domain.challenge.entity.Challenge;
+import com.gommit.domain.challenge.entity.ChallengeMember;
+import com.gommit.domain.challenge.entity.ChallengeMemberRole;
 import com.gommit.domain.challenge.entity.ChallengeStatus;
+import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.challenge.service.ChallengeService;
 import com.gommit.domain.group.dto.request.GroupCreateRequest;
@@ -33,6 +36,7 @@ public class GroupService {
     private final ChallengeService challengeService;
     private final ChallengeRepository challengeRepository;
     private final UserRepository userRepository;
+    private final ChallengeMemberRepository challengeMemberRepository;
 
     @Transactional
     public GroupDetailResponse createGroup(Long userId, GroupCreateRequest request) {
@@ -268,6 +272,61 @@ public class GroupService {
             new GroupResponse(group, members.size()),
             currentChallenge == null ? null : new ChallengeSummaryResponse(currentChallenge),
             memberResponses
+        );
+    }
+
+    // 공개 그룹 참여
+    @Transactional
+    public GroupJoinResponse joinGroup(Long groupId, Long userId) {
+        // 그룹조회
+        ChallengeGroup group = challengeGroupRepository.findById(groupId).orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+
+        // 그룹 참여 가능한지 확인
+        if(group.getStatus() != GroupStatus.READY) {
+            throw new BusinessException(ErrorCode.GROUP_NOT_JOINABLE);
+        }
+
+        // 공개그룹인지 확인
+        if(group.getVisibility() != Visibility.PUBLIC) {
+            throw new BusinessException(ErrorCode.INVITE_CODE_REQUIRED);
+        }
+
+        // READY 챌린지 조회
+        Challenge challenge = challengeRepository.findFirstByGroupIdAndStatus(groupId, ChallengeStatus.READY).orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_JOINABLE));
+
+        // 기존 GroupMember 참여 이력 확인
+        if(groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
+            throw new BusinessException(ErrorCode.ALREADY_JOINED);
+        }
+
+        // 현재 ACTIVE 멤버 수 확인
+        long currentMembers = groupMemberRepository.countByGroupIdAndStatus(groupId, GroupMemberStatus.ACTIVE);
+
+        if(currentMembers >= group.getMaxMembers()) {
+            throw new BusinessException(ErrorCode.GROUP_FULL);
+        }
+
+        // 검증 후 GroupMember 생성
+        GroupMember groupMember = GroupMember.builder()
+            .group(group)
+            .userId(userId)
+            .build();
+
+        groupMemberRepository.save(groupMember);
+
+        // ChallengeMember 생성
+        ChallengeMember challengeMember = challengeService.createChallengeMember(
+            challenge,
+            userId,
+            ChallengeMemberRole.MEMBER
+        );
+
+        User user = userRepository.findById(userId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        return new GroupJoinResponse(
+            new GroupMemberResponse(groupMember, user),
+            challenge.getId(),
+            challengeMember.getId()
         );
     }
 }
