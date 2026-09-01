@@ -1,11 +1,7 @@
 package com.gommit.domain.challenge.entity;
 
 import com.gommit.global.base.BaseEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import java.time.LocalDate;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -40,7 +36,7 @@ public class Challenge extends BaseEntity {
     private Integer frequencyValue;
 
     @Column(length = 30)
-    private String weekdays;
+    private String daysOfWeek;
 
     @Column(nullable = false)
     private int dailyCheckInCount;
