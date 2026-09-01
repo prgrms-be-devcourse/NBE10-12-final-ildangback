@@ -7,7 +7,7 @@ spring:
 
   servlet:
     multipart:
-      # 사용자 업로드 경로(ITEM/BACKGROUND/CHECKIN, 이미지)만 커버. DAILYLOG 는 서버 생성이라 무관.
+      # 사용자 업로드 경로(CHECKIN/ITEM, 이미지)만 커버. DAILYLOG 는 서버 생성이라 무관.
       max-file-size: 12MB
       max-request-size: 15MB
 
@@ -46,14 +46,12 @@ media:
     provider: ${MEDIA_STORAGE_PROVIDER:local}   # local | cloudinary
     local:
       base-dir: ${MEDIA_LOCAL_BASE_DIR:./data/media}
-      base-url: ${MEDIA_LOCAL_BASE_URL:http://localhost:8080/media}   # PUBLIC 정적 서빙 접두사. path 는 SecurityConfig 의 /media/** 와 일치
+      base-url: ${MEDIA_LOCAL_BASE_URL:http://localhost:8080/media}   # PUBLIC 정적 서빙 접두사.
+    cloudinary:                                 # provider=cloudinary 일 때만 사용
+      cloud-name: ${CLOUDINARY_CLOUD_NAME:}
+      api-key: ${CLOUDINARY_API_KEY:}
+      api-secret: ${CLOUDINARY_API_SECRET:}
     policies:
-      ITEM:       { folder: character-store,  max-size: 5MB,  visibility: PUBLIC,  allowed-content-types: [image/png, image/jpeg, image/webp] }
-      BACKGROUND: { folder: background-store, max-size: 10MB, visibility: PUBLIC,  allowed-content-types: [image/png, image/jpeg, image/webp] }
-      CHECKIN:    { folder: check-ins,        max-size: 5MB,  visibility: PRIVATE, allowed-content-types: [image/png, image/jpeg, image/webp] }
-      # TODO(checkin 영상): getUserMedia + MediaRecorder 는 Chrome/Firefox 에서 video/webm 을 낸다.
-      #   video/webm 을 여기 추가하고 MediaContentType 에 webm 매직바이트(EBML 1A45DFA3)를 넣어야 하며,
-      #   iOS 앱 출시 / 데스크톱 Safari 지원 시점에는 미디어 모듈에서 webm -> mp4 트랜스코딩이 필요하다.
-      # DAILYLOG 는 사용자 업로드가 아니라 서버(FFmpeg) 생성물.
-      # max-size 는 생성 결과가 예상(15-30MB)을 크게 벗어났는지 보는 정상성 검사이지 업로드 한도가 아니다.
-      DAILYLOG:   { folder: daily-check-ins, max-size: 40MB, visibility: PRIVATE, allowed-content-types: [video/mp4] }
+      CHECKIN:  { folder: check-ins,       max-size: 5MB,  visibility: PRIVATE, allowed-content-types: [image/png, image/jpeg, image/webp] }
+      DAILYLOG: { folder: daily-check-ins, max-size: 40MB, visibility: PRIVATE, allowed-content-types: [video/mp4] }
+      ITEM:     { folder: character-store, max-size: 5MB,  visibility: PUBLIC,  allowed-content-types: [image/png, image/jpeg, image/webp] }

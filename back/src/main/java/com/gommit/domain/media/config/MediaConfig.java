@@ -21,7 +21,7 @@ public class MediaConfig {
 
     @Bean
     @ConditionalOnProperty(name = "media.storage.provider", havingValue = "cloudinary")
-    public StorageService cloudinaryStorageService() {
-        return new CloudinaryStorageService();
+    public StorageService cloudinaryStorageService(MediaStorageProperties properties) {
+        return new CloudinaryStorageService(CloudinaryClientFactory.create(properties.cloudinary()), properties);
     }
 }
