@@ -35,7 +35,7 @@ public class GroupMember extends BaseEntity {
     private LocalDateTime leftAt;
 
     @Builder
-    public GroupMember(ChallengeGroup group, Long userId, LocalDateTime leftAt) {
+    public GroupMember(ChallengeGroup group, Long userId) {
         this.group = group;
         this.userId = userId;
         this.leftAt = null;

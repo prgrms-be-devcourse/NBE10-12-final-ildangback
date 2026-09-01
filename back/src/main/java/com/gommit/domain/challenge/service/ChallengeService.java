@@ -2,10 +2,7 @@ package com.gommit.domain.challenge.service;
 
 import com.gommit.domain.challenge.dto.request.InitialChallengeSettingRequest;
 import com.gommit.domain.challenge.dto.response.ChallengeSummaryResponse;
-import com.gommit.domain.challenge.entity.Challenge;
-import com.gommit.domain.challenge.entity.ChallengeMember;
-import com.gommit.domain.challenge.entity.FrequencyType;
-import com.gommit.domain.challenge.entity.Weekday;
+import com.gommit.domain.challenge.entity.*;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.checkin.entity.CheckInType;
@@ -54,19 +51,20 @@ public class ChallengeService {
 
         Challenge savedChallenge = challengeRepository.save(challenge);
 
-        createChallengeOwner(savedChallenge, userId);
+        createChallengeMember(savedChallenge, userId, ChallengeMemberRole.OWNER);
 
         return savedChallenge;
     }
 
-    // 그룹 생성자를 첫 챌린지의 OWNER로 등록
-    private void createChallengeOwner(Challenge challenge, Long userId) {
+    // 그룹 생성자를 챌린지멤버 등록
+    public ChallengeMember createChallengeMember(Challenge challenge, Long userId, ChallengeMemberRole role) {
         ChallengeMember challengeMember = ChallengeMember.builder()
             .challenge(challenge)
             .userId(userId)
+            .role(role)
             .build();
 
-        challengeMemberRepository.save(challengeMember);
+        return challengeMemberRepository.save(challengeMember);
     }
 
     // 선택된 요일 DB 저장용 문자열로 변환
