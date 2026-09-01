@@ -28,8 +28,8 @@ public class SecurityConfig {
         "/api/auth/signup",
         "/api/auth/login",
         "/api/auth/refresh",
-        "/api/users/check-email",
-        "/api/users/check-nickname",
+        "/api/auth/check-email",
+        "/api/auth/check-nickname",
     };
 
     private static final String[] DOCS_ENDPOINTS = {

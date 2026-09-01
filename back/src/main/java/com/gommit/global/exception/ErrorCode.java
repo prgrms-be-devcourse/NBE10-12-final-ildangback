@@ -15,15 +15,17 @@ public enum ErrorCode {
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
 
-// ===== challenge =====
+    // ===== challenge =====
 
-// ===== checkin =====
+    // ===== checkin =====
 
-// ===== group =====
+    // ===== group =====
 
-// ===== item =====
+    // ===== item =====
 
-// ===== point =====
+    // ===== point =====
+    INSUFFICIENT_POINTS(HttpStatus.CONFLICT, "포인트가 부족합니다."),
+    POINT_HISTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 포인트 이력입니다."),
 
 // ===== record =====
 
