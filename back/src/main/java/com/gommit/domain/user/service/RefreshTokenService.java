@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -87,6 +88,15 @@ public class RefreshTokenService {
     @Transactional
     public void revokeAll(Long userId) {
         refreshTokenRepository.revokeAllByUserId(userId, LocalDateTime.now());
+    }
+
+    // 매일 03:00에 만료 RT 정리
+    @Scheduled(cron = "0 0 3 * * *", zone = "Asia/Seoul")
+    @Transactional
+    public int deleteExpired() {
+        int deleted = refreshTokenRepository.deleteByExpiresAtBefore(LocalDateTime.now());
+        log.info("만료 RT 정리: {}건 삭제", deleted);
+        return deleted;
     }
 
     // 재사용으로 보고 거부
