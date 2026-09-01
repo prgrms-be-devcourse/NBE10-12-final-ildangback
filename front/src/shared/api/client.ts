@@ -102,6 +102,9 @@ interface RequestOptions {
   /**
    * 함수로 주면 보내기 직전에 평가한다. 401 → 갱신 → 재시도 경로에서 값이 바뀌는
    * 본문(RT)에 필요하다. 미리 만들어두면 재시도가 옛 RT 를 그대로 보낸다.
+   *
+   * `FormData` 를 주면 그대로 전송한다 — JSON 직렬화하지 않고 Content-Type 도 붙이지
+   * 않는다(브라우저가 multipart 경계를 채운다). 파일 업로드(인증 제출)에 쓴다.
    */
   body?: unknown;
   /** 기본 true. 로그인·회원가입·재발급처럼 토큰이 필요 없는 호출만 false 로 준다. */
@@ -118,14 +121,22 @@ async function send(
       ? (options.body as () => unknown)()
       : options.body;
 
+  const isMultipart = body instanceof FormData;
   const headers: Record<string, string> = {};
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (body !== undefined && !isMultipart) {
+    headers["Content-Type"] = "application/json";
+  }
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
   return fetch(`${BASE_URL}${path}`, {
     method: options.method ?? "GET",
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body:
+      body === undefined
+        ? undefined
+        : isMultipart
+          ? (body as FormData)
+          : JSON.stringify(body),
   });
 }
 
