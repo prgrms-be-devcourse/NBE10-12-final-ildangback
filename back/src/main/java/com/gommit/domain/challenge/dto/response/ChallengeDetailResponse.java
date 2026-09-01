@@ -5,54 +5,46 @@ import com.gommit.domain.challenge.entity.ChallengeStatus;
 import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.challenge.entity.Weekday;
 import com.gommit.domain.checkin.entity.CheckInType;
-import com.gommit.domain.challenge.dto.request.InitialChallengeSettingRequest;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public record ChallengeSummaryResponse(
+public record ChallengeDetailResponse(
     Long id,
-    int seqNo,
-    ChallengeStatus status,
+    Long groupId,
+    Integer seqNo,
     LocalDate startDate,
     LocalDate endDate,
+    ChallengeStatus status,
     FrequencyType frequencyType,
     Integer frequencyValue,
     List<Weekday> weekdays,
-    int dailyCheckInCount,
-    List<CheckInType> allowedTypes
+    Integer dailyCheckInCount,
+    Integer requiredDayCount,
+    Integer groupCurrentStreak,
+    Integer groupBestStreak,
+    List<CheckInType> allowedTypes,
+    Long ownerId
 ) {
-    public ChallengeSummaryResponse(
-        Challenge challenge,
-        InitialChallengeSettingRequest setting
-    ) {
+    public ChallengeDetailResponse(Challenge challenge, Long ownerId) {
         this(
             challenge.getId(),
+            challenge.getGroupId(),
             challenge.getSeqNo(),
-            challenge.getStatus(),
             challenge.getStartDate(),
             challenge.getEndDate(),
-            challenge.getFrequencyType(),
-            challenge.getFrequencyValue(),
-            setting.weekdays(),
-            challenge.getDailyCheckInCount(),
-            setting.allowedTypes()
-        );
-    }
-
-    public ChallengeSummaryResponse(Challenge challenge) {
-        this(
-            challenge.getId(),
-            challenge.getSeqNo(),
             challenge.getStatus(),
-            challenge.getStartDate(),
-            challenge.getEndDate(),
             challenge.getFrequencyType(),
             challenge.getFrequencyValue(),
             parseWeekdays(challenge.getWeekdays()),
             challenge.getDailyCheckInCount(),
-            challenge.isAllowPhoto() ? List.of(CheckInType.PHOTO) : List.of()
+            challenge.getRequiredDayCount(),
+            challenge.getGroupCurrentStreak(),
+            challenge.getGroupBestStreak(),
+            getAllowedTypes(challenge),
+            ownerId
         );
     }
 
@@ -65,5 +57,15 @@ public record ChallengeSummaryResponse(
             .map(String::trim)
             .map(Weekday::valueOf)
             .toList();
+    }
+
+    private static List<CheckInType> getAllowedTypes(Challenge challenge) {
+        List<CheckInType> allowedTypes = new ArrayList<>();
+
+        if (challenge.isAllowPhoto()) {
+            allowedTypes.add(CheckInType.PHOTO);
+        }
+
+        return allowedTypes;
     }
 }

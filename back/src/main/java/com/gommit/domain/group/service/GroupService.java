@@ -244,9 +244,9 @@ public class GroupService {
 
     @Transactional(readOnly = true)
     public GroupDetailResponse getGroupDetail(Long groupId) {
-
         // 그룹 조회
         ChallengeGroup group = challengeGroupRepository.findById(groupId).orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+
         // 현재 챌린지 조회
         Challenge currentChallenge = challengeRepository.findFirstByGroupIdAndStatus(groupId, ChallengeStatus.ACTIVE).orElseGet(() -> challengeRepository.findFirstByGroupIdAndStatus(groupId, ChallengeStatus.READY).orElse(null));
 

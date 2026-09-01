@@ -21,6 +21,8 @@ public enum ErrorCode {
     INVALID_FREQUENCY(HttpStatus.BAD_REQUEST, "인증 주기 설정이 올바르지 않습니다."),
     NO_CHECK_IN_METHOD(HttpStatus.BAD_REQUEST, "인증 방식은 최소 1개 이상 선택해야 합니다."),
     INVALID_CATEGORY_MAP_TYPE(HttpStatus.BAD_REQUEST, "카테고리와 맵 타입의 조합이 올바르지 않습니다."),
+    NOT_CHALLENGE_OWNER(HttpStatus.FORBIDDEN, "챌린지 OWNER 권한이 없습니다."),
+    NOT_CHALLENGE_MEMBER(HttpStatus.FORBIDDEN, "챌린지에 참여 중인 멤버가 아닙니다."),
 
     // ===== checkin =====
 

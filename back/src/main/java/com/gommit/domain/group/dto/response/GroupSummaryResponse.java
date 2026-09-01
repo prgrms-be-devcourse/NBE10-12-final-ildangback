@@ -52,7 +52,7 @@ public record GroupSummaryResponse(
 
     private static List<Weekday> parseWeekdays(String weekdays) {
         if (weekdays == null || weekdays.isBlank()) {
-            return null;
+            return List.of();
         }
 
         return Arrays.stream(weekdays.split(","))
