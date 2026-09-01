@@ -26,12 +26,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * 포인트 지급/차감/조회를 담당하는 도메인 서비스.
- *
- * <p>reward/deduct/rewardGroup/deductGroup은 REST API가 아니라 CheckIn, Item 등 다른 도메인이 자기 트랜잭션 안에서 호출하는
- * 내부 계약이다. 자세한 시그니처는 POINT_SERVICE_CONTRACT.md 참고.
- */
+// reward/deduct/rewardGroup/deductGroup은 REST API가 아니라 CheckIn, Item 등 다른 도메인이
+// 자기 트랜잭션 안에서 직접 호출하는 내부 계약이다.
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -147,11 +143,8 @@ public class PointService {
 
     // ===== 내부 헬퍼 =====
 
-    // 없으면 먼저 만들고, 그다음에 잠근 채로 가져온다.
-    // 순서가 중요하다 — 잠금 조회(SELECT ... FOR UPDATE)를 먼저 하면 결과가 0건이어도 MySQL이
-    // 그 자리에 갭 락을 걸어서, 뒤이은 생성용 INSERT(REQUIRES_NEW)가 그 갭 락에 막혀 자기 자신과
-    // 데드락이 난다. 그래서 잠금 없는 조회로 존재부터 확인하고, 없을 때만 만든 뒤, 잠금 조회는
-    // "이미 있는 행"에 대해서만 하도록 순서를 바꿨다.
+    // 없으면 만들고 나서 잠근다. 잠금 조회를 먼저 하면 0건이어도 MySQL이 갭 락을 걸어
+    // 뒤이은 생성 INSERT가 막혀 데드락이 나서 이 순서로 뒀다.
     private UserPoint lockOrCreateUserPoint(Long userId) {
         if (userPointRepository.findByUserId(userId).isEmpty()) {
             pointBalanceInitializer.createUserPointIfAbsent(userId);

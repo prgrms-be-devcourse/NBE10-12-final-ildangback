@@ -32,26 +32,31 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class PointServiceTest {
 
-    private final UserPointHistoryRepository userPointHistoryRepository =
-            org.mockito.Mockito.mock(UserPointHistoryRepository.class);
-    private final GroupPointHistoryRepository groupPointHistoryRepository =
-            org.mockito.Mockito.mock(GroupPointHistoryRepository.class);
-    private final UserPointRepository userPointRepository = org.mockito.Mockito.mock(UserPointRepository.class);
-    private final GroupPointRepository groupPointRepository = org.mockito.Mockito.mock(GroupPointRepository.class);
-    private final PointBalanceInitializer pointBalanceInitializer =
-            org.mockito.Mockito.mock(PointBalanceInitializer.class);
-    private final PointService pointService = new PointService(
-            userPointHistoryRepository,
-            groupPointHistoryRepository,
-            userPointRepository,
-            groupPointRepository,
-            pointBalanceInitializer);
+    @Mock
+    private UserPointHistoryRepository userPointHistoryRepository;
+
+    @Mock
+    private GroupPointHistoryRepository groupPointHistoryRepository;
+
+    @Mock
+    private UserPointRepository userPointRepository;
+
+    @Mock
+    private GroupPointRepository groupPointRepository;
+
+    @Mock
+    private PointBalanceInitializer pointBalanceInitializer;
+
+    @InjectMocks
+    private PointService pointService;
 
     private UserPoint userPoint(int balance) {
         UserPoint point = UserPoint.init(1L);

@@ -4,16 +4,12 @@ import com.gommit.domain.point.entity.UserPointHistory;
 import com.gommit.domain.point.entity.UserPointReason;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface UserPointHistoryRepository extends JpaRepository<UserPointHistory, Long> {
-
-    // 현재 잔액 = 가장 최근 이력의 balanceAfter
-    Optional<UserPointHistory> findTopByUserIdOrderByIdDesc(Long userId);
 
     @Query("select coalesce(sum(h.amount), 0) from UserPointHistory h "
             + "where h.userId = :userId and h.amount > 0 and h.createdAt >= :from")
