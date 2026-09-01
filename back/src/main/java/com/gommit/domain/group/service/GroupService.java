@@ -312,7 +312,7 @@ public class GroupService {
             .userId(userId)
             .build();
 
-        groupMemberRepository.save(groupMember);
+        GroupMember savedGroupMember = groupMemberRepository.save(groupMember);
 
         // ChallengeMember 생성
         ChallengeMember challengeMember = challengeService.createChallengeMember(
@@ -324,7 +324,7 @@ public class GroupService {
         User user = userRepository.findById(userId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         return new GroupJoinResponse(
-            new GroupMemberResponse(groupMember, user),
+            new GroupMemberResponse(savedGroupMember, user),
             challenge.getId(),
             challengeMember.getId()
         );
