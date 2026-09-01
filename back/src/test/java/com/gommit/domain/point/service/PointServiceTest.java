@@ -79,10 +79,9 @@ class PointServiceTest {
         @Test
         @DisplayName("잔액 행이 없으면 0에서 시작해서 지급된 만큼 잔액이 쌓인다")
         void rewardsFromZeroWhenNoBalanceRow() {
-            // given: 잠금 조회는 처음엔 비어있고, 초기화 후 재조회하면 새 행이 온다
-            when(userPointRepository.findWithLockByUserId(1L))
-                    .thenReturn(Optional.empty())
-                    .thenReturn(Optional.of(UserPoint.init(1L)));
+            // given: 존재 확인(잠금 없음)은 비어있고, 초기화 후 잠금 조회하면 새 행이 온다
+            when(userPointRepository.findByUserId(1L)).thenReturn(Optional.empty());
+            when(userPointRepository.findWithLockByUserId(1L)).thenReturn(Optional.of(UserPoint.init(1L)));
 
             // when
             pointService.reward(1L, 32L, 40, UserPointReason.CHECK_IN, "오운완");
