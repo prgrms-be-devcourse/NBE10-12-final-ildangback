@@ -46,36 +46,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
-            MethodArgumentNotValidException ex,
-            HttpHeaders headers,
-            HttpStatusCode status,
-            WebRequest request) {
+            MethodArgumentNotValidException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
-        List<ErrorResponse.FieldError> errors =
-                ex.getBindingResult().getFieldErrors().stream()
-                        .map(
-                                fe ->
-                                        new ErrorResponse.FieldError(
-                                                fe.getField(), fe.getDefaultMessage()))
-                        .toList();
+        List<ErrorResponse.FieldError> errors = ex.getBindingResult().getFieldErrors().stream()
+                .map(fe -> new ErrorResponse.FieldError(fe.getField(), fe.getDefaultMessage()))
+                .toList();
 
-        return ResponseEntity.badRequest()
-                .body(ErrorResponse.of(ErrorCode.INVALID_INPUT_VALUE, errors));
+        return ResponseEntity.badRequest().body(ErrorResponse.of(ErrorCode.INVALID_INPUT_VALUE, errors));
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException e) {
 
-        List<ErrorResponse.FieldError> errors =
-                e.getConstraintViolations().stream()
-                        .map(
-                                v ->
-                                        new ErrorResponse.FieldError(
-                                                lastNodeOf(v.getPropertyPath()), v.getMessage()))
-                        .toList();
+        List<ErrorResponse.FieldError> errors = e.getConstraintViolations().stream()
+                .map(v -> new ErrorResponse.FieldError(lastNodeOf(v.getPropertyPath()), v.getMessage()))
+                .toList();
 
-        return ResponseEntity.badRequest()
-                .body(ErrorResponse.of(ErrorCode.INVALID_INPUT_VALUE, errors));
+        return ResponseEntity.badRequest().body(ErrorResponse.of(ErrorCode.INVALID_INPUT_VALUE, errors));
     }
 
     private String lastNodeOf(Path propertyPath) {
@@ -86,16 +73,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(
-            Exception ex,
-            Object body,
-            HttpHeaders headers,
-            HttpStatusCode statusCode,
-            WebRequest request) {
+            Exception ex, Object body, HttpHeaders headers, HttpStatusCode statusCode, WebRequest request) {
 
-        log.warn(
-                "Spring internal exception: {} - {}",
-                ex.getClass().getSimpleName(),
-                ex.getMessage());
+        log.warn("Spring internal exception: {} - {}", ex.getClass().getSimpleName(), ex.getMessage());
 
         HttpStatus status = HttpStatus.valueOf(statusCode.value());
 

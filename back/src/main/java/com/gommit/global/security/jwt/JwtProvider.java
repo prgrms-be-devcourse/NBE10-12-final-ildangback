@@ -23,8 +23,7 @@ public class JwtProvider {
     private final long expirationSeconds;
 
     public JwtProvider(AuthTokenProperties properties) {
-        this.secretKey =
-                Keys.hmacShaKeyFor(properties.secretKey().getBytes(StandardCharsets.UTF_8));
+        this.secretKey = Keys.hmacShaKeyFor(properties.secretKey().getBytes(StandardCharsets.UTF_8));
         this.expirationSeconds = properties.accessToken().expiration().getSeconds();
     }
 
@@ -41,15 +40,13 @@ public class JwtProvider {
 
     public SecurityUser parse(String token) {
         try {
-            Claims claims =
-                    Jwts.parser()
-                            .verifyWith(secretKey)
-                            .build()
-                            .parseSignedClaims(token)
-                            .getPayload();
+            Claims claims = Jwts.parser()
+                    .verifyWith(secretKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
 
-            return new SecurityUser(
-                    Long.valueOf(claims.getSubject()), claims.get(CLAIM_ROLE, String.class));
+            return new SecurityUser(Long.valueOf(claims.getSubject()), claims.get(CLAIM_ROLE, String.class));
 
         } catch (JwtException | IllegalArgumentException e) {
             log.debug("AT 검증 실패: {}", e.getClass().getSimpleName());

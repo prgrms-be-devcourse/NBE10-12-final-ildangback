@@ -16,16 +16,15 @@ public interface GroupPointHistoryRepository extends JpaRepository<GroupPointHis
     Optional<GroupPointHistory> findTopByGroupIdOrderByIdDesc(Long groupId);
 
     // 커서 기반 목록 조회. earn=null(전체)/true(적립만)/false(차감만), reason=null이면 전체 사유
-    @Query(
-            "select h from GroupPointHistory h "
-                    + "where h.groupId = :groupId "
-                    + "and (:cursor is null or h.id < :cursor) "
-                    + "and (:from is null or h.createdAt >= :from) "
-                    + "and (:to is null or h.createdAt < :to) "
-                    + "and (:reason is null or h.reason = :reason) "
-                    + "and (:earn is null or (:earn = true and h.amount > 0) "
-                    + "or (:earn = false and h.amount < 0)) "
-                    + "order by h.id desc")
+    @Query("select h from GroupPointHistory h "
+            + "where h.groupId = :groupId "
+            + "and (:cursor is null or h.id < :cursor) "
+            + "and (:from is null or h.createdAt >= :from) "
+            + "and (:to is null or h.createdAt < :to) "
+            + "and (:reason is null or h.reason = :reason) "
+            + "and (:earn is null or (:earn = true and h.amount > 0) "
+            + "or (:earn = false and h.amount < 0)) "
+            + "order by h.id desc")
     List<GroupPointHistory> findHistories(
             @Param("groupId") Long groupId,
             @Param("cursor") Long cursor,

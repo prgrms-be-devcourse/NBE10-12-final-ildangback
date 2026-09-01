@@ -35,12 +35,7 @@ public class UserPointHistory extends BaseEntity {
     private int balanceAfter;
 
     private UserPointHistory(
-            Long userId,
-            Long challengeId,
-            String sourceName,
-            int amount,
-            UserPointReason reason,
-            int balanceAfter) {
+            Long userId, Long challengeId, String sourceName, int amount, UserPointReason reason, int balanceAfter) {
         this.userId = userId;
         this.challengeId = challengeId;
         this.sourceName = sourceName;
@@ -50,12 +45,7 @@ public class UserPointHistory extends BaseEntity {
     }
 
     public static UserPointHistory of(
-            Long userId,
-            Long challengeId,
-            String sourceName,
-            int amount,
-            UserPointReason reason,
-            int balanceAfter) {
+            Long userId, Long challengeId, String sourceName, int amount, UserPointReason reason, int balanceAfter) {
         return new UserPointHistory(userId, challengeId, sourceName, amount, reason, balanceAfter);
     }
 }

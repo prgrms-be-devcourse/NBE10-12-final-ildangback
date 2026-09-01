@@ -48,13 +48,11 @@ public class PointService {
     // 같은 유저/그룹에 대한 동시 호출이 순서대로 처리되도록 보장하기 위함이다.
 
     @Transactional
-    public void reward(
-            Long userId, Long challengeId, int amount, UserPointReason reason, String sourceName) {
+    public void reward(Long userId, Long challengeId, int amount, UserPointReason reason, String sourceName) {
         UserPoint point = lockOrCreateUserPoint(userId);
         point.add(amount);
         userPointHistoryRepository.save(
-                UserPointHistory.of(
-                        userId, challengeId, sourceName, amount, reason, point.getBalance()));
+                UserPointHistory.of(userId, challengeId, sourceName, amount, reason, point.getBalance()));
     }
 
     @Transactional
@@ -72,8 +70,7 @@ public class PointService {
     public void rewardGroup(Long groupId, int amount, GroupPointReason reason, String sourceName) {
         GroupPoint point = lockOrCreateGroupPoint(groupId);
         point.add(amount);
-        groupPointHistoryRepository.save(
-                GroupPointHistory.of(groupId, sourceName, amount, reason, point.getBalance()));
+        groupPointHistoryRepository.save(GroupPointHistory.of(groupId, sourceName, amount, reason, point.getBalance()));
     }
 
     @Transactional
@@ -91,7 +88,10 @@ public class PointService {
 
     public PointBalanceResponse getMyBalance(Long userId) {
         LocalDateTime startOfThisMonth = LocalDate.now().withDayOfMonth(1).atStartOfDay();
-        int balance = userPointRepository.findByUserId(userId).map(UserPoint::getBalance).orElse(0);
+        int balance = userPointRepository
+                .findByUserId(userId)
+                .map(UserPoint::getBalance)
+                .orElse(0);
         int monthlyEarned = userPointHistoryRepository.sumEarnedFrom(userId, startOfThisMonth);
         int monthlySpent = userPointHistoryRepository.sumSpentFrom(userId, startOfThisMonth);
         int totalEarned = userPointHistoryRepository.sumEarnedAll(userId);
@@ -99,33 +99,19 @@ public class PointService {
     }
 
     public SliceResponse<UserPointHistoryResponse> getMyHistories(
-            Long userId,
-            PeriodFilter period,
-            PointChangeType type,
-            UserPointReason reason,
-            Long cursor,
-            int size) {
+            Long userId, PeriodFilter period, PointChangeType type, UserPointReason reason, Long cursor, int size) {
         LocalDateTime[] range = toDateRange(period);
-        var rows =
-                userPointHistoryRepository.findHistories(
-                        userId,
-                        cursor,
-                        range[0],
-                        range[1],
-                        reason,
-                        toEarnFlag(type),
-                        PageRequest.of(0, size + 1));
+        var rows = userPointHistoryRepository.findHistories(
+                userId, cursor, range[0], range[1], reason, toEarnFlag(type), PageRequest.of(0, size + 1));
         var content = rows.stream().map(UserPointHistoryResponse::from).toList();
         return SliceResponse.ofCursor(content, size, UserPointHistoryResponse::id);
     }
 
     public UserPointHistoryResponse getMyHistoryDetail(Long userId, Long historyId) {
-        UserPointHistory history =
-                userPointHistoryRepository
-                        .findById(historyId)
-                        .filter(h -> h.getUserId().equals(userId))
-                        .orElseThrow(
-                                () -> new BusinessException(ErrorCode.POINT_HISTORY_NOT_FOUND));
+        UserPointHistory history = userPointHistoryRepository
+                .findById(historyId)
+                .filter(h -> h.getUserId().equals(userId))
+                .orElseThrow(() -> new BusinessException(ErrorCode.POINT_HISTORY_NOT_FOUND));
         return UserPointHistoryResponse.from(history);
     }
 
@@ -135,39 +121,27 @@ public class PointService {
     // Group 도메인 구현 완료 후 검증 로직을 채워 넣을 것.
 
     public GroupPointBalanceResponse getGroupBalance(Long groupId) {
-        int balance =
-                groupPointRepository.findByGroupId(groupId).map(GroupPoint::getBalance).orElse(0);
+        int balance = groupPointRepository
+                .findByGroupId(groupId)
+                .map(GroupPoint::getBalance)
+                .orElse(0);
         return new GroupPointBalanceResponse(groupId, balance);
     }
 
     public SliceResponse<GroupPointHistoryResponse> getGroupHistories(
-            Long groupId,
-            PeriodFilter period,
-            PointChangeType type,
-            GroupPointReason reason,
-            Long cursor,
-            int size) {
+            Long groupId, PeriodFilter period, PointChangeType type, GroupPointReason reason, Long cursor, int size) {
         LocalDateTime[] range = toDateRange(period);
-        var rows =
-                groupPointHistoryRepository.findHistories(
-                        groupId,
-                        cursor,
-                        range[0],
-                        range[1],
-                        reason,
-                        toEarnFlag(type),
-                        PageRequest.of(0, size + 1));
+        var rows = groupPointHistoryRepository.findHistories(
+                groupId, cursor, range[0], range[1], reason, toEarnFlag(type), PageRequest.of(0, size + 1));
         var content = rows.stream().map(GroupPointHistoryResponse::from).toList();
         return SliceResponse.ofCursor(content, size, GroupPointHistoryResponse::id);
     }
 
     public GroupPointHistoryResponse getGroupHistoryDetail(Long groupId, Long historyId) {
-        GroupPointHistory history =
-                groupPointHistoryRepository
-                        .findById(historyId)
-                        .filter(h -> h.getGroupId().equals(groupId))
-                        .orElseThrow(
-                                () -> new BusinessException(ErrorCode.POINT_HISTORY_NOT_FOUND));
+        GroupPointHistory history = groupPointHistoryRepository
+                .findById(historyId)
+                .filter(h -> h.getGroupId().equals(groupId))
+                .orElseThrow(() -> new BusinessException(ErrorCode.POINT_HISTORY_NOT_FOUND));
         return GroupPointHistoryResponse.from(history);
     }
 
@@ -175,35 +149,21 @@ public class PointService {
 
     // 잔액 행을 잠그고 가져온다. 아직 없으면(이 유저/그룹의 첫 포인트 이벤트) 0으로 만들고 다시 잠근다.
     private UserPoint lockOrCreateUserPoint(Long userId) {
-        return userPointRepository
-                .findWithLockByUserId(userId)
-                .orElseGet(
-                        () -> {
-                            pointBalanceInitializer.createUserPointIfAbsent(userId);
-                            return userPointRepository
-                                    .findWithLockByUserId(userId)
-                                    .orElseThrow(
-                                            () ->
-                                                    new IllegalStateException(
-                                                            "UserPoint 생성에 실패했다. userId="
-                                                                    + userId));
-                        });
+        return userPointRepository.findWithLockByUserId(userId).orElseGet(() -> {
+            pointBalanceInitializer.createUserPointIfAbsent(userId);
+            return userPointRepository
+                    .findWithLockByUserId(userId)
+                    .orElseThrow(() -> new IllegalStateException("UserPoint 생성에 실패했다. userId=" + userId));
+        });
     }
 
     private GroupPoint lockOrCreateGroupPoint(Long groupId) {
-        return groupPointRepository
-                .findWithLockByGroupId(groupId)
-                .orElseGet(
-                        () -> {
-                            pointBalanceInitializer.createGroupPointIfAbsent(groupId);
-                            return groupPointRepository
-                                    .findWithLockByGroupId(groupId)
-                                    .orElseThrow(
-                                            () ->
-                                                    new IllegalStateException(
-                                                            "GroupPoint 생성에 실패했다. groupId="
-                                                                    + groupId));
-                        });
+        return groupPointRepository.findWithLockByGroupId(groupId).orElseGet(() -> {
+            pointBalanceInitializer.createGroupPointIfAbsent(groupId);
+            return groupPointRepository
+                    .findWithLockByGroupId(groupId)
+                    .orElseThrow(() -> new IllegalStateException("GroupPoint 생성에 실패했다. groupId=" + groupId));
+        });
     }
 
     private static Boolean toEarnFlag(PointChangeType type) {
@@ -223,8 +183,6 @@ public class PointService {
         }
         // LAST_MONTH
         LocalDate startOfLastMonth = startOfThisMonth.minusMonths(1);
-        return new LocalDateTime[] {
-            startOfLastMonth.atStartOfDay(), startOfThisMonth.atStartOfDay()
-        };
+        return new LocalDateTime[] {startOfLastMonth.atStartOfDay(), startOfThisMonth.atStartOfDay()};
     }
 }

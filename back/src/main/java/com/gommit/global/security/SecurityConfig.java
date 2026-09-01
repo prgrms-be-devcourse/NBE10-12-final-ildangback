@@ -25,11 +25,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private static final String[] PUBLIC_ENDPOINTS = {
-        "/api/auth/signup",
-        "/api/auth/login",
-        "/api/auth/refresh",
-        "/api/auth/check-email",
-        "/api/auth/check-nickname",
+        "/api/auth/signup", "/api/auth/login", "/api/auth/refresh", "/api/auth/check-email", "/api/auth/check-nickname",
     };
 
     private static final String[] DOCS_ENDPOINTS = {
@@ -62,22 +58,17 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .sessionManagement(
-                        session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(
-                        auth ->
-                                auth.requestMatchers(HttpMethod.OPTIONS, "/**")
-                                        .permitAll()
-                                        .requestMatchers(PUBLIC_ENDPOINTS)
-                                        .permitAll()
-                                        .requestMatchers(DOCS_ENDPOINTS)
-                                        .permitAll()
-                                        .anyRequest()
-                                        .authenticated())
-                .exceptionHandling(
-                        handler ->
-                                handler.authenticationEntryPoint(authenticationEntryPoint)
-                                        .accessDeniedHandler(accessDeniedHandler))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth.requestMatchers(HttpMethod.OPTIONS, "/**")
+                        .permitAll()
+                        .requestMatchers(PUBLIC_ENDPOINTS)
+                        .permitAll()
+                        .requestMatchers(DOCS_ENDPOINTS)
+                        .permitAll()
+                        .anyRequest()
+                        .authenticated())
+                .exceptionHandling(handler -> handler.authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
@@ -86,8 +77,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(allowedOrigins);
-        configuration.setAllowedMethods(
-                List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setMaxAge(3600L);
 

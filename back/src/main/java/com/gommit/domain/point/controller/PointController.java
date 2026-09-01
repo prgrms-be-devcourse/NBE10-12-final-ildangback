@@ -47,19 +47,11 @@ public class PointController {
     @GetMapping("/api/users/me/points/histories")
     public SliceResponse<UserPointHistoryResponse> getMyPointHistories(
             @CurrentUser SecurityUser user,
-            @Parameter(description = "조회 기간 프리셋") @RequestParam(required = false)
-                    PeriodFilter period,
-            @Parameter(description = "적립/차감 구분 필터") @RequestParam(required = false)
-                    PointChangeType type,
-            @Parameter(description = "조회할 변동 사유") @RequestParam(required = false)
-                    UserPointReason reason,
-            @Parameter(description = "이전 응답의 nextCursor 값. 첫 페이지는 생략")
-                    @RequestParam(required = false)
-                    Long cursor,
-            @Parameter(description = "한 번에 가져올 개수")
-                    @RequestParam(defaultValue = "" + DEFAULT_SIZE)
-                    @Min(1)
-                    @Max(100)
+            @Parameter(description = "조회 기간 프리셋") @RequestParam(required = false) PeriodFilter period,
+            @Parameter(description = "적립/차감 구분 필터") @RequestParam(required = false) PointChangeType type,
+            @Parameter(description = "조회할 변동 사유") @RequestParam(required = false) UserPointReason reason,
+            @Parameter(description = "이전 응답의 nextCursor 값. 첫 페이지는 생략") @RequestParam(required = false) Long cursor,
+            @Parameter(description = "한 번에 가져올 개수") @RequestParam(defaultValue = "" + DEFAULT_SIZE) @Min(1) @Max(100)
                     int size) {
         return pointService.getMyHistories(user.getId(), period, type, reason, cursor, size);
     }
@@ -68,8 +60,7 @@ public class PointController {
     @Tag(name = "Personal Point")
     @GetMapping("/api/users/me/points/histories/{historyId}")
     public UserPointHistoryResponse getMyPointHistoryDetail(
-            @CurrentUser SecurityUser user,
-            @Parameter(description = "조회할 개인 포인트 이력 ID") @PathVariable Long historyId) {
+            @CurrentUser SecurityUser user, @Parameter(description = "조회할 개인 포인트 이력 ID") @PathVariable Long historyId) {
         return pointService.getMyHistoryDetail(user.getId(), historyId);
     }
 
@@ -88,19 +79,11 @@ public class PointController {
     @GetMapping("/api/groups/{groupId}/points/histories")
     public SliceResponse<GroupPointHistoryResponse> getGroupPointHistories(
             @Parameter(description = "조회할 그룹 ID") @PathVariable Long groupId,
-            @Parameter(description = "조회 기간 프리셋") @RequestParam(required = false)
-                    PeriodFilter period,
-            @Parameter(description = "적립/차감 구분 필터") @RequestParam(required = false)
-                    PointChangeType type,
-            @Parameter(description = "조회할 변동 사유") @RequestParam(required = false)
-                    GroupPointReason reason,
-            @Parameter(description = "이전 응답의 nextCursor 값. 첫 페이지는 생략")
-                    @RequestParam(required = false)
-                    Long cursor,
-            @Parameter(description = "한 번에 가져올 개수")
-                    @RequestParam(defaultValue = "" + DEFAULT_SIZE)
-                    @Min(1)
-                    @Max(100)
+            @Parameter(description = "조회 기간 프리셋") @RequestParam(required = false) PeriodFilter period,
+            @Parameter(description = "적립/차감 구분 필터") @RequestParam(required = false) PointChangeType type,
+            @Parameter(description = "조회할 변동 사유") @RequestParam(required = false) GroupPointReason reason,
+            @Parameter(description = "이전 응답의 nextCursor 값. 첫 페이지는 생략") @RequestParam(required = false) Long cursor,
+            @Parameter(description = "한 번에 가져올 개수") @RequestParam(defaultValue = "" + DEFAULT_SIZE) @Min(1) @Max(100)
                     int size) {
         return pointService.getGroupHistories(groupId, period, type, reason, cursor, size);
     }
