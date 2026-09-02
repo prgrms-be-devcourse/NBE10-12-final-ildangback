@@ -19,6 +19,11 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update RefreshToken rt set rt.rotatedAt = :now"
+            + " where rt.id = :id and rt.rotatedAt is null and rt.revokedAt is null")
+    int rotateIfActive(@Param("id") Long id, @Param("now") LocalDateTime now);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update RefreshToken rt set rt.revokedAt = :now where rt.id = :id and rt.revokedAt is null")
     int revokeIfActive(@Param("id") Long id, @Param("now") LocalDateTime now);
 
