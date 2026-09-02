@@ -65,4 +65,14 @@ public class GroupController {
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
+
+    @DeleteMapping("/{groupId}/members/me")
+    public ResponseEntity<Void> leaveGroup(
+        @PathVariable Long groupId,
+        @CurrentUser SecurityUser actor
+    ) {
+        groupService.leaveGroup(groupId, actor.getId());
+
+        return ResponseEntity.noContent().build();
+    }
 }

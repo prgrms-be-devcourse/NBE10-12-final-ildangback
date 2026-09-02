@@ -26,6 +26,7 @@ public enum ErrorCode {
     CHALLENGE_NOT_EDITABLE(HttpStatus.FORBIDDEN, "READY 상태의 챌린지만 설정을 수정할 수 있습니다."),
     INVALID_EXTENSION_START_DATE(HttpStatus.BAD_REQUEST, "연장 시즌의 시작일은 이전 시즌 종료일 이후여야 합니다."),
     INVALID_DAILY_COUNT(HttpStatus.BAD_REQUEST, "하루 인증 횟수가 허용 범위를 벗어났습니다."),
+    CANNOT_DELEGATE_TO_SELF(HttpStatus.BAD_REQUEST, "자기 자신에게 OWNER를 위임할 수 없습니다."),
 
     // ===== checkin =====
 
@@ -37,6 +38,7 @@ public enum ErrorCode {
     INVITE_CODE_REQUIRED(HttpStatus.FORBIDDEN, "초대코드가 필요한 그룹입니다."),
     ALREADY_JOINED(HttpStatus.CONFLICT, "이미 참여한 그룹입니다."),
     GROUP_FULL(HttpStatus.CONFLICT, "그룹 정원이 가득 찼습니다."),
+    GROUP_OWNER_CANNOT_LEAVE(HttpStatus.CONFLICT, "그룹 OWNER는 위임 후 퇴장할 수 있습니다."),
 
     // ===== item =====
 

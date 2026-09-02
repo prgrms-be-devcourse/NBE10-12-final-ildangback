@@ -41,4 +41,9 @@ public class GroupMember extends BaseEntity {
         this.leftAt = null;
         this.status = GroupMemberStatus.ACTIVE; // 첫 생성 ACTIVE
     }
+
+    public void leave() {
+        this.status = GroupMemberStatus.LEFT;
+        this.leftAt = LocalDateTime.now();
+    }
 }

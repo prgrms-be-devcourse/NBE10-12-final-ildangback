@@ -1,10 +1,7 @@
 package com.gommit.domain.group.service;
 
 import com.gommit.domain.challenge.dto.response.ChallengeSummaryResponse;
-import com.gommit.domain.challenge.entity.Challenge;
-import com.gommit.domain.challenge.entity.ChallengeMember;
-import com.gommit.domain.challenge.entity.ChallengeMemberRole;
-import com.gommit.domain.challenge.entity.ChallengeStatus;
+import com.gommit.domain.challenge.entity.*;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.challenge.service.ChallengeService;
@@ -328,5 +325,39 @@ public class GroupService {
             challenge.getId(),
             challengeMember.getId()
         );
+    }
+
+    @Transactional
+    public void leaveGroup(Long groupId, Long userId) {
+        ChallengeGroup group = challengeGroupRepository.findById(groupId).orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+
+        GroupMember groupMember = groupMemberRepository.findByGroupIdAndUserId(groupId, userId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_GROUP_MEMBER));
+
+        if(groupMember.getStatus() != GroupMemberStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.NOT_GROUP_MEMBER);
+        }
+
+        // 그룹 OWNER는 바로 퇴장 불가
+        if(group.getOwnerId().equals(userId)) {
+            throw new BusinessException(ErrorCode.GROUP_OWNER_CANNOT_LEAVE);
+        }
+
+        // 그룹 멤버 퇴장 처리
+        groupMember.leave();
+
+        // ACTIVE 시즌 멤버 퇴장
+        challengeRepository.findFirstByGroupIdAndStatus(groupId, ChallengeStatus.ACTIVE).ifPresent(challenge -> leaveChallengeMember(challenge.getId(), userId));
+
+        // READY 시즌 멤버 퇴장
+        challengeRepository.findFirstByGroupIdAndStatus(groupId, ChallengeStatus.READY).ifPresent(challenge -> leaveChallengeMember(challenge.getId(), userId));
+    }
+
+    private void leaveChallengeMember(Long challengeId, Long userId) {
+        challengeMemberRepository
+            .findByChallengeIdAndUserId(challengeId, userId)
+            .filter(member ->
+                member.getStatus() == ChallengeMemberStatus.ACTIVE
+            )
+            .ifPresent(ChallengeMember::leave);
     }
 }
