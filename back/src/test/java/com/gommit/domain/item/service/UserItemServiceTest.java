@@ -82,7 +82,7 @@ class UserItemServiceTest {
 
     @Test
     @DisplayName("미착용 아이템 착용 성공 시 equippedSlot이 채워진 UserItemResponse가 반환된다")
-    void equipItem_정상착용() {
+    void t1() {
         // given
         // userItemId=10 조회 → 미착용 상태의 UserItem 반환
         given(userItemRepository.findById(10L)).willReturn(Optional.of(unequippedUserItem));
@@ -103,7 +103,7 @@ class UserItemServiceTest {
 
     @Test
     @DisplayName("착용 시 해당 슬롯에 기존 착용 아이템이 있으면 자동으로 해제되고 새 아이템이 착용된다")
-    void equipItem_기존착용교체() {
+    void t2() {
         // given
         // 새로 착용할 미착용 아이템(userItemId=10)
         given(userItemRepository.findById(10L)).willReturn(Optional.of(unequippedUserItem));
@@ -124,7 +124,7 @@ class UserItemServiceTest {
 
     @Test
     @DisplayName("존재하지 않는 UserItem 착용 시 USER_ITEM_NOT_FOUND 예외가 발생한다")
-    void equipItem_아이템없음() {
+    void t3() {
         // given
         // userItemId=999는 존재하지 않음
         given(userItemRepository.findById(999L)).willReturn(Optional.empty());
@@ -138,7 +138,7 @@ class UserItemServiceTest {
 
     @Test
     @DisplayName("다른 유저의 아이템 착용 시 NOT_ITEM_OWNER 예외가 발생한다")
-    void equipItem_소유자아님() {
+    void t4() {
         // given
         // unequippedUserItem은 USER_ID(1L) 소유인데 OTHER_USER_ID(2L)가 착용 시도
         given(userItemRepository.findById(10L)).willReturn(Optional.of(unequippedUserItem));
@@ -153,7 +153,7 @@ class UserItemServiceTest {
 
     @Test
     @DisplayName("이미 착용 중인 아이템 재착용 시 ALREADY_EQUIPPED 예외가 발생한다")
-    void equipItem_이미착용중() {
+    void t5() {
         // given
         // equippedUserItem은 이미 equippedSlot=HEAD인 상태
         given(userItemRepository.findById(11L)).willReturn(Optional.of(equippedUserItem));
@@ -173,7 +173,7 @@ class UserItemServiceTest {
 
     @Test
     @DisplayName("기존 착용 아이템이 있을 때 기존 아이템이 해제되고 새 아이템이 착용된다")
-    void switchEquippedItem_기존착용있을때교체() {
+    void t6() {
         // given
         // HEAD 슬롯에 equippedUserItem이 착용 중
         given(userItemRepository.findByUserIdAndEquippedSlot(USER_ID, ItemSlot.HEAD))
@@ -192,7 +192,7 @@ class UserItemServiceTest {
 
     @Test
     @DisplayName("해당 슬롯에 기존 착용 아이템이 없을 때 새 아이템만 착용된다")
-    void switchEquippedItem_기존착용없을때() {
+    void t7() {
         // given
         // HEAD 슬롯에 착용된 아이템 없음
         given(userItemRepository.findByUserIdAndEquippedSlot(USER_ID, ItemSlot.HEAD))
@@ -212,7 +212,7 @@ class UserItemServiceTest {
 
     @Test
     @DisplayName("착용 중인 아이템 해제 성공 시 equippedSlot이 null인 UserItemResponse가 반환된다")
-    void unequipItem_정상해제() {
+    void t8() {
         // given
         // equippedUserItem: equippedSlot=HEAD (착용 중)
         given(userItemRepository.findById(11L)).willReturn(Optional.of(equippedUserItem));
@@ -228,7 +228,7 @@ class UserItemServiceTest {
 
     @Test
     @DisplayName("존재하지 않는 UserItem 해제 시 USER_ITEM_NOT_FOUND 예외가 발생한다")
-    void unequipItem_아이템없음() {
+    void t9() {
         // given
         given(userItemRepository.findById(999L)).willReturn(Optional.empty());
 
@@ -241,7 +241,7 @@ class UserItemServiceTest {
 
     @Test
     @DisplayName("다른 유저의 아이템 해제 시 NOT_ITEM_OWNER 예외가 발생한다")
-    void unequipItem_소유자아님() {
+    void t10() {
         // given
         // equippedUserItem은 USER_ID(1L) 소유인데 OTHER_USER_ID(2L)가 해제 시도
         given(userItemRepository.findById(11L)).willReturn(Optional.of(equippedUserItem));
@@ -255,7 +255,7 @@ class UserItemServiceTest {
 
     @Test
     @DisplayName("미착용 아이템 해제 시 NOT_EQUIPPED 예외가 발생한다")
-    void unequipItem_미착용() {
+    void t11() {
         // given
         // unequippedUserItem: equippedSlot=null (미착용)
         given(userItemRepository.findById(10L)).willReturn(Optional.of(unequippedUserItem));
@@ -274,7 +274,7 @@ class UserItemServiceTest {
 
     @Test
     @DisplayName("슬롯 미지정 시 커서 기반 전체 조회가 호출되고 SliceResponse로 반환된다")
-    void getMyItems_전체조회() {
+    void t12() {
         // given
         // [변경] findByUserId() → findByUserIdAndIdGreaterThanOrderByIdAsc(cursor=0, pageable)
         // 서비스가 cursor=null을 0L로 변환하여 호출하므로 stub도 eq(0L)로 맞춤.
@@ -302,7 +302,7 @@ class UserItemServiceTest {
 
     @Test
     @DisplayName("슬롯 지정 시 커서 기반 슬롯 필터 조회가 호출되고 해당 슬롯 아이템만 반환된다")
-    void getMyItems_슬롯필터() {
+    void t13() {
         // given
         // [변경] findByUserIdAndItem_Slot() → findByUserIdAndItem_SlotAndIdGreaterThanOrderByIdAsc()
         // 슬롯 + cursor=0 + pageable 세 조건으로 커서 기반 조회
@@ -333,7 +333,7 @@ class UserItemServiceTest {
 
     @Test
     @DisplayName("착용 아이템이 있을 때 해당 슬롯에 imageUrl이 채워지고 나머지 슬롯은 null로 반환된다")
-    void getMyCharacter_장착슬롯매핑() {
+    void t14() {
         // given
         // HEAD 슬롯만 착용 중인 상태 (equippedUserItem)
         given(userItemRepository.findByUserIdAndEquippedSlotNotNull(USER_ID)).willReturn(List.of(equippedUserItem));
@@ -355,7 +355,7 @@ class UserItemServiceTest {
 
     @Test
     @DisplayName("착용 아이템이 없을 때 모든 슬롯이 null로 반환된다")
-    void getMyCharacter_장착없음() {
+    void t15() {
         // given
         // 착용 아이템이 하나도 없음
         given(userItemRepository.findByUserIdAndEquippedSlotNotNull(USER_ID)).willReturn(List.of());
