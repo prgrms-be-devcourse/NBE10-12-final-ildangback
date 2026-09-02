@@ -37,8 +37,6 @@ public class ItemService {
 
     // 상점 아이템 목록 조회
     // [변경] 반환 타입: ShopItemListResponse → SliceResponse<ShopItemResponse>
-    // - 기존 ShopItemListResponse는 content 필드만 있어 프론트가 다음 페이지 여부를 알 수 없었음.
-    // - SliceResponse는 hasNext, nextCursor를 포함해 무한 스크롤에 필요한 정보를 제공함.
     // [변경] 파라미터: cursor, size 추가
     // - cursor: 마지막으로 받은 itemId. null이면 첫 요청(처음부터 조회).
     // - size: 한 번에 가져올 아이템 수.

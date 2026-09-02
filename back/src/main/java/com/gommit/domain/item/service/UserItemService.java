@@ -72,9 +72,6 @@ public class UserItemService {
 
     // 보유 아이템 조회
     // [변경] 반환 타입: List<UserItemResponse> → SliceResponse<UserItemResponse>
-    // - 기존 List 직접 반환은 배열([...])로 직렬화되어 나중에 hasNext, nextCursor를
-    //   추가하려면 응답 구조 자체를 바꿔야 해서 프론트 코드도 전부 수정해야 함.
-    // - SliceResponse로 통일하면 구조 변경 없이 필드만 채워지므로 호환성 유지.
     // [변경] 파라미터: cursor, size 추가
     // - cursor: 마지막으로 받은 userItemId. null이면 첫 요청.
     // - size: 한 번에 가져올 아이템 수.

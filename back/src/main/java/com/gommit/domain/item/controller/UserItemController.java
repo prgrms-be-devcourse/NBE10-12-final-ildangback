@@ -39,8 +39,6 @@ public class UserItemController {
      * 보유 아이템 조회
      * - slot 쿼리 파라미터가 있으면 해당 슬롯만, 없으면 전체 보유 아이템 반환.
      * [변경] 반환 타입: List<UserItemResponse> → SliceResponse<UserItemResponse>
-     *   - 기존 배열 응답은 hasNext, nextCursor를 추가하려면 구조 자체를 바꿔야 해서
-     *     프론트 코드까지 영향. SliceResponse로 통일하면 이후 변경에 유연하게 대응 가능.
      * [변경] 파라미터 추가:
      *   cursor - 마지막으로 받은 userItemId. 첫 요청 시 생략(null).
      *   size   - 한 번에 받을 개수. 기본 20. @Min(1)로 0 이하 입력을 컨트롤러 레벨에서 차단.
