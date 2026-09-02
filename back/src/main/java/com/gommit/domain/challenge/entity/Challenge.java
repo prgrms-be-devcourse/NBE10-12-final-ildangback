@@ -56,7 +56,7 @@ public class Challenge extends BaseEntity {
 
 
     @Builder
-    public Challenge(Long groupId, int seqNo, LocalDate startDate, LocalDate endDate, FrequencyType frequencyType, Integer frequencyValue, String weekdays, int dailyCheckInCount, int requiredDayCount, int groupCurrentStreak, int groupBestStreak, boolean allowPhoto) {
+    public Challenge(Long groupId, int seqNo, LocalDate startDate, LocalDate endDate, FrequencyType frequencyType, Integer frequencyValue, String daysOfWeek, int dailyCheckInCount, int requiredDayCount, int groupCurrentStreak, int groupBestStreak, boolean allowPhoto) {
         this.groupId = groupId;
         this.seqNo = seqNo;
         this.startDate = startDate;
@@ -64,7 +64,7 @@ public class Challenge extends BaseEntity {
         this.status = ChallengeStatus.READY;
         this.frequencyType = frequencyType;
         this.frequencyValue = frequencyValue;
-        this.weekdays = weekdays;
+        this.daysOfWeek = daysOfWeek;
         this.dailyCheckInCount = dailyCheckInCount;
         this.requiredDayCount = requiredDayCount;
         this.groupCurrentStreak = groupCurrentStreak;

@@ -1,6 +1,7 @@
 package com.gommit.domain.challenge.controller;
 
 import com.gommit.domain.challenge.dto.response.ChallengeStatusResponse;
+import com.gommit.domain.challenge.dto.response.MemberTodayStatusResponse;
 import com.gommit.domain.challenge.service.ChallengeService;
 import com.gommit.global.security.CurrentUser;
 import com.gommit.global.security.SecurityUser;
@@ -11,6 +12,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @Tag(name = "challenge - 챌린지")
 @RestController
@@ -31,5 +34,18 @@ public class ChallengeController {
             );
 
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{challengeId}/members")
+    public ResponseEntity<List<MemberTodayStatusResponse>> getMemberTodayStatuses(
+        @PathVariable Long challengeId,
+        @CurrentUser SecurityUser actor
+    ) {
+        return ResponseEntity.ok(
+            challengeService.getMemberTodayStatuses(
+                challengeId,
+                actor.getId()
+            )
+        );
     }
 }

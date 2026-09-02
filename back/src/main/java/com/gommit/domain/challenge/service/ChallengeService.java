@@ -3,12 +3,14 @@ package com.gommit.domain.challenge.service;
 import com.gommit.domain.challenge.dto.request.InitialChallengeSettingRequest;
 import com.gommit.domain.challenge.dto.response.ChallengeDetailResponse;
 import com.gommit.domain.challenge.dto.response.ChallengeStatusResponse;
-import com.gommit.domain.challenge.dto.response.ChallengeSummaryResponse;
+import com.gommit.domain.challenge.dto.response.MemberTodayStatusResponse;
 import com.gommit.domain.challenge.entity.*;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.checkin.entity.CheckInType;
+import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.user.entity.User;
+import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,6 +29,8 @@ import java.util.stream.Collectors;
 public class ChallengeService {
     private final ChallengeRepository challengeRepository;
     private final ChallengeMemberRepository challengeMemberRepository;
+    private final UserRepository userRepository;
+    private final CheckInRepository checkInRepository;
 
     // 그룹 생성 시 첫 챌린지 생성
     public Challenge createInitialChallenge(Long groupId, Long userId,InitialChallengeSettingRequest setting) {
@@ -37,7 +42,7 @@ public class ChallengeService {
         int requiredDayCount = calculateRequiredDayCount(setting);
 
         // DB (String) 저장을 위해 List를 문자열로 변환
-        String weekdays = convertWeekdays(setting.weekdays());
+        String daysOfWeek = convertDaysOfWeek(setting.daysOfWeek());
 
         // 허용된 인증 방식 PHOTO가 포함되어 있는지 확인
         boolean allowPhoto = setting.allowedTypes().contains(CheckInType.PHOTO);
@@ -49,7 +54,7 @@ public class ChallengeService {
             .endDate(setting.endDate())
             .frequencyType(setting.frequencyType())
             .frequencyValue(setting.frequencyValue())
-            .weekdays(weekdays)
+            .daysOfWeek(daysOfWeek)
             .dailyCheckInCount(setting.dailyCheckInCount())
             .requiredDayCount(requiredDayCount)
             .groupCurrentStreak(0)
@@ -129,13 +134,73 @@ public class ChallengeService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public List<MemberTodayStatusResponse> getMemberTodayStatuses(
+        Long challengeId,
+        Long userId
+    ) {
+        // 챌린지 조회
+        Challenge challenge = challengeRepository.findById(challengeId)
+            .orElseThrow(() ->
+                new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND)
+            );
+
+        // 요청자가 해당 시즌 멤버인지 확인
+        challengeMemberRepository
+            .findByChallengeIdAndUserId(challengeId, userId)
+            .orElseThrow(() ->
+                new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER)
+            );
+
+        // 현재 참여 중인 시즌 멤버 조회
+        List<ChallengeMember> members =
+            challengeMemberRepository.findAllByChallengeIdAndStatus(
+                challengeId,
+                ChallengeMemberStatus.ACTIVE
+            );
+
+        // 시즌 멤버 userId 목록
+        List<Long> userIds = members.stream()
+            .map(ChallengeMember::getUserId)
+            .toList();
+
+        // 유저 정보 한 번에 조회
+        List<User> users = userRepository.findAllByIdIn(userIds);
+
+        // userId로 유저를 찾을 수 있도록 Map 변환
+        Map<Long, User> userMap = users.stream()
+            .collect(Collectors.toMap(
+                User::getId,
+                user -> user
+            ));
+
+        LocalDate today = LocalDate.now();
+
+        return members.stream().map(member -> {
+            User user = userMap.get(member.getUserId());
+
+            // 오늘 인증 횟수 조회
+            long todayCheckInCount = checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(
+                challengeId,
+                member.getUserId(),
+                today
+            );
+
+            return new MemberTodayStatusResponse(
+                member.getUserId(),
+                user.getNickname(),
+                (int) todayCheckInCount
+            );
+        }).toList();
+    }
+
     // 선택된 요일 DB 저장용 문자열로 변환
-    private String convertWeekdays(List<Weekday> weekdays) {
-        if (weekdays == null || weekdays.isEmpty()) {
+    private String convertDaysOfWeek(List<DaysOfWeek> daysOfWeek) {
+        if (daysOfWeek == null || daysOfWeek.isEmpty()) {
             return null;
         }
 
-        return weekdays.stream().map(Weekday::name).collect(Collectors.joining(","));
+        return daysOfWeek.stream().map(DaysOfWeek::name).collect(Collectors.joining(","));
     }
 
     // 인증 주기 계산
@@ -146,14 +211,14 @@ public class ChallengeService {
             // 매일인증
             case DAILY -> (int) ChronoUnit.DAYS.between(setting.startDate(), setting.endDate()) + 1;
             // 선택된 요일 인증
-            case WEEKDAYS -> {
+            case DAYS_OF_WEEK -> {
                 int count = 0;
                 for(
                     LocalDate date = setting.startDate();
                     !date.isAfter(setting.endDate());
                     date = date.plusDays(1)
                 ) {
-                    if(setting.weekdays().contains(Weekday.getWeekday(date.getDayOfWeek()))) {
+                    if(setting.daysOfWeek().contains(DaysOfWeek.getDaysOfWeek(date.getDayOfWeek()))) {
                         count++;
                     }
                 } yield  count;
@@ -198,7 +263,7 @@ public class ChallengeService {
 
     // WEEKDAYS 필수 검증 체크
     private void validateWeekdays(InitialChallengeSettingRequest setting) {
-        if (setting.frequencyType() == FrequencyType.WEEKDAYS && (setting.weekdays() == null || setting.weekdays().isEmpty())) {
+        if (setting.frequencyType() == FrequencyType.DAYS_OF_WEEK && (setting.daysOfWeek() == null || setting.daysOfWeek().isEmpty())) {
             throw new BusinessException(ErrorCode.INVALID_FREQUENCY);
         }
     }
@@ -232,7 +297,7 @@ public class ChallengeService {
 
         return switch (challenge.getFrequencyType()) {
             case DAILY -> calculateDailyCurrentDay(challenge, today);
-            case WEEKDAYS -> calculateWeekdaysCurrentDay(challenge, today);
+            case DAYS_OF_WEEK -> calculateDaysOfWeekCurrentDay(challenge, today);
             case EVERY_N_DAYS -> calculateEveryNDaysCurrentDay(challenge, today);
         };
     }
@@ -248,12 +313,12 @@ public class ChallengeService {
         return Math.min(currentDay, challenge.getRequiredDayCount());
     }
 
-    private int calculateWeekdaysCurrentDay(Challenge challenge, LocalDate today) {
+    private int calculateDaysOfWeekCurrentDay(Challenge challenge, LocalDate today) {
         if(today.isBefore(challenge.getStartDate())) {
             return 0;
         }
 
-        List<Weekday> weekdays = Arrays.stream(challenge.getWeekdays().split(",")).map(Weekday::valueOf).toList();
+        List<DaysOfWeek> scheduledDays = Arrays.stream(challenge.getDaysOfWeek().split(",")).map(DaysOfWeek::valueOf).toList();
 
         LocalDate endDate = today.isAfter(challenge.getEndDate()) ? challenge.getEndDate() : today;
 
@@ -262,9 +327,9 @@ public class ChallengeService {
         for(LocalDate date = challenge.getStartDate();
             !date.isAfter(endDate);
             date = date.plusDays(1)) {
-            Weekday weekday = Weekday.getWeekday(date.getDayOfWeek());
+            DaysOfWeek currentDayOfWeek = DaysOfWeek.getDaysOfWeek(date.getDayOfWeek());
 
-            if(weekdays.contains(weekday)) {
+            if(scheduledDays.contains(currentDayOfWeek)) {
                 count++;
             }
         }
@@ -302,9 +367,9 @@ public class ChallengeService {
 
         return switch (challenge.getFrequencyType()) {
             case DAILY -> true;
-            case WEEKDAYS -> Arrays.stream(challenge.getWeekdays().split(","))
-                .map(Weekday::valueOf)
-                .anyMatch(weekday -> weekday == Weekday.getWeekday(today.getDayOfWeek()));
+            case DAYS_OF_WEEK -> Arrays.stream(challenge.getDaysOfWeek().split(","))
+                .map(DaysOfWeek::valueOf)
+                .anyMatch(daysOfWeek -> daysOfWeek == DaysOfWeek.getDaysOfWeek(today.getDayOfWeek()));
             case EVERY_N_DAYS -> {
                 long days = ChronoUnit.DAYS.between(challenge.getStartDate(), today);
 

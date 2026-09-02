@@ -3,7 +3,7 @@ package com.gommit.domain.challenge.dto.response;
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.ChallengeStatus;
 import com.gommit.domain.challenge.entity.FrequencyType;
-import com.gommit.domain.challenge.entity.Weekday;
+import com.gommit.domain.challenge.entity.DaysOfWeek;
 import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.domain.challenge.dto.request.InitialChallengeSettingRequest;
 
@@ -19,7 +19,7 @@ public record ChallengeSummaryResponse(
     LocalDate endDate,
     FrequencyType frequencyType,
     Integer frequencyValue,
-    List<Weekday> weekdays,
+    List<DaysOfWeek> daysOfWeek,
     int dailyCheckInCount,
     List<CheckInType> allowedTypes
 ) {
@@ -35,7 +35,7 @@ public record ChallengeSummaryResponse(
             challenge.getEndDate(),
             challenge.getFrequencyType(),
             challenge.getFrequencyValue(),
-            setting.weekdays(),
+            setting.daysOfWeek(),
             challenge.getDailyCheckInCount(),
             setting.allowedTypes()
         );
@@ -50,20 +50,20 @@ public record ChallengeSummaryResponse(
             challenge.getEndDate(),
             challenge.getFrequencyType(),
             challenge.getFrequencyValue(),
-            parseWeekdays(challenge.getWeekdays()),
+            parseDaysOfWeek(challenge.getDaysOfWeek()),
             challenge.getDailyCheckInCount(),
             challenge.isAllowPhoto() ? List.of(CheckInType.PHOTO) : List.of()
         );
     }
 
-    private static List<Weekday> parseWeekdays(String weekdays) {
-        if(weekdays == null || weekdays.isEmpty()) {
+    private static List<DaysOfWeek> parseDaysOfWeek(String daysOfWeek) {
+        if(daysOfWeek == null || daysOfWeek.isEmpty()) {
             return List.of();
         }
 
-        return Arrays.stream(weekdays.split(","))
+        return Arrays.stream(daysOfWeek.split(","))
             .map(String::trim)
-            .map(Weekday::valueOf)
+            .map(DaysOfWeek::valueOf)
             .toList();
     }
 }
