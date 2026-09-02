@@ -5,6 +5,7 @@ import com.gommit.domain.challenge.entity.ChallengeMemberRole;
 import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface ChallengeMemberRepository extends JpaRepository<ChallengeMember, Long> {
@@ -13,4 +14,6 @@ public interface ChallengeMemberRepository extends JpaRepository<ChallengeMember
     Optional<ChallengeMember> findByChallengeIdAndRole(Long challengeId, ChallengeMemberRole role);
 
     long countByChallengeIdAndStatus(Long challengeId, ChallengeMemberStatus status);
+
+    List<ChallengeMember> findAllByChallengeIdAndStatus(Long challengeId, ChallengeMemberStatus status);
 }

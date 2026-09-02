@@ -2,7 +2,7 @@ package com.gommit.domain.group.dto.response;
 
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.FrequencyType;
-import com.gommit.domain.challenge.entity.Weekday;
+import com.gommit.domain.challenge.entity.DaysOfWeek;
 import com.gommit.domain.group.entity.ChallengeGroup;
 import com.gommit.domain.group.entity.GroupCategory;
 import com.gommit.domain.group.entity.GroupStatus;
@@ -24,7 +24,7 @@ public record GroupSummaryResponse(
     LocalDate endDate,
     FrequencyType frequencyType,
     Integer frequencyValue,
-    List<Weekday> weekdays,
+    List<DaysOfWeek> weekdays,
     int dailyCheckInCount
 ) {
     public GroupSummaryResponse(
@@ -45,19 +45,19 @@ public record GroupSummaryResponse(
             challenge.getEndDate(),
             challenge.getFrequencyType(),
             challenge.getFrequencyValue(),
-            parseWeekdays(challenge.getWeekdays()),
+            parseDaysOfWeek(challenge.getDaysOfWeek()),
             challenge.getDailyCheckInCount()
         );
     }
 
-    private static List<Weekday> parseWeekdays(String weekdays) {
-        if (weekdays == null || weekdays.isBlank()) {
+    private static List<DaysOfWeek> parseDaysOfWeek(String daysOfWeek) {
+        if (daysOfWeek == null || daysOfWeek.isBlank()) {
             return List.of();
         }
 
-        return Arrays.stream(weekdays.split(","))
+        return Arrays.stream(daysOfWeek.split(","))
             .map(String::trim)
-            .map(Weekday::valueOf)
+            .map(DaysOfWeek::valueOf)
             .toList();
     }
 }

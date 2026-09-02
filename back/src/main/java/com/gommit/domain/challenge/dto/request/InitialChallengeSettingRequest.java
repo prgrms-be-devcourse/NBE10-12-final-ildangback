@@ -1,7 +1,7 @@
 package com.gommit.domain.challenge.dto.request;
 
+import com.gommit.domain.challenge.entity.DaysOfWeek;
 import com.gommit.domain.challenge.entity.FrequencyType;
-import com.gommit.domain.challenge.entity.Weekday;
 import com.gommit.domain.checkin.entity.CheckInType;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -26,7 +26,7 @@ public record InitialChallengeSettingRequest(
     @Max(7)
     Integer frequencyValue,
 
-    List<Weekday> weekdays,
+    List<DaysOfWeek> daysOfWeek,
 
     @NotNull
     @Min(1)

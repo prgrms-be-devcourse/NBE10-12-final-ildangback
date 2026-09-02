@@ -2,7 +2,7 @@ package com.gommit.domain.challenge.entity;
 
 import java.time.DayOfWeek;
 
-public enum Weekday {
+public enum DaysOfWeek {
     MON,
     TUE,
     WED,
@@ -11,7 +11,7 @@ public enum Weekday {
     SAT,
     SUN;
 
-    public static Weekday getWeekday(DayOfWeek dayOfWeek) {
+    public static DaysOfWeek getDaysOfWeek(DayOfWeek dayOfWeek) {
         return switch (dayOfWeek) {
             case MONDAY -> MON;
             case TUESDAY -> TUE;
