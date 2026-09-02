@@ -17,12 +17,12 @@ class RefreshTokenCleanupIntegrationTest extends IntegrationTestSupport {
     private RefreshTokenService refreshTokenService;
 
     @Test
-    @DisplayName("만료된 RT 만 지운다 — 폐기됐어도 만료 전이면 남긴다. 지우면 재사용 탐지가 꺼진다")
+    @DisplayName("만료된 RT 만 지운다. 폐기됐어도 만료 전이면 남긴다")
     void deleteExpiredRemovesOnlyExpiredRows() {
         Long userId = signUpAndGetUserId();
         LocalDateTime now = LocalDateTime.now();
 
-        // 만료 여부 × 폐기 여부 네 조합. 운영에서 가장 많은 행은 expired-and-revoked 다
+        // 만료 여부 x 폐기 여부 네 조합. 운영에서 가장 많은 행은 expired-and-revoked 다
         insertToken(userId, "expired-and-revoked", now.minusDays(1), now.minusDays(2));
         insertToken(userId, "expired-not-revoked", now.minusDays(1), null);
         insertToken(userId, "revoked-not-expired", now.plusDays(30), now.minusDays(1));
@@ -34,7 +34,7 @@ class RefreshTokenCleanupIntegrationTest extends IntegrationTestSupport {
         assertThat(remainingTokenHashes()).containsExactlyInAnyOrder("revoked-not-expired", "active");
     }
 
-    // 가입만 시키고 그때 발급된 RT 는 걷어낸다. 이 테스트는 직접 넣은 행만 본다.
+    // 로그인으로 생긴 RT 는 걷어낸다. 이 테스트는 직접 넣은 행만 본다.
     private Long signUpAndGetUserId() {
         loginAs();
         jdbcTemplate.update("DELETE FROM refresh_tokens");

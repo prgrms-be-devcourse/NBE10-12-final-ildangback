@@ -46,12 +46,12 @@ public class RefreshTokenService {
     // RT 로테이션
     @Transactional
     public RotateResult rotate(String rawToken) {
-        User owner = verifyAndRevoke(rawToken);
+        User owner = verifyAndRotate(rawToken);
         return new RotateResult(owner, issue(owner));
     }
 
-    // RT 검증 후 폐기
-    private User verifyAndRevoke(String rawToken) {
+    // RT 검증 후 로테이션 처리
+    private User verifyAndRotate(String rawToken) {
         RefreshToken token = refreshTokenRepository
                 .findByTokenHashForUpdate(hash(rawToken))
                 .orElseThrow(() -> new BusinessException(ErrorCode.REFRESH_TOKEN_INVALID));
@@ -63,12 +63,16 @@ public class RefreshTokenService {
 
         Long userId = token.getUser().getId();
 
-        if (!token.isRevoked()) {
-            refreshTokenRepository.revokeIfActive(token.getId(), now);
+        if (token.isRevoked()) {
+            throw new BusinessException(ErrorCode.REFRESH_TOKEN_INVALID);
+        }
+
+        if (!token.isRotated()) {
+            refreshTokenRepository.rotateIfActive(token.getId(), now);
             return getActiveUser(userId);
         }
 
-        if (isRevokedInGracePeriod(token, now)) {
+        if (isRotatedInGracePeriod(token, now)) {
             return getActiveUser(userId);
         }
 
@@ -112,13 +116,13 @@ public class RefreshTokenService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.REFRESH_TOKEN_INVALID));
     }
 
-    // 폐기 후 유예 시간 이내인지
-    private boolean isRevokedInGracePeriod(RefreshToken token, LocalDateTime now) {
-        LocalDateTime revokedAt = token.getRevokedAt();
-        if (revokedAt == null) {
+    // 로테이션 후 유예 시간 이내인지
+    private boolean isRotatedInGracePeriod(RefreshToken token, LocalDateTime now) {
+        LocalDateTime rotatedAt = token.getRotatedAt();
+        if (rotatedAt == null) {
             return false;
         }
-        return !now.isAfter(revokedAt.plus(authTokenProperties.refreshToken().reuseGracePeriod()));
+        return !now.isAfter(rotatedAt.plus(authTokenProperties.refreshToken().reuseGracePeriod()));
     }
 
     // RT 생성

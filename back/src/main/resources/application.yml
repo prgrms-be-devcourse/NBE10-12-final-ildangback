@@ -33,4 +33,4 @@ auth-token:
     expiration: 15m
   refresh-token:
     expiration: 30d
-    reuse-grace-period: 30s
+    reuse-grace-period: 3s
