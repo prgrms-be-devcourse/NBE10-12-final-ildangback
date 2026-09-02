@@ -14,6 +14,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.Map;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -29,9 +30,14 @@ public class CloudinaryStorageService implements StorageService {
     private static final String TYPE_PUBLIC = "upload";
     private static final String TYPE_PRIVATE = "authenticated";
 
+    // PRIVATE 미디어를 서버가 Cloudinary 서명 URL 로 받아 올 때의 타임아웃.
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
+
     private final MediaStorageProperties properties;
     private final Cloudinary cloudinary;
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final HttpClient httpClient =
+            HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build();
 
     // Cloudinary 클라이언트는 MediaConfig 가 CloudinaryClientFactory 로 만들어 주입한다.
     public CloudinaryStorageService(Cloudinary cloudinary, MediaStorageProperties properties) {
@@ -74,7 +80,10 @@ public class CloudinaryStorageService implements StorageService {
         String signedUrl = buildUrl(storageKey, deliveryType(properties.policyFor(mediaRole)), true);
         try {
             HttpResponse<byte[]> response = httpClient.send(
-                    HttpRequest.newBuilder(URI.create(signedUrl)).GET().build(),
+                    HttpRequest.newBuilder(URI.create(signedUrl))
+                            .timeout(REQUEST_TIMEOUT)
+                            .GET()
+                            .build(),
                     HttpResponse.BodyHandlers.ofByteArray());
             if (response.statusCode() != 200) {
                 throw new BusinessException(ErrorCode.MEDIA_NOT_FOUND);
