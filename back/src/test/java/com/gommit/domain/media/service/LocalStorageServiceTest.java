@@ -74,6 +74,35 @@ class LocalStorageServiceTest {
         }
 
         @Test
+        @DisplayName("허용되지 않는 콘텐츠 타입이면 UNSUPPORTED_MEDIA_TYPE")
+        void unsupportedContentType() {
+            MockMultipartFile pdf = new MockMultipartFile("file", "x.pdf", "application/pdf", PNG_BYTES);
+            assertThatThrownBy(() -> service.store(pdf, MediaRole.CHECKIN))
+                    .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                            .isEqualTo(ErrorCode.UNSUPPORTED_MEDIA_TYPE));
+        }
+
+        @Test
+        @DisplayName("파일 쓰기가 실패하면 MEDIA_STORAGE_FAILED")
+        void writeFailure() throws IOException {
+            // baseDir 자리에 일반 파일을 두면 하위 디렉토리 생성이 IOException 으로 실패한다
+            Path notADir = baseDir.resolve("not-a-dir");
+            Files.writeString(notADir, "x");
+            LocalStorageService broken = new LocalStorageService(new MediaStorageProperties(
+                    "local",
+                    new MediaStorageProperties.LocalPaths(notADir.toString(), "http://localhost/media"),
+                    null,
+                    Map.of(
+                            MediaRole.CHECKIN,
+                            new StoragePolicy(
+                                    "check-ins", DataSize.ofMegabytes(5), Visibility.PRIVATE, Set.of("image/png")))));
+
+            assertThatThrownBy(() -> broken.store(pngFile(), MediaRole.CHECKIN))
+                    .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                            .isEqualTo(ErrorCode.MEDIA_STORAGE_FAILED));
+        }
+
+        @Test
         @DisplayName("확장자는 Content-Type 에서 정한다 (jpeg -> jpg)")
         void extensionFromContentType() {
             MockMultipartFile jpeg = new MockMultipartFile("file", "x", "image/jpeg", PNG_BYTES);
@@ -140,6 +169,19 @@ class LocalStorageServiceTest {
             String key = service.store(pngFile(), MediaRole.CHECKIN).storageKey();
             service.delete(key, MediaRole.CHECKIN);
             assertThat(baseDir.resolve(key)).doesNotExist();
+        }
+
+        @Test
+        @DisplayName("삭제가 IOException 으로 실패하면 MEDIA_STORAGE_FAILED")
+        void deleteFailure() throws IOException {
+            // 키가 비어 있지 않은 디렉토리를 가리키면 deleteIfExists 가 IOException 을 던진다
+            Path dir = baseDir.resolve("check-ins/sub");
+            Files.createDirectories(dir);
+            Files.writeString(dir.resolve("child.txt"), "x");
+
+            assertThatThrownBy(() -> service.delete("check-ins/sub", MediaRole.CHECKIN))
+                    .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                            .isEqualTo(ErrorCode.MEDIA_STORAGE_FAILED));
         }
 
         @Test

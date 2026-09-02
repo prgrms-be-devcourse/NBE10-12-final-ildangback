@@ -18,6 +18,7 @@ import com.gommit.domain.media.policy.StoragePolicy;
 import com.gommit.domain.media.policy.StoragePolicy.Visibility;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
@@ -104,6 +105,35 @@ class CloudinaryStorageServiceTest {
                     .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                             .isEqualTo(ErrorCode.UNSUPPORTED_MEDIA_TYPE));
         }
+
+        @Test
+        @DisplayName("영상 콘텐츠 타입이면 resource_type=video")
+        void videoContentType() throws Exception {
+            given(cloudinary.uploader()).willReturn(uploader);
+            given(uploader.upload(any(), anyMap()))
+                    .willReturn(Map.of("public_id", "daily-check-ins/v", "format", "mp4"));
+
+            CloudinaryStorageService service = new CloudinaryStorageService(cloudinary, PROPERTIES);
+            service.store(new MockMultipartFile("f", "x", "video/mp4", new byte[] {1}), MediaRole.DAILYLOG);
+
+            ArgumentCaptor<Map<String, Object>> options = ArgumentCaptor.forClass(Map.class);
+            verify(uploader).upload(any(), options.capture());
+            assertThat(options.getValue()).containsEntry("resource_type", "video");
+        }
+
+        @Test
+        @DisplayName("업로드가 IOException 을 던지면 MEDIA_STORAGE_FAILED")
+        void uploadFailure() throws Exception {
+            given(cloudinary.uploader()).willReturn(uploader);
+            given(uploader.upload(any(), anyMap())).willThrow(new IOException("boom"));
+
+            CloudinaryStorageService service = new CloudinaryStorageService(cloudinary, PROPERTIES);
+            MockMultipartFile png = new MockMultipartFile("f", "x", "image/png", new byte[] {1});
+
+            assertThatThrownBy(() -> service.store(png, MediaRole.CHECKIN))
+                    .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                            .isEqualTo(ErrorCode.MEDIA_STORAGE_FAILED));
+        }
     }
 
     @Nested
@@ -131,6 +161,33 @@ class CloudinaryStorageServiceTest {
                     .containsEntry("resource_type", "image")
                     .containsEntry("type", "authenticated")
                     .containsEntry("invalidate", true);
+        }
+
+        @Test
+        @DisplayName("mp4 키는 resource_type=video 로 destroy 를 호출한다")
+        void destroysVideo() throws Exception {
+            given(cloudinary.uploader()).willReturn(uploader);
+            given(uploader.destroy(eq("daily-check-ins/v"), anyMap())).willReturn(Map.of("result", "ok"));
+
+            CloudinaryStorageService service = new CloudinaryStorageService(cloudinary, PROPERTIES);
+            service.delete("daily-check-ins/v.mp4", MediaRole.DAILYLOG);
+
+            ArgumentCaptor<Map<String, Object>> options = ArgumentCaptor.forClass(Map.class);
+            verify(uploader).destroy(eq("daily-check-ins/v"), options.capture());
+            assertThat(options.getValue()).containsEntry("resource_type", "video");
+        }
+
+        @Test
+        @DisplayName("destroy 가 IOException 을 던지면 MEDIA_STORAGE_FAILED")
+        void destroyFailure() throws Exception {
+            given(cloudinary.uploader()).willReturn(uploader);
+            given(uploader.destroy(any(), anyMap())).willThrow(new IOException("boom"));
+
+            CloudinaryStorageService service = new CloudinaryStorageService(cloudinary, PROPERTIES);
+
+            assertThatThrownBy(() -> service.delete("check-ins/abc123.jpg", MediaRole.CHECKIN))
+                    .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                            .isEqualTo(ErrorCode.MEDIA_STORAGE_FAILED));
         }
     }
 
