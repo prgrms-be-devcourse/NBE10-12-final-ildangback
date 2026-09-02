@@ -19,7 +19,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-
 @Tag(name = "Item", description = "상점 아이템 API")
 @RestController
 @RequiredArgsConstructor
@@ -38,18 +37,14 @@ public class ItemController {
             @RequestParam(required = false) ItemSlot slot,
             @RequestParam(required = false) Long cursor,
             @RequestParam(defaultValue = "20") @Min(1) int size,
-            @CurrentUser SecurityUser actor
-    ) {
+            @CurrentUser SecurityUser actor) {
         return ResponseEntity.ok(itemService.getShopItems(actor.getId(), slot, cursor, size));
     }
 
     // 아이템 구매
     @PostMapping("/items/{itemId}/purchase")
     @Operation(summary = "아이템 구매")
-    public ResponseEntity<ItemPurchaseResponse> purchase(
-            @PathVariable Long itemId,
-            @CurrentUser SecurityUser actor
-    ) {
+    public ResponseEntity<ItemPurchaseResponse> purchase(@PathVariable Long itemId, @CurrentUser SecurityUser actor) {
         ItemPurchaseResponse response = itemService.purchaseItem(actor.getId(), itemId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -57,9 +52,7 @@ public class ItemController {
     // 관리자 아이템 등록
     @PostMapping(value = "/admin/items", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "아이템 등록(관리자)")
-    public ResponseEntity<ItemResponse> createItem(
-        @Valid @ModelAttribute ItemCreateRequest request
-        ) {
+    public ResponseEntity<ItemResponse> createItem(@Valid @ModelAttribute ItemCreateRequest request) {
         ItemResponse response = itemService.createItem(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -67,9 +60,7 @@ public class ItemController {
     // 관리자 아이템 삭제
     @DeleteMapping("/admin/items/{itemId}")
     @Operation(summary = "아이템 삭제(관리자)")
-    public ResponseEntity<Void> deleteItem(
-        @PathVariable Long itemId
-    ) {
+    public ResponseEntity<Void> deleteItem(@PathVariable Long itemId) {
         itemService.deleteItem(itemId);
         return ResponseEntity.noContent().build();
     }

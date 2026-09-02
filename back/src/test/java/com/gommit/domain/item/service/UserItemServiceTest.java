@@ -1,5 +1,13 @@
 package com.gommit.domain.item.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
+
 import com.gommit.domain.item.dto.response.CharacterResponse;
 import com.gommit.domain.item.dto.response.UserItemResponse;
 import com.gommit.domain.item.entity.Item;
@@ -9,6 +17,9 @@ import com.gommit.domain.item.repository.UserItemRepository;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,18 +29,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.then;
-import static org.mockito.Mockito.never;
 
 // Spring Context 없이 Mockito만으로 실행하는 순수 단위 테스트
 @ExtendWith(MockitoExtension.class)
@@ -58,7 +57,11 @@ class UserItemServiceTest {
     @BeforeEach
     void setUp() {
         // DB가 없으므로 ReflectionTestUtils로 BaseEntity의 private id·createdAt 필드를 강제 주입
-        headItem = Item.of(ItemSlot.HEAD, "기본 모자", "https://cdn.phototourl.com/free/2026-09-02-404c3e23-3aa1-46f2-b0e2-4e2c239530ce.jpg", 100);
+        headItem = Item.of(
+                ItemSlot.HEAD,
+                "기본 모자",
+                "https://cdn.phototourl.com/free/2026-09-02-404c3e23-3aa1-46f2-b0e2-4e2c239530ce.jpg",
+                100);
         ReflectionTestUtils.setField(headItem, "id", 1L);
 
         // 미착용 상태: equip() 호출 없음 → equippedSlot=null
@@ -289,8 +292,12 @@ class UserItemServiceTest {
         assertThat(response.content()).hasSize(2);
 
         // [변경] 호출 메서드 검증도 커서 기반 메서드로 교체
-        then(userItemRepository).should().findByUserIdAndIdGreaterThanOrderByIdAsc(eq(USER_ID), eq(0L), any(Pageable.class));
-        then(userItemRepository).should(never()).findByUserIdAndItem_SlotAndIdGreaterThanOrderByIdAsc(any(), any(), any(), any());
+        then(userItemRepository)
+                .should()
+                .findByUserIdAndIdGreaterThanOrderByIdAsc(eq(USER_ID), eq(0L), any(Pageable.class));
+        then(userItemRepository)
+                .should(never())
+                .findByUserIdAndItemSlotAndIdGreaterThanOrderByIdAsc(any(), any(), any(), any());
     }
 
     @Test
@@ -299,8 +306,8 @@ class UserItemServiceTest {
         // given
         // [변경] findByUserIdAndItem_Slot() → findByUserIdAndItem_SlotAndIdGreaterThanOrderByIdAsc()
         // 슬롯 + cursor=0 + pageable 세 조건으로 커서 기반 조회
-        given(userItemRepository.findByUserIdAndItem_SlotAndIdGreaterThanOrderByIdAsc(
-                eq(USER_ID), eq(ItemSlot.HEAD), eq(0L), any(Pageable.class)))
+        given(userItemRepository.findByUserIdAndItemSlotAndIdGreaterThanOrderByIdAsc(
+                        eq(USER_ID), eq(ItemSlot.HEAD), eq(0L), any(Pageable.class)))
                 .willReturn(List.of(unequippedUserItem));
 
         // when
@@ -313,8 +320,10 @@ class UserItemServiceTest {
         assertThat(response.content().get(0).item().slot()).isEqualTo(ItemSlot.HEAD);
 
         // [변경] 슬롯 필터 커서 기반 메서드가 호출되고, 전체 조회 메서드는 호출되지 않아야 함
-        then(userItemRepository).should().findByUserIdAndItem_SlotAndIdGreaterThanOrderByIdAsc(
-                eq(USER_ID), eq(ItemSlot.HEAD), eq(0L), any(Pageable.class));
+        then(userItemRepository)
+                .should()
+                .findByUserIdAndItemSlotAndIdGreaterThanOrderByIdAsc(
+                        eq(USER_ID), eq(ItemSlot.HEAD), eq(0L), any(Pageable.class));
         then(userItemRepository).should(never()).findByUserIdAndIdGreaterThanOrderByIdAsc(any(), any(), any());
     }
 
@@ -327,8 +336,7 @@ class UserItemServiceTest {
     void getMyCharacter_장착슬롯매핑() {
         // given
         // HEAD 슬롯만 착용 중인 상태 (equippedUserItem)
-        given(userItemRepository.findByUserIdAndEquippedSlotNotNull(USER_ID))
-                .willReturn(List.of(equippedUserItem));
+        given(userItemRepository.findByUserIdAndEquippedSlotNotNull(USER_ID)).willReturn(List.of(equippedUserItem));
 
         // when
         CharacterResponse response = userItemService.getMyCharacter(USER_ID);
@@ -350,8 +358,7 @@ class UserItemServiceTest {
     void getMyCharacter_장착없음() {
         // given
         // 착용 아이템이 하나도 없음
-        given(userItemRepository.findByUserIdAndEquippedSlotNotNull(USER_ID))
-                .willReturn(List.of());
+        given(userItemRepository.findByUserIdAndEquippedSlotNotNull(USER_ID)).willReturn(List.of());
 
         // when
         CharacterResponse response = userItemService.getMyCharacter(USER_ID);

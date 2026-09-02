@@ -2,13 +2,12 @@ package com.gommit.domain.item.repository;
 
 import com.gommit.domain.item.entity.ItemSlot;
 import com.gommit.domain.item.entity.UserItem;
+import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
-
-import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface UserItemRepository extends JpaRepository<UserItem, Long> {
@@ -32,7 +31,8 @@ public interface UserItemRepository extends JpaRepository<UserItem, Long> {
 
     // [변경] getMyItems 슬롯 필터 조회: slot + cursor 두 조건으로 size+1개 가져옴.
     @EntityGraph(attributePaths = "item")
-    List<UserItem> findByUserIdAndItem_SlotAndIdGreaterThanOrderByIdAsc(Long userId, ItemSlot slot, Long cursor, Pageable pageable);
+    List<UserItem> findByUserIdAndItemSlotAndIdGreaterThanOrderByIdAsc(
+            Long userId, ItemSlot slot, Long cursor, Pageable pageable);
 
     // 구매 시 중복 보유 체크
     boolean existsByUserIdAndItemId(Long userId, Long itemId);

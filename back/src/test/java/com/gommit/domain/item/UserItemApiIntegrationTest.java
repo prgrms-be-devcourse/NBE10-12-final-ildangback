@@ -1,12 +1,12 @@
 package com.gommit.domain.item;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
 import com.gommit.support.IntegrationTestSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 // IntegrationTestSupport를 상속받아 MySQL Testcontainer + MockMvc 환경을 재사용한다.
 // @BeforeEach에서 clearDatabase()가 실행되므로 각 테스트는 빈 DB 상태에서 시작한다.
@@ -101,8 +101,7 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
             // ItemController와 동일하게 @Min(1)이 컨트롤러에 선언되어 있으므로
             // Bean Validation이 서비스 호출 전에 400을 반환한다.
-            mockMvc.perform(withToken(
-                            get("/api/users/me/items").param("size", "0"), tokens.accessToken()))
+            mockMvc.perform(withToken(get("/api/users/me/items").param("size", "0"), tokens.accessToken()))
                     .andExpect(status().isBadRequest());
         }
     }
@@ -130,8 +129,7 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
             // 구매 API 대신 DB 직접 삽입으로 보유 상태를 만든다 (테스트 속도 향상)
             long userItemId = insertUserItem(userId, itemId);
 
-            mockMvc.perform(withToken(
-                            put("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()))
+            mockMvc.perform(withToken(put("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()))
                     .andExpect(status().isOk())
                     // 착용 후 equippedSlot이 해당 슬롯 문자열로 채워져야 한다
                     .andExpect(jsonPath("$.equippedSlot").value("HEAD"));
@@ -143,8 +141,7 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
             var tokens = loginAs();
 
             // DB에 없는 userItemId → UserItemService에서 USER_ITEM_NOT_FOUND → 404
-            mockMvc.perform(withToken(
-                            put("/api/users/me/items/999999/equip"), tokens.accessToken()))
+            mockMvc.perform(withToken(put("/api/users/me/items/999999/equip"), tokens.accessToken()))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.code").value("USER_ITEM_NOT_FOUND"));
         }
@@ -162,8 +159,7 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
             // 별개의 유저가 소유자의 userItemId로 착용 시도
             // isOwnedBy(userId) 검사에서 false → NOT_ITEM_OWNER → 403
             var other = loginAs("other@example.com", "타인");
-            mockMvc.perform(withToken(
-                            put("/api/users/me/items/" + userItemId + "/equip"), other.accessToken()))
+            mockMvc.perform(withToken(put("/api/users/me/items/" + userItemId + "/equip"), other.accessToken()))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.code").value("NOT_ITEM_OWNER"));
         }
@@ -178,12 +174,10 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
             long userItemId = insertUserItem(userId, itemId);
 
             // 첫 번째 착용 (성공)
-            mockMvc.perform(withToken(
-                    put("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()));
+            mockMvc.perform(withToken(put("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()));
 
             // 두 번째 착용 시도 → isEquipped()가 true → ALREADY_EQUIPPED → 409
-            mockMvc.perform(withToken(
-                            put("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()))
+            mockMvc.perform(withToken(put("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.code").value("ALREADY_EQUIPPED"));
         }
@@ -198,8 +192,7 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
         @Test
         @DisplayName("미인증이면 401")
         void 미인증_401() throws Exception {
-            mockMvc.perform(delete("/api/users/me/items/1/equip"))
-                    .andExpect(status().isUnauthorized());
+            mockMvc.perform(delete("/api/users/me/items/1/equip")).andExpect(status().isUnauthorized());
         }
 
         @Test
@@ -212,12 +205,10 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
             long userItemId = insertUserItem(userId, itemId);
 
             // 먼저 착용 상태로 만든다
-            mockMvc.perform(withToken(
-                    put("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()));
+            mockMvc.perform(withToken(put("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()));
 
             // 착용 해제 요청 → unequip() 호출 → equippedSlot = null
-            mockMvc.perform(withToken(
-                            delete("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()))
+            mockMvc.perform(withToken(delete("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()))
                     .andExpect(status().isOk())
                     // Jackson이 null 필드를 직렬화하는 방식에 따라
                     // doesNotExist() 또는 value((Object) null) 중 하나로 조정한다
@@ -235,8 +226,7 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
             long userItemId = insertUserItem(userId, itemId);
 
             // isEquipped()가 false → NOT_EQUIPPED(HttpStatus.BAD_REQUEST) → 400
-            mockMvc.perform(withToken(
-                            delete("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()))
+            mockMvc.perform(withToken(delete("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("NOT_EQUIPPED"));
         }
@@ -251,13 +241,11 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
             long itemId = insertItem("TOP", "기본 상의", 200);
             long userItemId = insertUserItem(ownerId, itemId);
 
-            mockMvc.perform(withToken(
-                    put("/api/users/me/items/" + userItemId + "/equip"), ownerTokens.accessToken()));
+            mockMvc.perform(withToken(put("/api/users/me/items/" + userItemId + "/equip"), ownerTokens.accessToken()));
 
             // 타인이 소유자의 착용 아이템을 해제 시도 → NOT_ITEM_OWNER → 403
             var other = loginAs("other2@example.com", "타인2");
-            mockMvc.perform(withToken(
-                            delete("/api/users/me/items/" + userItemId + "/equip"), other.accessToken()))
+            mockMvc.perform(withToken(delete("/api/users/me/items/" + userItemId + "/equip"), other.accessToken()))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.code").value("NOT_ITEM_OWNER"));
         }

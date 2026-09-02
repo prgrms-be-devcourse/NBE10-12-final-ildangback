@@ -12,14 +12,13 @@ import com.gommit.domain.item.repository.UserItemRepository;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import java.util.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import java.util.*;
-
 
 @Service
 @RequiredArgsConstructor
@@ -32,7 +31,8 @@ public class ItemService {
     // 이미지 임시 경로
     private String uploadImage(MultipartFile image) {
         // 임시 고정 경로
-        return "https://cdn.phototourl.com/free/2026-09-02-404c3e23-3aa1-46f2-b0e2-4e2c239530ce.jpg" + image.getOriginalFilename();
+        return "https://cdn.phototourl.com/free/2026-09-02-404c3e23-3aa1-46f2-b0e2-4e2c239530ce.jpg"
+                + image.getOriginalFilename();
     }
 
     // 상점 아이템 목록 조회
@@ -49,7 +49,7 @@ public class ItemService {
         Pageable pageable = PageRequest.of(0, size + 1);
 
         List<Item> items;
-        if(slot == null) {
+        if (slot == null) {
             items = itemRepository.findByIdGreaterThanOrderByIdAsc(effectiveCursor, pageable);
         } else {
             items = itemRepository.findBySlotAndIdGreaterThanOrderByIdAsc(slot, effectiveCursor, pageable);
@@ -59,12 +59,12 @@ public class ItemService {
         // 상점 커서가 Item 기준이므로 UserItem 전체를 Map으로 만들어 O(1)로 보유 여부를 체크함.
         List<UserItem> userItems = userItemRepository.findByUserId(userId);
         Map<Long, UserItem> ownedMap = new HashMap<>();
-        for(UserItem userItem : userItems) {
+        for (UserItem userItem : userItems) {
             ownedMap.put(userItem.getItem().getId(), userItem);
         }
 
         List<ShopItemResponse> responseList = new ArrayList<>();
-        for(Item item : items) {
+        for (Item item : items) {
             UserItem matchedUserItem = ownedMap.get(item.getId());
             boolean owned = matchedUserItem != null;
             boolean equipped = matchedUserItem != null && matchedUserItem.isEquipped();
@@ -81,9 +81,8 @@ public class ItemService {
     // 아이템 구매
     @Transactional
     public ItemPurchaseResponse purchaseItem(Long userId, Long itemId) {
-        Item item = itemRepository.findById(itemId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.ITEM_NOT_FOUND));
-        if(userItemRepository.existsByUserIdAndItemId(userId, itemId)) {
+        Item item = itemRepository.findById(itemId).orElseThrow(() -> new BusinessException(ErrorCode.ITEM_NOT_FOUND));
+        if (userItemRepository.existsByUserIdAndItemId(userId, itemId)) {
             throw new BusinessException(ErrorCode.ALREADY_OWNED_ITEM);
         }
 
@@ -98,12 +97,11 @@ public class ItemService {
         // 차감 후 잔액 받아오기
         int remainingBalance = 0;
         return new ItemPurchaseResponse(
-            savedUserItem.getId(),
-            item.getId(),
-            savedUserItem.getCreatedAt(),
-            remainingBalance, // 차감 후 잔액
-            savedUserItem.getEquippedSlot()
-        );
+                savedUserItem.getId(),
+                item.getId(),
+                savedUserItem.getCreatedAt(),
+                remainingBalance, // 차감 후 잔액
+                savedUserItem.getEquippedSlot());
     }
 
     // 아이템 등록 (관리자)
@@ -118,12 +116,10 @@ public class ItemService {
     // 아이템 삭제 (관리자)
     @Transactional
     public void deleteItem(Long itemId) {
-        Item item = itemRepository.findById(itemId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.ITEM_NOT_FOUND));
-        if(userItemRepository.existsByItemId(itemId)) {
+        Item item = itemRepository.findById(itemId).orElseThrow(() -> new BusinessException(ErrorCode.ITEM_NOT_FOUND));
+        if (userItemRepository.existsByItemId(itemId)) {
             throw new BusinessException(ErrorCode.ITEM_IN_USE);
         }
         itemRepository.deleteById(itemId);
     }
-
 }

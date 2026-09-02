@@ -30,7 +30,6 @@ public class UserItem extends BaseEntity {
     @Column(length = 20)
     private ItemSlot equippedSlot;
 
-
     public boolean isOwnedBy(Long userId) {
         return this.userId.equals(userId);
     }
@@ -53,6 +52,4 @@ public class UserItem extends BaseEntity {
         userItem.item = item;
         return userItem;
     }
-
 }
-
