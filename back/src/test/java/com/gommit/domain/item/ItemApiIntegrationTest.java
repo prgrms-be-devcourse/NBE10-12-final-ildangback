@@ -40,10 +40,11 @@ class ItemApiIntegrationTest extends IntegrationTestSupport {
         // SecurityUser.getAuthorities()에서 "ROLE_" + role 로 조합되므로 ADMIN이면 ROLE_ADMIN이 된다.
         jdbcTemplate.update("UPDATE users SET role = 'ADMIN' WHERE email = ?", email);
         // 재로그인해서 ADMIN role이 담긴 새 JWT를 발급받는다.
-        String body = mockMvc.perform(jsonRequest(
-                        post("/api/auth/login"),
-                        json("email", email, "password", DEFAULT_PASSWORD)))
-                .andReturn().getResponse().getContentAsString();
+        String body = mockMvc.perform(
+                        jsonRequest(post("/api/auth/login"), json("email", email, "password", DEFAULT_PASSWORD)))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
         return new Tokens(fieldOf(body, "accessToken"), fieldOf(body, "refreshToken"));
     }
 
@@ -204,14 +205,13 @@ class ItemApiIntegrationTest extends IntegrationTestSupport {
 
             // withToken()이 MockMultipartHttpServletRequestBuilder를 받지 못하므로 헤더를 직접 추가한다.
             mockMvc.perform(multipart("/api/admin/items")
-                            .file(new MockMultipartFile(
-                                    "image", "hat.png", MediaType.IMAGE_PNG_VALUE, new byte[]{1}))
+                            .file(new MockMultipartFile("image", "hat.png", MediaType.IMAGE_PNG_VALUE, new byte[] {1}))
                             .param("slot", "HEAD")
                             .param("name", "관리자 모자")
                             .param("price", "500")
                             .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokens.accessToken()))
                     .andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.id").exists())       // DB가 부여한 id가 응답에 있어야 한다
+                    .andExpect(jsonPath("$.id").exists()) // DB가 부여한 id가 응답에 있어야 한다
                     .andExpect(jsonPath("$.name").value("관리자 모자"))
                     .andExpect(jsonPath("$.slot").value("HEAD"));
         }

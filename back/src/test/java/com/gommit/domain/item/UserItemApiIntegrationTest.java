@@ -52,7 +52,7 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
         @Test
         @DisplayName("미인증이면 401")
-        void 미인증_401() throws Exception {
+        void t1() throws Exception {
             mockMvc.perform(get("/api/users/me/character"))
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
@@ -60,7 +60,7 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
         @Test
         @DisplayName("인증하면 200 과 슬롯 맵을 돌려준다")
-        void 인증_200() throws Exception {
+        void t2() throws Exception {
             var tokens = loginAs();
 
             mockMvc.perform(withToken(get("/api/users/me/character"), tokens.accessToken()))
@@ -78,13 +78,13 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
         @Test
         @DisplayName("미인증이면 401")
-        void 미인증_401() throws Exception {
+        void t3() throws Exception {
             mockMvc.perform(get("/api/users/me/items")).andExpect(status().isUnauthorized());
         }
 
         @Test
         @DisplayName("인증하면 200 과 SliceResponse 구조를 돌려준다")
-        void 인증_200() throws Exception {
+        void t4() throws Exception {
             var tokens = loginAs();
 
             // 보유 아이템이 없어도 빈 content 배열과 hasNext=false로 200이 응답되어야 한다.
@@ -96,7 +96,7 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
         @Test
         @DisplayName("size=0 이면 400 — @Min(1) 제약")
-        void size_0이면_400() throws Exception {
+        void t5() throws Exception {
             var tokens = loginAs();
 
             // ItemController와 동일하게 @Min(1)이 컨트롤러에 선언되어 있으므로
@@ -114,13 +114,13 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
         @Test
         @DisplayName("미인증이면 401")
-        void 미인증_401() throws Exception {
+        void t6() throws Exception {
             mockMvc.perform(put("/api/users/me/items/1/equip")).andExpect(status().isUnauthorized());
         }
 
         @Test
         @DisplayName("보유한 아이템 착용 시 200 과 equippedSlot 이 채워진다")
-        void 착용성공_200() throws Exception {
+        void t7() throws Exception {
             String email = "equip@example.com";
             // 이 테스트 전용 이메일과 닉네임을 사용해 다른 테스트와 충돌을 방지한다.
             var tokens = loginAs(email, "착용테스터");
@@ -137,7 +137,7 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
         @Test
         @DisplayName("존재하지 않는 userItemId 착용 시 404")
-        void 없는아이템_404() throws Exception {
+        void t8() throws Exception {
             var tokens = loginAs();
 
             // DB에 없는 userItemId → UserItemService에서 USER_ITEM_NOT_FOUND → 404
@@ -148,7 +148,7 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
         @Test
         @DisplayName("다른 유저의 아이템 착용 시도 시 403")
-        void 타인아이템_403() throws Exception {
+        void t9() throws Exception {
             // 소유자 계정을 만들고 아이템을 보유시킨다
             String ownerEmail = "owner@example.com";
             loginAs(ownerEmail, "소유자");
@@ -166,7 +166,7 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
         @Test
         @DisplayName("이미 착용 중인 아이템 재착용 시 409")
-        void 이미착용중_409() throws Exception {
+        void t10() throws Exception {
             String email = "alreadyequip@example.com";
             var tokens = loginAs(email, "중복착용테스터");
             long userId = getUserId(email);
@@ -191,13 +191,13 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
         @Test
         @DisplayName("미인증이면 401")
-        void 미인증_401() throws Exception {
+        void t11() throws Exception {
             mockMvc.perform(delete("/api/users/me/items/1/equip")).andExpect(status().isUnauthorized());
         }
 
         @Test
         @DisplayName("착용 중인 아이템 해제 시 200 과 equippedSlot 이 사라진다")
-        void 해제성공_200() throws Exception {
+        void t12() throws Exception {
             String email = "unequip@example.com";
             var tokens = loginAs(email, "해제테스터");
             long userId = getUserId(email);
@@ -217,7 +217,7 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
         @Test
         @DisplayName("미착용 상태 아이템 해제 시 400")
-        void 미착용해제_400() throws Exception {
+        void t13() throws Exception {
             String email = "notequip@example.com";
             var tokens = loginAs(email, "미착용테스터");
             long userId = getUserId(email);
@@ -233,7 +233,7 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
         @Test
         @DisplayName("다른 유저의 아이템 해제 시도 시 403")
-        void 타인아이템_403() throws Exception {
+        void t14() throws Exception {
             // 소유자가 아이템을 보유하고 착용한다
             String ownerEmail = "owner2@example.com";
             var ownerTokens = loginAs(ownerEmail, "소유자2");
