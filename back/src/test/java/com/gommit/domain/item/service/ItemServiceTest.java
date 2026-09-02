@@ -3,12 +3,13 @@ package com.gommit.domain.item.service;
 import com.gommit.domain.item.dto.request.ItemCreateRequest;
 import com.gommit.domain.item.dto.response.ItemPurchaseResponse;
 import com.gommit.domain.item.dto.response.ItemResponse;
-import com.gommit.domain.item.dto.response.ShopItemListResponse;
+import com.gommit.domain.item.dto.response.ShopItemResponse;
 import com.gommit.domain.item.entity.Item;
 import com.gommit.domain.item.entity.ItemSlot;
 import com.gommit.domain.item.entity.UserItem;
 import com.gommit.domain.item.repository.ItemRepository;
 import com.gommit.domain.item.repository.UserItemRepository;
+import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,8 +18,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.springframework.mock.web.MockMultipartFile;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -57,10 +59,10 @@ public class ItemServiceTest {
     void setUp() {
         // Item.of()로 엔티티를 생성하면 id null
         // 테스트에서는 DB가 없으므로 ReflectionTestUtils.setField로 BaseEntity의 private id 필드를 강제로 주입
-        headItem = Item.of(ItemSlot.HEAD, "기본 모자", "https://cdn.phototourl.com/free/2026-09-02-404c3e23-3aa1-46f2-b0e2-4e2c239530ce.jpg", 100);
+        headItem = Item.of(ItemSlot.HEAD, "기본 모자", "https://cdn.example.com/hat.png", 100);
         ReflectionTestUtils.setField(headItem, "id", 1L);
 
-        topItem = Item.of(ItemSlot.TOP, "기본 상의", "https://cdn.phototourl.com/free/2026-09-02-404c3e23-3aa1-46f2-b0e2-4e2c239530ce.jpg", 200);
+        topItem = Item.of(ItemSlot.TOP, "기본 상의", "https://cdn.example.com/top.png", 200);
         ReflectionTestUtils.setField(topItem, "id", 2L);
 
         // userId = 1 이 headItem을 보유하고 착용중인 UserItem (equippedSlot = HEAD)
@@ -84,30 +86,33 @@ public class ItemServiceTest {
     @DisplayName("슬롯 미지정 시 전체 아이템 조회, 보유·장착 상태가 응답에 정확히 반영된다")
     void t1() {
         // given
-        // slot=null 분기에서 itemRepository.findAll()이 두 아이템을 돌려주도록 stub 설정
-        given(itemRepository.findAll()).willReturn(List.of(headItem, topItem));
-        // userId=1의 보유 아이템 목록을 반환하도록 stub 설정
+        // [변경] findAll() → findByIdGreaterThanOrderByIdAsc(cursor=0, pageable)
+        // 서비스가 cursor=null을 0으로 변환하여 이 메서드를 호출하므로 stub도 동일하게 맞춤.
+        // any(Pageable.class)는 PageRequest.of(0, size+1) 형태의 Pageable을 포괄적으로 매칭함.
+        given(itemRepository.findByIdGreaterThanOrderByIdAsc(eq(0L), any(Pageable.class)))
+                .willReturn(List.of(headItem, topItem));
+        // userId=1의 보유 아이템 전체를 반환 (ownedMap 구성용, 커서 없이 전체 조회)
         given(userItemRepository.findByUserId(1L)).willReturn(List.of(ownedAndEquipped, ownedNotEquipped));
 
         // when
-        // slot=null → 전체 조회 분기 실행
-        ShopItemListResponse response = itemService.getShopItems(1L, null);
+        // [변경] cursor=null(첫 요청), size=20으로 호출
+        SliceResponse<ShopItemResponse> response = itemService.getShopItems(1L, null, null, 20);
 
         // then
-        // 아이템이 2개여야 한다
-        assertThat(response.getContent()).hasSize(2);
+        // [변경] getContent() → content() : SliceResponse는 record이므로 접근자가 필드명 그대로임
+        assertThat(response.content()).hasSize(2);
 
         // 첫 번째 항목 = headItem: 보유하고 착용 중이므로 owned=true, equipped=true
-        assertThat(response.getContent().get(0).isOwned()).isTrue();
-        assertThat(response.getContent().get(0).isEquipped()).isTrue();
+        assertThat(response.content().get(0).owned()).isTrue();
+        assertThat(response.content().get(0).equipped()).isTrue();
 
         // 두 번째 항목 = topItem: 보유하지만 미착용이므로 owned=true, equipped=false
-        assertThat(response.getContent().get(1).isOwned()).isTrue();
-        assertThat(response.getContent().get(1).isEquipped()).isFalse();
+        assertThat(response.content().get(1).owned()).isTrue();
+        assertThat(response.content().get(1).equipped()).isFalse();
 
-        // slot=null일 때 findAll()이 호출되어야 하고 findBySlot()은 절대 호출되지 않아야 함
-        then(itemRepository).should().findAll();
-        then(itemRepository).should(never()).findBySlot(any());
+        // [변경] slot=null일 때 커서 기반 전체 조회 메서드가 호출되어야 함
+        then(itemRepository).should().findByIdGreaterThanOrderByIdAsc(eq(0L), any(Pageable.class));
+        then(itemRepository).should(never()).findBySlotAndIdGreaterThanOrderByIdAsc(any(), any(), any());
     }
 
     // ─────────────────────────────────────────────────
@@ -135,8 +140,8 @@ public class ItemServiceTest {
 
         // then
         // 반환된 응답의 userItemId, itemId가 올바른지 검증
-        assertThat(response.getUserItemId()).isEqualTo(10L);
-        assertThat(response.getItemId()).isEqualTo(1L);
+        assertThat(response.userItemId()).isEqualTo(10L);
+        assertThat(response.itemId()).isEqualTo(1L);
 
         // save()가 정확히 1번 호출되었는지 검증
         then(userItemRepository).should(times(1)).save(any(UserItem.class));
@@ -181,16 +186,11 @@ public class ItemServiceTest {
             "fake-image-bytes".getBytes()    // 파일 바이트 (테스트이므로 더미 데이터)
         );
 
-        // ItemCreateRequest는 @Getter만 있고 setter가 없으므로
-        // ReflectionTestUtils로 각 필드를 직접 주입한다
-        ItemCreateRequest request = new ItemCreateRequest();
-        ReflectionTestUtils.setField(request, "slot", ItemSlot.HEAD);
-        ReflectionTestUtils.setField(request, "name", "새 모자");
-        ReflectionTestUtils.setField(request, "price", 150);
-        ReflectionTestUtils.setField(request, "image", imageFile);
+        // record는 생성자로 직접 값을 넘긴다 (ReflectionTestUtils 불필요)
+        ItemCreateRequest request = new ItemCreateRequest(ItemSlot.HEAD, "새 모자", 150, imageFile);
 
         // save() 호출 시 id가 부여된 Item을 반환하도록 stub
-        Item savedItem = Item.of(ItemSlot.HEAD, "새 모자", "https://cdn.phototourl.com/free/2026-09-02-404c3e23-3aa1-46f2-b0e2-4e2c239530ce.jpg", 150);
+        Item savedItem = Item.of(ItemSlot.HEAD, "새 모자", "https://example.com/images/temp-hat.png", 150);
         ReflectionTestUtils.setField(savedItem, "id", 3L);
         given(itemRepository.save(any(Item.class))).willReturn(savedItem);
 
@@ -198,10 +198,10 @@ public class ItemServiceTest {
         ItemResponse response = itemService.createItem(request);
 
         // then
-        assertThat(response.getId()).isEqualTo(3L);
-        assertThat(response.getName()).isEqualTo("새 모자");
-        assertThat(response.getSlot()).isEqualTo(ItemSlot.HEAD);
-        assertThat(response.getPrice()).isEqualTo(150);
+        assertThat(response.id()).isEqualTo(3L);
+        assertThat(response.name()).isEqualTo("새 모자");
+        assertThat(response.slot()).isEqualTo(ItemSlot.HEAD);
+        assertThat(response.price()).isEqualTo(150);
 
         // itemRepository.save()가 정확히 1번 호출되어야 함
         then(itemRepository).should(times(1)).save(any(Item.class));
@@ -261,5 +261,4 @@ public class ItemServiceTest {
         // 보유자가 있으므로 deleteById() 호출 없어야 함
         then(itemRepository).should(never()).deleteById(any());
     }
-
 }

@@ -7,10 +7,12 @@ import com.gommit.domain.item.entity.CheckInState;
 import com.gommit.domain.item.entity.ItemSlot;
 import com.gommit.domain.item.entity.UserItem;
 import com.gommit.domain.item.repository.UserItemRepository;
+import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
-import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,21 +71,38 @@ public class UserItemService {
     }
 
     // 보유 아이템 조회
-    public List<UserItemResponse> getMyItems(Long userId, ItemSlot slot) {
+    // [변경] 반환 타입: List<UserItemResponse> → SliceResponse<UserItemResponse>
+    // - 기존 List 직접 반환은 배열([...])로 직렬화되어 나중에 hasNext, nextCursor를
+    //   추가하려면 응답 구조 자체를 바꿔야 해서 프론트 코드도 전부 수정해야 함.
+    // - SliceResponse로 통일하면 구조 변경 없이 필드만 채워지므로 호환성 유지.
+    // [변경] 파라미터: cursor, size 추가
+    // - cursor: 마지막으로 받은 userItemId. null이면 첫 요청.
+    // - size: 한 번에 가져올 아이템 수.
+    public SliceResponse<UserItemResponse> getMyItems(Long userId, ItemSlot slot, Long cursor, int size) {
+        // cursor가 null(첫 요청)이면 0으로 처리 → WHERE id > 0 = 전체 범위
+        long effectiveCursor = cursor != null ? cursor : 0L;
+
+        // size+1개를 요청해 다음 페이지 존재 여부를 판단한다.
+        Pageable pageable = PageRequest.of(0, size + 1);
+
         List<UserItem> userItems;
         if(slot == null) {
-            userItems = userItemRepository.findByUserId(userId);
+            // 슬롯 미지정: 보유 아이템 전체를 커서 기반으로 조회
+            userItems = userItemRepository.findByUserIdAndIdGreaterThanOrderByIdAsc(userId, effectiveCursor, pageable);
         } else {
-            userItems = userItemRepository.findByUserIdAndItem_Slot(userId, slot);
+            // 슬롯 지정: 해당 슬롯 아이템만 커서 기반으로 조회
+            userItems = userItemRepository.findByUserIdAndItem_SlotAndIdGreaterThanOrderByIdAsc(userId, slot, effectiveCursor, pageable);
         }
 
         List<UserItemResponse> responseList = new ArrayList<>();
         for(UserItem userItem : userItems) {
             ItemResponse itemResponse = new ItemResponse(userItem.getItem());
-            UserItemResponse userItemResponse = new UserItemResponse(userItem, itemResponse);
-            responseList.add(userItemResponse);
+            responseList.add(new UserItemResponse(userItem, itemResponse));
         }
-        return responseList;
+
+        // nextCursor는 마지막 항목의 userItemId.
+        // 다음 요청 시 ?cursor={nextCursor}로 넘기면 그 이후부터 이어서 가져옴.
+        return SliceResponse.ofCursor(responseList, size, UserItemResponse::id);
     }
 
     // 내 캐릭터 조회

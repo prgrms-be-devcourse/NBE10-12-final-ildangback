@@ -6,6 +6,7 @@ import com.gommit.domain.item.entity.Item;
 import com.gommit.domain.item.entity.ItemSlot;
 import com.gommit.domain.item.entity.UserItem;
 import com.gommit.domain.item.repository.UserItemRepository;
+import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -24,6 +26,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
@@ -90,9 +93,9 @@ class UserItemServiceTest {
 
         // then
         // 착용 후 equippedSlot이 HEAD여야 함
-        assertThat(response.getEquippedSlot()).isEqualTo(ItemSlot.HEAD);
+        assertThat(response.equippedSlot()).isEqualTo(ItemSlot.HEAD);
         // 응답의 userItemId가 올바른지 확인
-        assertThat(response.getId()).isEqualTo(10L);
+        assertThat(response.id()).isEqualTo(10L);
     }
 
     @Test
@@ -216,8 +219,8 @@ class UserItemServiceTest {
 
         // then
         // 해제 후 equippedSlot이 null이어야 함
-        assertThat(response.getEquippedSlot()).isNull();
-        assertThat(response.getId()).isEqualTo(11L);
+        assertThat(response.equippedSlot()).isNull();
+        assertThat(response.id()).isEqualTo(11L);
     }
 
     @Test
@@ -267,42 +270,52 @@ class UserItemServiceTest {
     // ─────────────────────────────────────────────────
 
     @Test
-    @DisplayName("슬롯 미지정 시 findByUserId가 호출되어 보유 아이템 전체가 반환된다")
+    @DisplayName("슬롯 미지정 시 커서 기반 전체 조회가 호출되고 SliceResponse로 반환된다")
     void getMyItems_전체조회() {
         // given
-        // slot=null → findByUserId() 분기
-        given(userItemRepository.findByUserId(USER_ID))
+        // [변경] findByUserId() → findByUserIdAndIdGreaterThanOrderByIdAsc(cursor=0, pageable)
+        // 서비스가 cursor=null을 0L로 변환하여 호출하므로 stub도 eq(0L)로 맞춤.
+        // any(Pageable.class)는 PageRequest.of(0, size+1) 형태를 포괄적으로 매칭함.
+        given(userItemRepository.findByUserIdAndIdGreaterThanOrderByIdAsc(eq(USER_ID), eq(0L), any(Pageable.class)))
                 .willReturn(List.of(unequippedUserItem, equippedUserItem));
 
         // when
-        List<UserItemResponse> responses = userItemService.getMyItems(USER_ID, null);
+        // [변경] cursor=null(첫 요청), size=20으로 호출
+        SliceResponse<UserItemResponse> response = userItemService.getMyItems(USER_ID, null, null, 20);
 
         // then
-        // 보유 아이템 2개가 반환되어야 함
-        assertThat(responses).hasSize(2);
-        // slot=null이므로 findByUserId()가 호출되고, findByUserIdAndItem_Slot()은 호출되지 않아야 함
-        then(userItemRepository).should().findByUserId(USER_ID);
-        then(userItemRepository).should(never()).findByUserIdAndItem_Slot(any(), any());
+        // [변경] responses.hasSize() → response.content().hasSize()
+        // SliceResponse는 record이므로 content() 접근자로 리스트를 꺼냄
+        assertThat(response.content()).hasSize(2);
+
+        // [변경] 호출 메서드 검증도 커서 기반 메서드로 교체
+        then(userItemRepository).should().findByUserIdAndIdGreaterThanOrderByIdAsc(eq(USER_ID), eq(0L), any(Pageable.class));
+        then(userItemRepository).should(never()).findByUserIdAndItem_SlotAndIdGreaterThanOrderByIdAsc(any(), any(), any(), any());
     }
 
     @Test
-    @DisplayName("슬롯 지정 시 findByUserIdAndItem_Slot이 호출되어 해당 슬롯 아이템만 반환된다")
+    @DisplayName("슬롯 지정 시 커서 기반 슬롯 필터 조회가 호출되고 해당 슬롯 아이템만 반환된다")
     void getMyItems_슬롯필터() {
         // given
-        // HEAD 슬롯 필터링 → findByUserIdAndItem_Slot() 분기
-        given(userItemRepository.findByUserIdAndItem_Slot(USER_ID, ItemSlot.HEAD))
+        // [변경] findByUserIdAndItem_Slot() → findByUserIdAndItem_SlotAndIdGreaterThanOrderByIdAsc()
+        // 슬롯 + cursor=0 + pageable 세 조건으로 커서 기반 조회
+        given(userItemRepository.findByUserIdAndItem_SlotAndIdGreaterThanOrderByIdAsc(
+                eq(USER_ID), eq(ItemSlot.HEAD), eq(0L), any(Pageable.class)))
                 .willReturn(List.of(unequippedUserItem));
 
         // when
-        List<UserItemResponse> responses = userItemService.getMyItems(USER_ID, ItemSlot.HEAD);
+        // [변경] cursor=null(첫 요청), size=20으로 호출
+        SliceResponse<UserItemResponse> response = userItemService.getMyItems(USER_ID, ItemSlot.HEAD, null, 20);
 
         // then
-        assertThat(responses).hasSize(1);
+        assertThat(response.content()).hasSize(1);
         // 반환된 아이템의 슬롯이 HEAD인지 확인
-        assertThat(responses.get(0).getItem().getSlot()).isEqualTo(ItemSlot.HEAD);
-        // slot이 있으므로 findByUserIdAndItem_Slot()이 호출되고, findByUserId()는 호출되지 않아야 함
-        then(userItemRepository).should().findByUserIdAndItem_Slot(USER_ID, ItemSlot.HEAD);
-        then(userItemRepository).should(never()).findByUserId(any());
+        assertThat(response.content().get(0).item().slot()).isEqualTo(ItemSlot.HEAD);
+
+        // [변경] 슬롯 필터 커서 기반 메서드가 호출되고, 전체 조회 메서드는 호출되지 않아야 함
+        then(userItemRepository).should().findByUserIdAndItem_SlotAndIdGreaterThanOrderByIdAsc(
+                eq(USER_ID), eq(ItemSlot.HEAD), eq(0L), any(Pageable.class));
+        then(userItemRepository).should(never()).findByUserIdAndIdGreaterThanOrderByIdAsc(any(), any(), any());
     }
 
     // ─────────────────────────────────────────────────
@@ -322,14 +335,14 @@ class UserItemServiceTest {
 
         // then
         // HEAD 슬롯에 headItem의 imageUrl이 채워져야 함
-        assertThat(response.getSlots().get(ItemSlot.HEAD))
+        assertThat(response.slots().get(ItemSlot.HEAD))
                 .isEqualTo("https://cdn.phototourl.com/free/2026-09-02-404c3e23-3aa1-46f2-b0e2-4e2c239530ce.jpg");
         // 나머지 슬롯(TOP, BOTTOM, SHOES)은 착용한 아이템이 없으므로 null이어야 함
-        assertThat(response.getSlots().get(ItemSlot.TOP)).isNull();
-        assertThat(response.getSlots().get(ItemSlot.BOTTOM)).isNull();
-        assertThat(response.getSlots().get(ItemSlot.SHOES)).isNull();
+        assertThat(response.slots().get(ItemSlot.TOP)).isNull();
+        assertThat(response.slots().get(ItemSlot.BOTTOM)).isNull();
+        assertThat(response.slots().get(ItemSlot.SHOES)).isNull();
         // ItemSlot 열거값 4개(HEAD/TOP/BOTTOM/SHOES) 전부 키로 존재해야 함
-        assertThat(response.getSlots()).hasSize(ItemSlot.values().length);
+        assertThat(response.slots()).hasSize(ItemSlot.values().length);
     }
 
     @Test
@@ -345,8 +358,8 @@ class UserItemServiceTest {
 
         // then
         // values()로 모든 슬롯의 imageUrl 값을 꺼내 전부 null인지 한 번에 확인
-        assertThat(response.getSlots().values()).allMatch(v -> v == null);
+        assertThat(response.slots().values()).allMatch(v -> v == null);
         // 슬롯 키는 여전히 4개 모두 존재해야 함 (null 값이지만 키는 있어야 함)
-        assertThat(response.getSlots()).hasSize(ItemSlot.values().length);
+        assertThat(response.slots()).hasSize(ItemSlot.values().length);
     }
 }
