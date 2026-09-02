@@ -71,4 +71,24 @@ public class Challenge extends BaseEntity {
         this.groupBestStreak = groupBestStreak;
         this.allowPhoto = allowPhoto;
     }
+
+    public void updateSettings(
+        LocalDate startDate,
+        LocalDate endDate,
+        FrequencyType frequencyType,
+        Integer frequencyValue,
+        String daysOfWeek,
+        int dailyCheckInCount,
+        int requiredDayCount,
+        boolean allowPhoto
+    ) {
+        this.startDate = startDate;
+        this.endDate = endDate;
+        this.frequencyType = frequencyType;
+        this.frequencyValue = frequencyValue;
+        this.daysOfWeek = daysOfWeek;
+        this.dailyCheckInCount = dailyCheckInCount;
+        this.requiredDayCount = requiredDayCount;
+        this.allowPhoto = allowPhoto;
+    }
 }

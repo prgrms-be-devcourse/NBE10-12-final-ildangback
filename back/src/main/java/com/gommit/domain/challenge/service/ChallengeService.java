@@ -1,8 +1,10 @@
 package com.gommit.domain.challenge.service;
 
+import com.gommit.domain.challenge.dto.request.ChallengeUpdateRequest;
 import com.gommit.domain.challenge.dto.request.InitialChallengeSettingRequest;
 import com.gommit.domain.challenge.dto.response.ChallengeDetailResponse;
 import com.gommit.domain.challenge.dto.response.ChallengeStatusResponse;
+import com.gommit.domain.challenge.dto.response.ChallengeUpdateResponse;
 import com.gommit.domain.challenge.dto.response.MemberTodayStatusResponse;
 import com.gommit.domain.challenge.entity.*;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
@@ -134,6 +136,7 @@ public class ChallengeService {
         );
     }
 
+    // 시즌 멤버 오늘 인증 현황
     @Transactional(readOnly = true)
     public List<MemberTodayStatusResponse> getMemberTodayStatuses(
         Long challengeId,
@@ -192,6 +195,145 @@ public class ChallengeService {
                 (int) todayCheckInCount
             );
         }).toList();
+    }
+
+    // 시즌 연장시 챌린지 설정 (OWNER만 수정 가능 / READY 상태에서만 설정 수정 가능)
+    @Transactional
+    public ChallengeUpdateResponse updateChallenge(Long challengeId, Long userId, ChallengeUpdateRequest request) {
+        Challenge challenge = challengeRepository.findById(challengeId).orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
+
+        ChallengeMember challengeMember = challengeMemberRepository.findByChallengeIdAndUserId(challengeId, userId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER));
+
+        if(challengeMember.getRole() != ChallengeMemberRole.OWNER) {
+            throw new BusinessException(ErrorCode.NOT_CHALLENGE_OWNER);
+        }
+
+        if(challenge.getStatus() != ChallengeStatus.READY) {
+            throw new BusinessException(ErrorCode.CHALLENGE_NOT_EDITABLE);
+        }
+
+        /*
+        * 날짜 최종값
+        * */
+
+        LocalDate startDate = request.startDate() != null ? request.startDate() : challenge.getStartDate();
+        LocalDate endDate = request.endDate() != null ? request.endDate() : challenge.getEndDate();
+
+        if(!startDate.isAfter(LocalDate.now())) {
+            throw new BusinessException(ErrorCode.INVALID_START_DATE);
+        }
+
+        // 연장 시즌이면 이전 시즌 종료일 이후여야 함
+        if(challenge.getSeqNo() > 1) {
+            Challenge previousChallenge = challengeRepository.findByGroupIdAndSeqNo(challenge.getGroupId(), challenge.getSeqNo() - 1).orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
+
+            if(!startDate.isAfter(previousChallenge.getEndDate())) {
+                throw new BusinessException(ErrorCode.INVALID_EXTENSION_START_DATE);
+            }
+        }
+
+        if(endDate.isBefore(startDate)) {
+            throw new BusinessException(ErrorCode.INVALID_PERIOD);
+        }
+
+        /*
+         * 인증 주기 최종값
+         * */
+
+        FrequencyType frequencyType = request.frequencyType() != null ? request.frequencyType() : challenge.getFrequencyType();
+        Integer frequencyValue = request.frequencyValue() != null ? request.frequencyValue() : challenge.getFrequencyValue();
+
+        List<DaysOfWeek> daysOfWeek;
+
+        if (request.daysOfWeek() != null) {
+            daysOfWeek = request.daysOfWeek();
+        } else if (challenge.getDaysOfWeek() != null) {
+            daysOfWeek = Arrays.stream(challenge.getDaysOfWeek().split(","))
+                .map(String::trim)
+                .map(DaysOfWeek::valueOf)
+                .toList();
+        } else {
+            daysOfWeek = null;
+        }
+
+        switch (frequencyType) {
+            case DAILY -> {
+                // 별도 검증 없음
+            }
+
+            case DAYS_OF_WEEK -> {
+                if (daysOfWeek == null || daysOfWeek.isEmpty()) {
+                    throw new BusinessException(ErrorCode.INVALID_FREQUENCY);
+                }
+            }
+
+            case EVERY_N_DAYS -> {
+                if (frequencyValue == null
+                    || frequencyValue < 2
+                    || frequencyValue > 7) {
+                    throw new BusinessException(ErrorCode.INVALID_FREQUENCY);
+                }
+            }
+        }
+
+        /*
+         * 하루 인증 횟수
+         * */
+
+        int dailyCheckInCount = request.dailyCheckInCount() != null
+            ? request.dailyCheckInCount()
+            : challenge.getDailyCheckInCount();
+
+        if (dailyCheckInCount < 1 || dailyCheckInCount > 10) {
+            throw new BusinessException(ErrorCode.INVALID_DAILY_COUNT);
+        }
+
+        /*
+         * 인증 방법
+         * */
+
+        List<CheckInType> allowedTypes = request.allowedTypes() != null ? request.allowedTypes() : challenge.isAllowPhoto() ? List.of(CheckInType.PHOTO) : List.of();
+
+        if(allowedTypes.isEmpty()) {
+            throw new BusinessException(ErrorCode.NO_CHECK_IN_METHOD);
+        }
+
+        boolean allowPhoto = allowedTypes.contains(CheckInType.PHOTO);
+
+        int requiredDayCount = switch (frequencyType) {
+            case DAILY ->
+                (int) ChronoUnit.DAYS.between(startDate, endDate) + 1;
+
+            case DAYS_OF_WEEK -> {
+                int count = 0;
+
+                for (
+                    LocalDate date = startDate;
+                    !date.isAfter(endDate);
+                    date = date.plusDays(1)
+                ) {
+                    if (daysOfWeek.contains(
+                        DaysOfWeek.getDaysOfWeek(date.getDayOfWeek())
+                    )) {
+                        count++;
+                    }
+                }
+
+                yield count;
+            }
+
+            case EVERY_N_DAYS -> {
+                long days = ChronoUnit.DAYS.between(startDate, endDate);
+
+                yield (int) (days / frequencyValue) + 1;
+            }
+        };
+
+        String dayOfWeekValue = daysOfWeek == null ? null : daysOfWeek.stream().map(DaysOfWeek::name).collect(Collectors.joining(","));
+
+        challenge.updateSettings(startDate, endDate, frequencyType, frequencyValue,dayOfWeekValue, dailyCheckInCount, requiredDayCount, allowPhoto);
+
+        return new ChallengeUpdateResponse(challenge.getId(), startDate, endDate, frequencyType, frequencyValue, daysOfWeek, dailyCheckInCount, allowedTypes);
     }
 
     // 선택된 요일 DB 저장용 문자열로 변환

@@ -1,6 +1,8 @@
 package com.gommit.domain.challenge.controller;
 
+import com.gommit.domain.challenge.dto.request.ChallengeUpdateRequest;
 import com.gommit.domain.challenge.dto.response.ChallengeStatusResponse;
+import com.gommit.domain.challenge.dto.response.ChallengeUpdateResponse;
 import com.gommit.domain.challenge.dto.response.MemberTodayStatusResponse;
 import com.gommit.domain.challenge.service.ChallengeService;
 import com.gommit.global.security.CurrentUser;
@@ -8,10 +10,7 @@ import com.gommit.global.security.SecurityUser;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -47,5 +46,21 @@ public class ChallengeController {
                 actor.getId()
             )
         );
+    }
+
+    @PatchMapping("/{challengeId}")
+    public ResponseEntity<ChallengeUpdateResponse> updateChallenge(
+        @PathVariable Long challengeId,
+        @CurrentUser SecurityUser actor,
+        @RequestBody ChallengeUpdateRequest request
+    ) {
+        ChallengeUpdateResponse response =
+            challengeService.updateChallenge(
+                challengeId,
+                actor.getId(),
+                request
+            );
+
+        return ResponseEntity.ok(response);
     }
 }
