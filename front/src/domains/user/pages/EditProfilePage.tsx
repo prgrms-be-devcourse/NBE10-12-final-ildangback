@@ -50,10 +50,17 @@ export function EditProfilePage() {
 
   const nicknameChanged = nickname !== user?.nickname;
 
-  // api.yaml 이 check-nickname 을 "가입 폼 및 프로필 수정" 두 곳으로 지정했다.
+  // check-nickname 은 가입 폼과 프로필 수정 두 곳에서 쓴다.
   // 보장이 아니라 409 를 미리 알려주는 용도다 — 저장 시점에 서버가 다시 검사한다.
   const verifyNickname = async () => {
-    if (!nicknameChanged || errors.nickname) return;
+    // errors.nickname 만으로는 첫 blur 를 막지 못한다 — react-hook-form 이 커스텀
+    // onBlur 를 zod 리졸버보다 먼저 부른다. 그래서 형식 검사를 여기서 한 번 더 한다.
+    if (
+      !nicknameChanged ||
+      errors.nickname ||
+      !nicknameField.safeParse(nickname).success
+    )
+      return;
     try {
       const { available } = await checkNickname(nickname);
       if (!available)

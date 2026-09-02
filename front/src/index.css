@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 /*
- * 색은 docs/front_example 의 "꼬밋 Purple UI Color Guide" 가 정본이다.
- * 여기 값을 바꾸기 전에 그 이미지를 먼저 확인한다.
+ * 색은 "꼬밋 Purple UI Color Guide" 가 정본이다.
+ * 여기 값을 바꾸기 전에 그 가이드를 먼저 확인한다.
  */
 @theme {
   /* Tailwind 기본 purple 램프를 지우고 가이드 값으로 덮는다. 섞이면 색이 어긋난다. */

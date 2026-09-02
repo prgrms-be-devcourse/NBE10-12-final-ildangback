@@ -59,7 +59,7 @@ export function SignUpPage() {
 
   const nickname = useWatch({ control, name: "nickname" }) ?? "";
 
-  // 중복 확인은 보장이 아니다(api.yaml). 가입 시점에 서버가 다시 검사하므로
+  // 중복 확인은 보장이 아니다. 가입 시점에 서버가 다시 검사하므로
   // 여기서는 409 를 미리 알려주는 용도로만 쓴다.
   const checkDuplicate = async (
     field: "email" | "nickname",
@@ -101,7 +101,7 @@ export function SignUpPage() {
       return;
     }
 
-    // 가입은 토큰을 주지 않는다(api.yaml). 방금 받은 값으로 곧바로 로그인한다.
+    // 가입은 토큰을 주지 않는다. 방금 받은 값으로 곧바로 로그인한다.
     try {
       await signIn(email, password);
       navigate("/", { replace: true });

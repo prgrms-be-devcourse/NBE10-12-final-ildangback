@@ -1,5 +1,3 @@
-/** docs/api.yaml 이 정본이다. 코드를 고치면 그쪽도 같이 고친다. */
-
 export interface FieldError {
   field: string;
   reason: string;

@@ -3,9 +3,9 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router";
 import { z } from "zod";
-import { tokenStore } from "../../../shared/api/tokenStore";
 import { applyApiError } from "../../../shared/lib/applyApiError";
 import { setFlash } from "../../../shared/lib/flash";
+import { useAuth } from "../../../shared/lib/useAuth";
 import { PASSWORD_MIN, passwordField } from "../../../shared/lib/validation";
 import { Button } from "../../../shared/ui/Button";
 import { FormAlert } from "../../../shared/ui/FormAlert";
@@ -31,6 +31,7 @@ const schema = z
 type PasswordForm = z.infer<typeof schema>;
 
 export function ChangePasswordPage() {
+  const { signOut } = useAuth();
   const navigate = useNavigate();
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -46,10 +47,11 @@ export function ChangePasswordPage() {
     try {
       await changePassword({ currentPassword, newPassword });
 
-      // 서버가 본인의 모든 RT 를 폐기한다(api.yaml). 우리 RT 도 이미 죽었으므로
-      // 들고 있어봐야 다음 갱신에서 401 이다. 지우고 다시 로그인하게 한다.
-      tokenStore.clear();
+      // 서버가 본인의 모든 RT 를 폐기한다. 우리 RT 도 이미 죽었으므로
+      // 들고 있어봐야 다음 갱신에서 401 이다. 토큰만 지우면 AuthProvider 상태가
+      // 로그인인 채 남으므로 signOut 으로 상태까지 비운다.
       setFlash("비밀번호를 변경했어요. 다시 로그인해 주세요.");
+      await signOut();
       navigate("/login", { replace: true });
     } catch (error) {
       setFormError(

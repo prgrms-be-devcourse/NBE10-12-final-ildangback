@@ -7,7 +7,7 @@ export interface ApplyApiErrorOptions {
   /**
    * code 별로 폼 상단 문구를 갈아끼운다.
    * INVALID_CREDENTIALS 문구가 ErrorCode 에 하나뿐이라 비밀번호 변경 · 탈퇴 화면에서도
-   * "이메일 또는 비밀번호가..." 로 오기 때문이다. api.yaml 이 이 두 곳만 지정해 뒀다.
+   * "이메일 또는 비밀번호가..." 로 오기 때문이다.
    */
   messages?: Record<string, string>;
   /** code 별로 그 오류를 붙일 필드. 409 중복처럼 어느 칸이 문제인지 아는 경우에 쓴다. */

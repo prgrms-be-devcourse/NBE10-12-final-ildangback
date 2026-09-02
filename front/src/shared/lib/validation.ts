@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * 서버 제약(docs/api.yaml SignUpRequest)을 그대로 옮긴 것이다.
+ * 서버의 SignUpRequest 제약을 그대로 옮긴 것이다.
  * 여기 값을 바꾸기 전에 서버 애노테이션을 먼저 확인한다 — 어긋나면 통과시켜 놓고 400 을 받는다.
  */
 export const PASSWORD_MIN = 10;

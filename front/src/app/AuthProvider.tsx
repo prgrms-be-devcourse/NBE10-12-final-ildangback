@@ -29,7 +29,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
       .catch(() => {
         if (cancelled) return;
-        tokenStore.clear();
+        // RT 폐기가 확정(401)이면 client 가 이미 지웠다. 여기서 마저 지우면
+        // 일시적 오프라인 · 서버 오류에도 로그인이 풀린다 — 비로그인으로만 내려놓는다.
         setStatus("anonymous");
       });
 
@@ -38,14 +39,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // 갱신이 최종 실패하면 화면 어디에 있든 로그인으로 보낸다.
+  // 로그인 상태로 쓰던 중에 갱신이 최종 실패하면 화면 어디에 있든 로그인으로 보낸다.
+  // 부팅 복구 실패는 조용히 비로그인으로 내려놓는다 — 탭 3개는 비로그인도 들어가는
+  // 화면이라, 오래 안 온 방문자가 홈 대신 로그인 화면을 보면 안 된다.
   useEffect(() => {
     setSessionExpiredHandler(() => {
       setUser(null);
       setStatus("anonymous");
-      navigate("/login", { replace: true });
+      if (status === "authenticated") navigate("/login", { replace: true });
     });
-  }, [navigate]);
+  }, [navigate, status]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const result = await authApi.login({ email, password });
@@ -54,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await authApi.logout();
+    await authApi.logout().catch(() => undefined);
     setUser(null);
     setStatus("anonymous");
   }, []);

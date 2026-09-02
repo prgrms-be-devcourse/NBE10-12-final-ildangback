@@ -29,7 +29,13 @@ export function HomePage() {
         role="button"
         tabIndex={0}
         onClick={() => navigate("/signup")}
-        onKeyDown={(e) => e.key === "Enter" && navigate("/signup")}
+        onKeyDown={(e) => {
+          // 네이티브 버튼은 Enter 와 Space 둘 다 눌린다. role="button" 도 같아야 한다.
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault(); // Space 의 기본 동작(스크롤) 방지
+            navigate("/signup");
+          }
+        }}
         className="mt-5 w-full cursor-pointer overflow-hidden rounded-2xl transition-transform active:scale-[0.99]"
       >
         <img

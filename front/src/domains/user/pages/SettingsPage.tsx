@@ -54,8 +54,10 @@ export function SettingsPage() {
   } | null>(null);
 
   const handleSignOut = async () => {
-    await signOut();
+    // 홈(공개 화면)으로 먼저 나간 뒤 상태를 비운다. 순서를 바꾸면 anonymous 커밋 순간
+    // 아직 설정 화면이라 RequireAuth 의 /login 리다이렉트가 끼어들어 홈 대신 로그인이 뜬다.
     navigate("/", { replace: true });
+    await signOut();
   };
 
   return (

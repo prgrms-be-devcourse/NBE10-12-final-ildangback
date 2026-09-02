@@ -8,7 +8,7 @@ import { TopBar } from "../../../shared/ui/TopBar";
 
 /**
  * 설정 > 계정 관리. 비밀번호 변경과 탈퇴가 여기 모인다.
- * 이 화면은 front_example 에 시안이 없어서 설정 화면의 행 모양을 그대로 따랐다.
+ * 이 화면은 시안이 없어서 설정 화면의 행 모양을 그대로 따랐다.
  */
 export function AccountPage() {
   const { user } = useAuth();

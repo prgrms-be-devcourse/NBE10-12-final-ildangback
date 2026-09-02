@@ -41,8 +41,8 @@ export function setSessionExpiredHandler(handler: () => void): void {
 // ---------------------------------------------------------------------------
 // single-flight 재발급
 //
-// 인증인가설계.md 7-2 가 경고하는 지점이다. 401 마다 각자 refresh 를 부르면
-// 첫 응답이 RT 를 로테이션시켜 나머지가 옛 RT 를 들고 401 을 맞는다.
+// 401 마다 각자 refresh 를 부르면 첫 응답이 RT 를 로테이션시켜
+// 나머지가 옛 RT 를 들고 401 을 맞는다.
 // 진행 중인 갱신이 있으면 그 Promise 를 그대로 돌려줘서 호출을 1회로 묶는다.
 // ---------------------------------------------------------------------------
 let refreshInFlight: Promise<string> | null = null;
@@ -65,9 +65,14 @@ async function requestNewTokens(): Promise<string> {
     signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS),
   });
 
-  if (!response.ok) {
+  // 401 만 "RT 가 죽었다" 는 서버의 확답이다. 5xx · 타임아웃 · 오프라인은 RT 를
+  // 지우지 않고 일반 오류로 올린다 — 멀쩡한 RT 를 들고 로그아웃시키지 않는다.
+  if (response.status === 401) {
     tokenStore.clear();
     throw new SessionExpiredError();
+  }
+  if (!response.ok) {
+    throw new ApiError(response.status, await readErrorBody(response));
   }
 
   const tokens: TokenResponse = await response.json();
@@ -77,9 +82,15 @@ async function requestNewTokens(): Promise<string> {
 
 function refreshAccessToken(): Promise<string> {
   if (!refreshInFlight) {
-    refreshInFlight = requestNewTokens().finally(() => {
-      refreshInFlight = null;
-    });
+    refreshInFlight = requestNewTokens()
+      .catch((error) => {
+        // 공유 Promise 안이라 동시 401 이 몇 개든 한 번만 불린다.
+        if (error instanceof SessionExpiredError) onSessionExpired?.();
+        throw error;
+      })
+      .finally(() => {
+        refreshInFlight = null;
+      });
   }
   return refreshInFlight;
 }
@@ -131,7 +142,7 @@ export async function apiFetch<T>(
     !tokenStore.getAccessToken() &&
     tokenStore.getRefreshToken()
   ) {
-    await refreshAccessTokenOrExpire();
+    await refreshAccessToken();
   }
 
   let response = await send(
@@ -144,14 +155,14 @@ export async function apiFetch<T>(
     const body = await readErrorBody(response);
 
     // 401 이라고 다 AT 문제가 아니다. 비밀번호 변경 · 탈퇴는 현재 비밀번호가 틀려도
-    // 401 INVALID_CREDENTIALS 로 온다(api.yaml 이 "code로 구분한다"고 못박아 뒀다).
+    // 401 INVALID_CREDENTIALS 로 온다 — code 로 갈라내야 한다.
     // 그걸 만료로 착각해 갱신을 돌리면 RT 만 헛되이 로테이션된다.
     if (body.code !== "UNAUTHORIZED") {
       throw new ApiError(401, body);
     }
 
     // 여기부터가 진짜 AT 만료다. 갱신은 single-flight 라 동시에 여러 개가 터져도 1회만 나간다.
-    const renewed = await refreshAccessTokenOrExpire();
+    const renewed = await refreshAccessToken();
     response = await send(path, options, renewed);
   }
 
@@ -162,16 +173,6 @@ export async function apiFetch<T>(
   // 로그아웃·탈퇴는 204 라 본문이 없다.
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
-}
-
-async function refreshAccessTokenOrExpire(): Promise<string> {
-  try {
-    return await refreshAccessToken();
-  } catch (error) {
-    // 갱신도 실패했으면 재시도하지 않는다. 무한루프 방지 (인증인가설계.md 7장).
-    onSessionExpired?.();
-    throw error;
-  }
 }
 
 async function readErrorBody(response: Response): Promise<ErrorResponse> {
