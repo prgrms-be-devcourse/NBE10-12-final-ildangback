@@ -21,7 +21,7 @@ public interface GroupPointRepository extends JpaRepository<GroupPoint, Long> {
     boolean existsByGroupId(Long groupId);
 
     // 없으면 0원 잔액 행을 만들고 있으면 무시한다(멱등, 동시 호출해도 예외 없음).
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query(
             value = "insert into group_points (group_id, balance, created_at, updated_at) "
                     + "values (:groupId, 0, current_timestamp, current_timestamp) "
