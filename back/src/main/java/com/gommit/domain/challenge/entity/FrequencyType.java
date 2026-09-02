@@ -2,6 +2,6 @@ package com.gommit.domain.challenge.entity;
 
 public enum FrequencyType {
     DAILY,
-    WEEKDAYS,
+    DAYS_OF_WEEK,
     EVERY_N_DAYS
 }
