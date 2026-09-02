@@ -147,7 +147,7 @@ public class PointService {
     // 나가서 유니크 제약 위반을 catch로 못 막는다.
     private UserPoint lockOrCreateUserPoint(Long userId) {
         if (!userPointRepository.existsByUserId(userId)) {
-            userPointRepository.insertZeroBalanceIfAbsent(userId);
+            userPointRepository.insertZeroBalanceIfAbsent(userId, LocalDateTime.now());
         }
         return userPointRepository
                 .findWithLockByUserId(userId)
@@ -156,7 +156,7 @@ public class PointService {
 
     private GroupPoint lockOrCreateGroupPoint(Long groupId) {
         if (!groupPointRepository.existsByGroupId(groupId)) {
-            groupPointRepository.insertZeroBalanceIfAbsent(groupId);
+            groupPointRepository.insertZeroBalanceIfAbsent(groupId, LocalDateTime.now());
         }
         return groupPointRepository
                 .findWithLockByGroupId(groupId)

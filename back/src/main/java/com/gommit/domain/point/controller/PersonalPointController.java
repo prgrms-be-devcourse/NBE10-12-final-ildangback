@@ -18,11 +18,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Validated
 @RestController
+@RequestMapping("/api/users/me/points")
+@Tag(name = "Personal Point", description = "개인 포인트 잔액 및 변동 이력 조회")
 @RequiredArgsConstructor
 public class PersonalPointController {
 
@@ -31,15 +34,13 @@ public class PersonalPointController {
     private final PointService pointService;
 
     @Operation(summary = "개인 포인트 잔액 조회", description = "현재 잔액, 이번 달 적립/사용, 누적 적립을 함께 반환한다.")
-    @Tag(name = "Personal Point", description = "개인 포인트 잔액 및 변동 이력 조회")
-    @GetMapping("/api/users/me/points")
+    @GetMapping
     public PointBalanceResponse getMyPointBalance(@CurrentUser SecurityUser user) {
         return pointService.getMyBalance(user.getId());
     }
 
     @Operation(summary = "개인 포인트 이력 조회", description = "최근 발생한 순서로 이력을 커서 기반 무한스크롤로 반환한다.")
-    @Tag(name = "Personal Point")
-    @GetMapping("/api/users/me/points/histories")
+    @GetMapping("/histories")
     public SliceResponse<UserPointHistoryResponse> getMyPointHistories(
             @CurrentUser SecurityUser user,
             @Parameter(description = "조회 기간 프리셋") @RequestParam(required = false) PeriodFilter period,
@@ -52,8 +53,7 @@ public class PersonalPointController {
     }
 
     @Operation(summary = "개인 포인트 이력 상세 조회", description = "이력 목록에서 항목을 눌렀을 때 보여주는 상세 화면용 API.")
-    @Tag(name = "Personal Point")
-    @GetMapping("/api/users/me/points/histories/{historyId}")
+    @GetMapping("/histories/{historyId}")
     public UserPointHistoryResponse getMyPointHistoryDetail(
             @CurrentUser SecurityUser user, @Parameter(description = "조회할 개인 포인트 이력 ID") @PathVariable Long historyId) {
         return pointService.getMyHistoryDetail(user.getId(), historyId);

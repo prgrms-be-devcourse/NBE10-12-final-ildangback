@@ -2,6 +2,7 @@ package com.gommit.domain.point.repository;
 
 import com.gommit.domain.point.entity.GroupPoint;
 import jakarta.persistence.LockModeType;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -24,8 +25,8 @@ public interface GroupPointRepository extends JpaRepository<GroupPoint, Long> {
     @Modifying(clearAutomatically = true)
     @Query(
             value = "insert into group_points (group_id, balance, created_at, updated_at) "
-                    + "values (:groupId, 0, current_timestamp, current_timestamp) "
+                    + "values (:groupId, 0, :now, :now) "
                     + "on duplicate key update group_id = group_id",
             nativeQuery = true)
-    void insertZeroBalanceIfAbsent(@Param("groupId") Long groupId);
+    void insertZeroBalanceIfAbsent(@Param("groupId") Long groupId, @Param("now") LocalDateTime now);
 }

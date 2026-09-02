@@ -2,6 +2,7 @@ package com.gommit.domain.point.repository;
 
 import com.gommit.domain.point.entity.UserPoint;
 import jakarta.persistence.LockModeType;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -24,8 +25,8 @@ public interface UserPointRepository extends JpaRepository<UserPoint, Long> {
     @Modifying(clearAutomatically = true)
     @Query(
             value = "insert into user_points (user_id, balance, created_at, updated_at) "
-                    + "values (:userId, 0, current_timestamp, current_timestamp) "
+                    + "values (:userId, 0, :now, :now) "
                     + "on duplicate key update user_id = user_id",
             nativeQuery = true)
-    void insertZeroBalanceIfAbsent(@Param("userId") Long userId);
+    void insertZeroBalanceIfAbsent(@Param("userId") Long userId, @Param("now") LocalDateTime now);
 }

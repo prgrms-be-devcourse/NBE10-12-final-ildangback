@@ -16,11 +16,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Validated
 @RestController
+@RequestMapping("/api/groups/{groupId}/points")
+@Tag(name = "Group Point", description = "그룹 포인트 잔액 및 변동 이력 조회")
 @RequiredArgsConstructor
 public class GroupPointController {
 
@@ -29,16 +32,14 @@ public class GroupPointController {
     private final PointService pointService;
 
     @Operation(summary = "그룹 포인트 잔액 조회", description = "해당 그룹에 참여 중인 멤버만 조회할 수 있다.")
-    @Tag(name = "Group Point", description = "그룹 포인트 잔액 및 변동 이력 조회")
-    @GetMapping("/api/groups/{groupId}/points")
+    @GetMapping
     public GroupPointBalanceResponse getGroupPointBalance(
             @Parameter(description = "조회할 그룹 ID") @PathVariable Long groupId) {
         return pointService.getGroupBalance(groupId);
     }
 
     @Operation(summary = "그룹 포인트 이력 조회", description = "최근 발생한 순서로 이력을 커서 기반 무한스크롤로 반환한다.")
-    @Tag(name = "Group Point")
-    @GetMapping("/api/groups/{groupId}/points/histories")
+    @GetMapping("/histories")
     public SliceResponse<GroupPointHistoryResponse> getGroupPointHistories(
             @Parameter(description = "조회할 그룹 ID") @PathVariable Long groupId,
             @Parameter(description = "조회 기간 프리셋") @RequestParam(required = false) PeriodFilter period,
@@ -51,8 +52,7 @@ public class GroupPointController {
     }
 
     @Operation(summary = "그룹 포인트 이력 상세 조회", description = "이력 목록에서 항목을 눌렀을 때 보여주는 상세 화면용 API.")
-    @Tag(name = "Group Point")
-    @GetMapping("/api/groups/{groupId}/points/histories/{historyId}")
+    @GetMapping("/histories/{historyId}")
     public GroupPointHistoryResponse getGroupPointHistoryDetail(
             @Parameter(description = "조회할 그룹 ID") @PathVariable Long groupId,
             @Parameter(description = "조회할 그룹 포인트 이력 ID") @PathVariable Long historyId) {

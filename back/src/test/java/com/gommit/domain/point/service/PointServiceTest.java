@@ -97,7 +97,7 @@ class PointServiceTest {
             pointService.reward(1L, 32L, 40, UserPointReason.CHECK_IN, "오운완");
 
             // then
-            verify(userPointRepository).insertZeroBalanceIfAbsent(1L);
+            verify(userPointRepository).insertZeroBalanceIfAbsent(eq(1L), any(LocalDateTime.class));
             ArgumentCaptor<UserPointHistory> captor = ArgumentCaptor.forClass(UserPointHistory.class);
             verify(userPointHistoryRepository).save(captor.capture());
             assertThat(captor.getValue().getBalanceAfter()).isEqualTo(40);
@@ -186,7 +186,7 @@ class PointServiceTest {
             pointService.rewardGroup(12L, 30, GroupPointReason.DAILY_ALL_COMPLETE, "오운완");
 
             // then
-            verify(groupPointRepository).insertZeroBalanceIfAbsent(12L);
+            verify(groupPointRepository).insertZeroBalanceIfAbsent(eq(12L), any(LocalDateTime.class));
             ArgumentCaptor<GroupPointHistory> captor = ArgumentCaptor.forClass(GroupPointHistory.class);
             verify(groupPointHistoryRepository).save(captor.capture());
             assertThat(captor.getValue().getBalanceAfter()).isEqualTo(30);
