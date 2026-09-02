@@ -76,8 +76,8 @@ class PointServiceTest {
     }
 
     private GroupPointHistory groupHistory(Long id, Long groupId, int amount, int balanceAfter) {
-        GroupPointHistory history = GroupPointHistory.of(
-                groupId, "오운완", amount, GroupPointReason.DAILY_ALL_COMPLETE, balanceAfter);
+        GroupPointHistory history =
+                GroupPointHistory.of(groupId, "오운완", amount, GroupPointReason.DAILY_ALL_COMPLETE, balanceAfter);
         ReflectionTestUtils.setField(history, "id", id);
         return history;
     }
@@ -328,7 +328,8 @@ class PointServiceTest {
             verify(userPointHistoryRepository)
                     .findHistories(any(), any(), from.capture(), to.capture(), any(), any(), any());
             LocalDate thisMonthFirstDay = PointService.businessMonthFirstDay(LocalDateTime.now());
-            assertThat(from.getValue()).isEqualTo(thisMonthFirstDay.minusMonths(1).atTime(4, 0));
+            assertThat(from.getValue())
+                    .isEqualTo(thisMonthFirstDay.minusMonths(1).atTime(4, 0));
             assertThat(to.getValue()).isEqualTo(thisMonthFirstDay.atTime(4, 0));
         }
     }

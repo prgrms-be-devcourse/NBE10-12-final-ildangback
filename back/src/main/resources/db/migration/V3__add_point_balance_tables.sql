@@ -27,3 +27,8 @@ CREATE TABLE group_points (
     CONSTRAINT uk_group_points_group UNIQUE (group_id),
     CONSTRAINT fk_group_points_group FOREIGN KEY (group_id) REFERENCES challenge_groups (id)
 );
+
+-- findHistories 커서 조회(userId/groupId + id desc)용 인덱스.
+-- 기존 (user_id, created_at)/(group_id, created_at) 인덱스는 기간 필터용으로 남겨둔다.
+CREATE INDEX idx_user_point_histories_user_cursor ON user_point_histories (user_id, id);
+CREATE INDEX idx_group_point_histories_group_cursor ON group_point_histories (group_id, id);
