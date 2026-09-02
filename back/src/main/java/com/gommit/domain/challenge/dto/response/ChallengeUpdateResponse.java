@@ -1,4 +1,4 @@
-package com.gommit.domain.challenge.dto.request;
+package com.gommit.domain.challenge.dto.response;
 
 import com.gommit.domain.challenge.entity.DaysOfWeek;
 import com.gommit.domain.challenge.entity.FrequencyType;
@@ -7,7 +7,8 @@ import com.gommit.domain.checkin.entity.CheckInType;
 import java.time.LocalDate;
 import java.util.List;
 
-public record ChallengeUpdateRequest(
+public record ChallengeUpdateResponse(
+    Long id,
     LocalDate startDate,
     LocalDate endDate,
     FrequencyType frequencyType,
