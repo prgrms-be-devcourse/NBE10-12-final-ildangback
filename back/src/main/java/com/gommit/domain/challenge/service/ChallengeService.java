@@ -2,20 +2,24 @@ package com.gommit.domain.challenge.service;
 
 import com.gommit.domain.challenge.dto.request.ChallengeUpdateRequest;
 import com.gommit.domain.challenge.dto.request.InitialChallengeSettingRequest;
-import com.gommit.domain.challenge.dto.response.ChallengeDetailResponse;
-import com.gommit.domain.challenge.dto.response.ChallengeStatusResponse;
-import com.gommit.domain.challenge.dto.response.ChallengeUpdateResponse;
-import com.gommit.domain.challenge.dto.response.MemberTodayStatusResponse;
+import com.gommit.domain.challenge.dto.request.OwnerDelegationRequest;
+import com.gommit.domain.challenge.dto.response.*;
 import com.gommit.domain.challenge.entity.*;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.domain.checkin.repository.CheckInRepository;
+import com.gommit.domain.group.entity.ChallengeGroup;
+import com.gommit.domain.group.entity.GroupMember;
+import com.gommit.domain.group.entity.GroupMemberStatus;
+import com.gommit.domain.group.repository.ChallengeGroupRepository;
+import com.gommit.domain.group.repository.GroupMemberRepository;
 import com.gommit.domain.user.entity.User;
 import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.config.annotation.AlreadyBuiltException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +37,8 @@ public class ChallengeService {
     private final ChallengeMemberRepository challengeMemberRepository;
     private final UserRepository userRepository;
     private final CheckInRepository checkInRepository;
+    private final ChallengeGroupRepository challengeGroupRepository;
+    private final GroupMemberRepository groupMemberRepository;
 
     // 그룹 생성 시 첫 챌린지 생성
     public Challenge createInitialChallenge(Long groupId, Long userId,InitialChallengeSettingRequest setting) {
@@ -291,7 +297,6 @@ public class ChallengeService {
         /*
          * 인증 방법
          * */
-
         List<CheckInType> allowedTypes = request.allowedTypes() != null ? request.allowedTypes() : challenge.isAllowPhoto() ? List.of(CheckInType.PHOTO) : List.of();
 
         if(allowedTypes.isEmpty()) {
@@ -335,6 +340,44 @@ public class ChallengeService {
 
         return new ChallengeUpdateResponse(challenge.getId(), startDate, endDate, frequencyType, frequencyValue, daysOfWeek, dailyCheckInCount, allowedTypes);
     }
+
+    @Transactional
+    public OwnerDelegationResponse delegateOwner(Long challengeId, Long userId, OwnerDelegationRequest request) {
+        Challenge challenge = challengeRepository.findById(challengeId).orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
+
+        ChallengeMember currentMember = challengeMemberRepository.findByChallengeIdAndUserId(challengeId, userId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER));
+
+        // OWNER인지 확인
+        if(currentMember.getRole() != ChallengeMemberRole.OWNER) {
+            throw new BusinessException(ErrorCode.NOT_CHALLENGE_OWNER);
+        }
+
+        if(userId.equals(request.targetUserId())) {
+            throw new BusinessException(ErrorCode.CANNOT_DELEGATE_TO_SELF);
+        }
+
+        // 위임 대상 멤버 조회
+        ChallengeMember targetMember = challengeMemberRepository.findByChallengeIdAndUserId(challengeId, request.targetUserId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER));
+
+        if(targetMember.getStatus() != ChallengeMemberStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER);
+        }
+
+        currentMember.changeRole(ChallengeMemberRole.MEMBER);
+        targetMember.changeRole(ChallengeMemberRole.OWNER);
+
+        if(challenge.getSeqNo() == 1 || challenge.getStatus() == ChallengeStatus.ACTIVE) {
+            ChallengeGroup group = challengeGroupRepository.findById(challenge.getGroupId()).orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+            group.changeOwner(request.targetUserId());
+        }
+
+        return new OwnerDelegationResponse(
+            challengeId,
+            userId,
+            request.targetUserId()
+        );
+    }
+
 
     // 선택된 요일 DB 저장용 문자열로 변환
     private String convertDaysOfWeek(List<DaysOfWeek> daysOfWeek) {
