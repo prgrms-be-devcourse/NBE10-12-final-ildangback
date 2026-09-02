@@ -49,7 +49,7 @@ public class CloudinaryStorageService implements StorageService {
             Map<?, ?> result = cloudinary
                     .uploader()
                     .upload(
-                            file.getBytes(),
+                            file.getInputStream(),
                             ObjectUtils.asMap(
                                     "folder",
                                     policy.folder(),
