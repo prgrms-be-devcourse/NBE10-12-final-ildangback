@@ -36,6 +36,7 @@ export function EditProfilePage() {
     handleSubmit,
     setError,
     control,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<EditForm>({
     resolver: zodResolver(schema),
@@ -63,6 +64,9 @@ export function EditProfilePage() {
       return;
     try {
       const { available } = await checkNickname(nickname);
+      // 확인하는 사이에 값이 바뀌었으면 버린다. 옛 응답이 늦게 도착해 지금 입력과
+      // 무관한 "이미 사용 중" 을 덮어쓰는 것을 막는다.
+      if (getValues("nickname") !== nickname) return;
       if (!available)
         setError("nickname", { message: "이미 사용 중인 닉네임입니다." });
     } catch {
