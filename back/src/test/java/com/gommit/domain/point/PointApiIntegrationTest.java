@@ -1,5 +1,6 @@
 package com.gommit.domain.point;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -8,6 +9,13 @@ import com.gommit.domain.point.entity.GroupPointReason;
 import com.gommit.domain.point.entity.UserPointReason;
 import com.gommit.domain.point.service.PointService;
 import com.gommit.support.IntegrationTestSupport;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -317,6 +325,75 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
             getGroupHistoryDetail(tokens.accessToken(), otherGroupId, historyId)
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.code").value("POINT_HISTORY_NOT_FOUND"));
+        }
+    }
+
+    @Nested
+    @DisplayName("동시 지급/차감 - 잔액 유실 여부")
+    class Concurrency {
+
+        // 잔액 행 생성 경쟁(ON DUPLICATE KEY UPDATE 멱등 처리)에 대한 회귀 테스트.
+        @Test
+        @DisplayName("동시에 N번 지급하면 잔액과 이력이 정확히 N번만큼 쌓인다")
+        void concurrentRewardsDoNotLoseUpdates() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+            Long userId = userIdOf(EMAIL);
+            int threadCount = 8;
+            int amountEach = 100;
+
+            ExecutorService pool = Executors.newFixedThreadPool(threadCount);
+            List<Callable<Void>> tasks = IntStream.range(0, threadCount)
+                    .<Callable<Void>>mapToObj(i -> () -> {
+                        pointService.reward(userId, null, amountEach, UserPointReason.CHECK_IN, "동시성 테스트");
+                        return null;
+                    })
+                    .toList();
+            List<Future<Void>> futures = pool.invokeAll(tasks);
+            pool.shutdown();
+            pool.awaitTermination(30, TimeUnit.SECONDS);
+            for (Future<Void> future : futures) {
+                future.get(); // 스레드 내부 예외가 있었다면 여기서 드러난다
+            }
+
+            int balance = jdbcTemplate.queryForObject(
+                    "select balance from user_points where user_id = ?", Integer.class, userId);
+            Integer historyCount = jdbcTemplate.queryForObject(
+                    "select count(*) from user_point_histories where user_id = ?", Integer.class, userId);
+
+            assertThat(balance).isEqualTo(threadCount * amountEach);
+            assertThat(historyCount).isEqualTo(threadCount);
+        }
+
+        // 그룹 포인트도 잔액 테이블/락 구조가 동일하므로 같은 시나리오를 검증한다.
+        @Test
+        @DisplayName("동시에 N번 그룹에 지급하면 잔액과 이력이 정확히 N번만큼 쌓인다")
+        void concurrentGroupRewardsDoNotLoseUpdates() throws Exception {
+            loginAs(EMAIL, NICKNAME);
+            Long groupId = insertTestGroup(userIdOf(EMAIL));
+            int threadCount = 8;
+            int amountEach = 50;
+
+            ExecutorService pool = Executors.newFixedThreadPool(threadCount);
+            List<Callable<Void>> tasks = IntStream.range(0, threadCount)
+                    .<Callable<Void>>mapToObj(i -> () -> {
+                        pointService.rewardGroup(groupId, amountEach, GroupPointReason.DAILY_ALL_COMPLETE, "동시성 테스트");
+                        return null;
+                    })
+                    .toList();
+            List<Future<Void>> futures = pool.invokeAll(tasks);
+            pool.shutdown();
+            pool.awaitTermination(30, TimeUnit.SECONDS);
+            for (Future<Void> future : futures) {
+                future.get();
+            }
+
+            int balance = jdbcTemplate.queryForObject(
+                    "select balance from group_points where group_id = ?", Integer.class, groupId);
+            Integer historyCount = jdbcTemplate.queryForObject(
+                    "select count(*) from group_point_histories where group_id = ?", Integer.class, groupId);
+
+            assertThat(balance).isEqualTo(threadCount * amountEach);
+            assertThat(historyCount).isEqualTo(threadCount);
         }
     }
 }

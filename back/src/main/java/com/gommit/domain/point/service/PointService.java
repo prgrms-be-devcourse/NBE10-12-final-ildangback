@@ -37,7 +37,6 @@ public class PointService {
     private final GroupPointHistoryRepository groupPointHistoryRepository;
     private final UserPointRepository userPointRepository;
     private final GroupPointRepository groupPointRepository;
-    private final PointBalanceInitializer pointBalanceInitializer;
 
     // ===== 내부 계약: 지급/차감 =====
     // 잔액 행(UserPoint/GroupPoint)을 SELECT ... FOR UPDATE로 잠근 뒤 갱신한다.
@@ -143,11 +142,12 @@ public class PointService {
 
     // ===== 내부 헬퍼 =====
 
-    // 없으면 만들고 나서 잠근다. 잠금 조회를 먼저 하면 0건이어도 MySQL이 갭 락을 걸어
-    // 뒤이은 생성 INSERT가 막혀 데드락이 나서 이 순서로 뒀다.
+    // 갭 락 데드락을 피하려고 없으면 만들고 나서 잠근다(순서 중요).
+    // 생성은 ON DUPLICATE KEY UPDATE로 멱등하게 한다 - save()는 커밋 시점에 INSERT가
+    // 나가서 유니크 제약 위반을 catch로 못 막는다.
     private UserPoint lockOrCreateUserPoint(Long userId) {
-        if (userPointRepository.findByUserId(userId).isEmpty()) {
-            pointBalanceInitializer.createUserPointIfAbsent(userId);
+        if (!userPointRepository.existsByUserId(userId)) {
+            userPointRepository.insertZeroBalanceIfAbsent(userId);
         }
         return userPointRepository
                 .findWithLockByUserId(userId)
@@ -155,8 +155,8 @@ public class PointService {
     }
 
     private GroupPoint lockOrCreateGroupPoint(Long groupId) {
-        if (groupPointRepository.findByGroupId(groupId).isEmpty()) {
-            pointBalanceInitializer.createGroupPointIfAbsent(groupId);
+        if (!groupPointRepository.existsByGroupId(groupId)) {
+            groupPointRepository.insertZeroBalanceIfAbsent(groupId);
         }
         return groupPointRepository
                 .findWithLockByGroupId(groupId)

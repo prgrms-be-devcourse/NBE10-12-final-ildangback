@@ -53,9 +53,6 @@ class PointServiceTest {
     @Mock
     private GroupPointRepository groupPointRepository;
 
-    @Mock
-    private PointBalanceInitializer pointBalanceInitializer;
-
     @InjectMocks
     private PointService pointService;
 
@@ -92,15 +89,15 @@ class PointServiceTest {
         @Test
         @DisplayName("잔액 행이 없으면 0에서 시작해서 지급된 만큼 잔액이 쌓인다")
         void rewardsFromZeroWhenNoBalanceRow() {
-            // given: 존재 확인(잠금 없음)은 비어있고, 초기화 후 잠금 조회하면 새 행이 온다
-            when(userPointRepository.findByUserId(1L)).thenReturn(Optional.empty());
+            // given: 존재 확인(잠금 없음)은 false이고, 초기화 후 잠금 조회하면 새 행이 온다
+            when(userPointRepository.existsByUserId(1L)).thenReturn(false);
             when(userPointRepository.findWithLockByUserId(1L)).thenReturn(Optional.of(UserPoint.init(1L)));
 
             // when
             pointService.reward(1L, 32L, 40, UserPointReason.CHECK_IN, "오운완");
 
             // then
-            verify(pointBalanceInitializer).createUserPointIfAbsent(1L);
+            verify(userPointRepository).insertZeroBalanceIfAbsent(1L);
             ArgumentCaptor<UserPointHistory> captor = ArgumentCaptor.forClass(UserPointHistory.class);
             verify(userPointHistoryRepository).save(captor.capture());
             assertThat(captor.getValue().getBalanceAfter()).isEqualTo(40);
@@ -176,6 +173,23 @@ class PointServiceTest {
             ArgumentCaptor<GroupPointHistory> captor = ArgumentCaptor.forClass(GroupPointHistory.class);
             verify(groupPointHistoryRepository).save(captor.capture());
             assertThat(captor.getValue().getBalanceAfter()).isEqualTo(8450);
+        }
+
+        @Test
+        @DisplayName("그룹 잔액 행이 없으면 0에서 시작해서 지급된 만큼 잔액이 쌓인다")
+        void rewardsGroupFromZeroWhenNoBalanceRow() {
+            // given
+            when(groupPointRepository.existsByGroupId(12L)).thenReturn(false);
+            when(groupPointRepository.findWithLockByGroupId(12L)).thenReturn(Optional.of(GroupPoint.init(12L)));
+
+            // when
+            pointService.rewardGroup(12L, 30, GroupPointReason.DAILY_ALL_COMPLETE, "오운완");
+
+            // then
+            verify(groupPointRepository).insertZeroBalanceIfAbsent(12L);
+            ArgumentCaptor<GroupPointHistory> captor = ArgumentCaptor.forClass(GroupPointHistory.class);
+            verify(groupPointHistoryRepository).save(captor.capture());
+            assertThat(captor.getValue().getBalanceAfter()).isEqualTo(30);
         }
 
         @Test
