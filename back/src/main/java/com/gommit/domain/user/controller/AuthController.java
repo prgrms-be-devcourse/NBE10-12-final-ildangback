@@ -1,14 +1,18 @@
 package com.gommit.domain.user.controller;
 
 import com.gommit.domain.user.dto.request.LoginRequest;
+import com.gommit.domain.user.dto.request.PasswordResetConfirmRequest;
+import com.gommit.domain.user.dto.request.PasswordResetRequest;
 import com.gommit.domain.user.dto.request.RefreshRequest;
 import com.gommit.domain.user.dto.request.SignUpRequest;
 import com.gommit.domain.user.dto.response.AvailabilityResponse;
 import com.gommit.domain.user.dto.response.LoginResponse;
+import com.gommit.domain.user.dto.response.PasswordResetTargetResponse;
 import com.gommit.domain.user.dto.response.TokenResponse;
 import com.gommit.domain.user.dto.response.UserSummaryResponse;
 import com.gommit.domain.user.service.AuthService;
 import com.gommit.domain.user.service.EmailVerificationService;
+import com.gommit.domain.user.service.PasswordResetService;
 import com.gommit.domain.user.service.UserService;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.security.CurrentUser;
@@ -36,6 +40,7 @@ public class AuthController {
     private final AuthService authService;
     private final UserService userService;
     private final EmailVerificationService emailVerificationService;
+    private final PasswordResetService passwordResetService;
 
     @Operation(summary = "회원가입")
     @PostMapping("/signup")
@@ -104,6 +109,26 @@ public class AuthController {
     @PostMapping("/verify-email/resend")
     public ResponseEntity<Void> resendVerificationEmail(@CurrentUser SecurityUser actor) {
         emailVerificationService.resend(actor.getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "비밀번호 재설정 메일 요청")
+    @PostMapping("/password-reset")
+    public ResponseEntity<Void> requestPasswordReset(@Valid @RequestBody PasswordResetRequest request) {
+        passwordResetService.request(request.email());
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "비밀번호 재설정 토큰 확인")
+    @GetMapping("/password-reset")
+    public ResponseEntity<PasswordResetTargetResponse> checkPasswordResetToken(@RequestParam String token) {
+        return ResponseEntity.ok(passwordResetService.findTarget(token));
+    }
+
+    @Operation(summary = "비밀번호 재설정")
+    @PostMapping("/password-reset/confirm")
+    public ResponseEntity<Void> confirmPasswordReset(@Valid @RequestBody PasswordResetConfirmRequest request) {
+        passwordResetService.reset(request.token(), request.newPassword());
         return ResponseEntity.noContent().build();
     }
 }

@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 public record UserProfileResponse(
         Long id,
         String email,
+        boolean emailVerified,
         String nickname,
         String introduction,
         int personalStreak,
@@ -18,6 +19,7 @@ public record UserProfileResponse(
         this(
                 user.getId(),
                 user.getEmail(),
+                user.isEmailVerified(),
                 user.getNickname(),
                 user.getIntroduction(),
                 user.getPersonalStreak(),

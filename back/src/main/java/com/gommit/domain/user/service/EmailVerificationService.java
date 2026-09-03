@@ -26,11 +26,13 @@ public class EmailVerificationService {
     private static final Duration RESEND_MIN_INTERVAL = Duration.ofSeconds(60);
     private static final String LINK_FORMAT = "%s/api/auth/verify-email?token=%s";
     private static final String RESULT_FORMAT = "%s/verify-result?status=%s";
+    private static final String SUBJECT = "[꼬밋] 이메일 인증을 완료해 주세요";
+    private static final String BODY_FORMAT = "아래 링크를 눌러 이메일 인증을 완료해 주세요.%n%n%s";
 
     private final EmailTokenRepository emailTokenRepository;
     private final UserRepository userRepository;
     private final SecureTokenProvider secureTokenProvider;
-    private final VerificationMailSender mailSender;
+    private final EmailSender mailSender;
 
     @Value("${app.frontend-base-url}")
     private String frontendBaseUrl;
@@ -41,9 +43,23 @@ public class EmailVerificationService {
     // 인증 메일 발송
     @Transactional
     public void send(User user) {
+        sendMail(user, SUBJECT, BODY_FORMAT);
+    }
+
+    // 최소 간격이 지났을 때만 인증 메일 발송
+    @Transactional
+    public void sendIfDue(User user, String subject, String bodyFormat) {
+        if (!hasRecentToken(user.getId())) {
+            sendMail(user, subject, bodyFormat);
+        }
+    }
+
+    // 토큰을 발급해 메일로 보낸다
+    private void sendMail(User user, String subject, String bodyFormat) {
         String rawToken = issue(user);
         try {
-            mailSender.send(user.getEmail(), LINK_FORMAT.formatted(apiBaseUrl, rawToken));
+            String link = LINK_FORMAT.formatted(apiBaseUrl, rawToken);
+            mailSender.send(user.getEmail(), subject, bodyFormat.formatted(link));
         } catch (RuntimeException e) {
             log.warn("인증 메일 발송 실패: userId={}, {}", user.getId(), e.getMessage());
         }
