@@ -55,7 +55,7 @@ public class CloudinaryStorageService implements StorageService {
             Map<?, ?> result = cloudinary
                     .uploader()
                     .upload(
-                            file.getInputStream(),
+                            file.getBytes(),
                             ObjectUtils.asMap(
                                     "folder",
                                     policy.folder(),
