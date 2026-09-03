@@ -30,6 +30,7 @@ public enum ErrorCode {
     EXTENSION_CHOICE_CLOSED(HttpStatus.CONFLICT, "연장 참여 의사 선택 기간이 마감되었습니다."),
     INVALID_EXTENSION_CHOICE(HttpStatus.BAD_REQUEST, "연장 참여 의사는 EXTEND 또는 DECLINE만 선택할 수 있습니다."),
     EXTENSION_CHOICE_NOT_AVAILABLE(HttpStatus.CONFLICT, "현재 연장 참여 의사를 선택할 수 없는 챌린지입니다."),
+    EXTENSION_START_DATE_NOT_EDITABLE(HttpStatus.BAD_REQUEST, "연장 시즌의 시작일은 변경할 수 없습니다."),
 
     // ===== checkin =====
 

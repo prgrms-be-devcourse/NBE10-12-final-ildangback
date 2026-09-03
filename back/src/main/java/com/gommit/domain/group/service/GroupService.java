@@ -4,6 +4,7 @@ import com.gommit.domain.challenge.dto.response.ChallengeSummaryResponse;
 import com.gommit.domain.challenge.entity.*;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
+import com.gommit.domain.challenge.service.ChallengeMemberService;
 import com.gommit.domain.challenge.service.ChallengeService;
 import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.group.dto.request.GroupCreateRequest;
@@ -39,6 +40,7 @@ public class GroupService {
     private final UserRepository userRepository;
     private final ChallengeMemberRepository challengeMemberRepository;
     private final CheckInRepository checkInRepository;
+    private final ChallengeMemberService challengeMemberService;
 
     @Transactional
     public GroupDetailResponse createGroup(Long userId, GroupCreateRequest request) {
@@ -317,7 +319,7 @@ public class GroupService {
         GroupMember savedGroupMember = groupMemberRepository.save(groupMember);
 
         // ChallengeMember 생성
-        ChallengeMember challengeMember = challengeService.createChallengeMember(
+        ChallengeMember challengeMember = challengeMemberService.createChallengeMember(
             challenge,
             userId,
             ChallengeMemberRole.MEMBER
