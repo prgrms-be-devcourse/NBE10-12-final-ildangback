@@ -1,6 +1,7 @@
 package com.gommit.domain.challenge.service;
 
 import com.gommit.domain.challenge.dto.request.ChallengeUpdateRequest;
+import com.gommit.domain.challenge.dto.request.ExtensionChoiceRequest;
 import com.gommit.domain.challenge.dto.request.InitialChallengeSettingRequest;
 import com.gommit.domain.challenge.dto.request.OwnerDelegationRequest;
 import com.gommit.domain.challenge.dto.response.*;
@@ -378,6 +379,49 @@ public class ChallengeService {
         );
     }
 
+    // 다음 시즌 연장 참여 의사 검사
+    @Transactional
+    public ExtensionChoiceResponse updateExtensionChoice(Long challengeId, Long userId,ExtensionChoiceRequest request) {
+        // 챌린지 조회
+        Challenge challenge = challengeRepository.findById(challengeId).orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
+
+        // 진해 중인 시즌에서만 연장 의사 선택 가능
+        if(challenge.getStatus() != ChallengeStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.EXTENSION_CHOICE_NOT_AVAILABLE);
+        }
+
+        // 해당 챌린지의 내 참여 정보 조회
+        ChallengeMember challengeMember = challengeMemberRepository.findByChallengeIdAndUserId(challengeId, userId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER));
+
+        // 현재 참여 중인 멤버만 연장 의사 선택 가능
+        if(challengeMember.getStatus() != ChallengeMemberStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER);
+        }
+
+        // 연장 투표 마감 여부 확인
+        validateExtensionChoicePeriod(challenge);
+
+        // EXTEND / DECLINE 선택
+        validateExtensionChoice(request.choice());
+
+        // 내 연장 의사 변경
+        challengeMember.changeExtensionChoice(request.choice());
+
+        // 현재 ACTIVE 멤버들의 선택 현황 집계
+        int pendingCount = (int) challengeMemberRepository.countByChallengeIdAndStatusAndExtensionChoice(challengeId, ChallengeMemberStatus.ACTIVE, ExtensionChoice.PENDING);
+        int extendCount = (int) challengeMemberRepository.countByChallengeIdAndStatusAndExtensionChoice(challengeId, ChallengeMemberStatus.ACTIVE, ExtensionChoice.EXTEND);
+        int declineCount = (int) challengeMemberRepository.countByChallengeIdAndStatusAndExtensionChoice(challengeId, ChallengeMemberStatus.ACTIVE, ExtensionChoice.DECLINE);
+
+        return new ExtensionChoiceResponse(
+            challengeId,
+            userId,
+            challengeMember.getExtensionChoice(),
+            pendingCount,
+            extendCount,
+            declineCount
+        );
+    }
+
 
     // 선택된 요일 DB 저장용 문자열로 변환
     private String convertDaysOfWeek(List<DaysOfWeek> daysOfWeek) {
@@ -562,4 +606,19 @@ public class ChallengeService {
             }
         };
     }
+
+    private void validateExtensionChoice(ExtensionChoice choice) {
+        if(choice != ExtensionChoice.EXTEND && choice != ExtensionChoice.DECLINE) {
+            throw new BusinessException(ErrorCode.INVALID_EXTENSION_CHOICE);
+        }
+    }
+
+    private void validateExtensionChoicePeriod(Challenge challenge) {
+        LocalDate deadline = challenge.getEndDate().minusDays(2);
+
+        if(LocalDate.now().isAfter(deadline)) {
+            throw new BusinessException(ErrorCode.EXTENSION_CHOICE_CLOSED);
+        }
+    }
+
 }
