@@ -27,6 +27,9 @@ public enum ErrorCode {
     INVALID_EXTENSION_START_DATE(HttpStatus.BAD_REQUEST, "연장 시즌의 시작일은 이전 시즌 종료일 이후여야 합니다."),
     INVALID_DAILY_COUNT(HttpStatus.BAD_REQUEST, "하루 인증 횟수가 허용 범위를 벗어났습니다."),
     CANNOT_DELEGATE_TO_SELF(HttpStatus.BAD_REQUEST, "자기 자신에게 OWNER를 위임할 수 없습니다."),
+    EXTENSION_CHOICE_CLOSED(HttpStatus.CONFLICT, "연장 참여 의사 선택 기간이 마감되었습니다."),
+    INVALID_EXTENSION_CHOICE(HttpStatus.BAD_REQUEST, "연장 참여 의사는 EXTEND 또는 DECLINE만 선택할 수 있습니다."),
+    EXTENSION_CHOICE_NOT_AVAILABLE(HttpStatus.CONFLICT, "현재 연장 참여 의사를 선택할 수 없는 챌린지입니다."),
 
     // ===== checkin =====
 

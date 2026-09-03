@@ -64,6 +64,10 @@ public class ChallengeMember extends BaseEntity {
         this.role = role;
     }
 
+    public void changeExtensionChoice(ExtensionChoice choice) {
+        this.extensionChoice = choice;
+    }
+
     public void leave() {
         this.status = ChallengeMemberStatus.LEFT;
         this.leftAt = LocalDateTime.now();
