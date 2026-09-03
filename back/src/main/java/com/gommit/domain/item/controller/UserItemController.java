@@ -9,15 +9,18 @@ import com.gommit.global.security.CurrentUser;
 import com.gommit.global.security.SecurityUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "UserItem", description = "보유 아이템/캐릭터 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/users/me")
+@Validated
 public class UserItemController {
     private final UserItemService userItemService;
 
@@ -35,7 +38,6 @@ public class UserItemController {
     /**
      * 보유 아이템 조회
      * - slot 쿼리 파라미터가 있으면 해당 슬롯만, 없으면 전체 보유 아이템 반환.
-     * [변경] 반환 타입: List<UserItemResponse> → SliceResponse<UserItemResponse>
      * [변경] 파라미터 추가:
      *   cursor - 마지막으로 받은 userItemId. 첫 요청 시 생략(null).
      *   size   - 한 번에 받을 개수. 기본 20. @Min(1)로 0 이하 입력을 컨트롤러 레벨에서 차단.
@@ -45,7 +47,7 @@ public class UserItemController {
     public ResponseEntity<SliceResponse<UserItemResponse>> getMyItems(
             @RequestParam(required = false) ItemSlot slot,
             @RequestParam(required = false) Long cursor,
-            @RequestParam(defaultValue = "20") @Min(1) int size,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
             @CurrentUser SecurityUser actor) {
         return ResponseEntity.ok(userItemService.getMyItems(actor.getId(), slot, cursor, size));
     }

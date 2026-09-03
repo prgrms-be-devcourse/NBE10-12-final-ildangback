@@ -12,17 +12,20 @@ import com.gommit.global.security.SecurityUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "Item", description = "상점 아이템 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api")
+@Validated
 public class ItemController {
     private final ItemService itemService;
 
@@ -36,7 +39,7 @@ public class ItemController {
     public ResponseEntity<SliceResponse<ShopItemResponse>> getShopItems(
             @RequestParam(required = false) ItemSlot slot,
             @RequestParam(required = false) Long cursor,
-            @RequestParam(defaultValue = "20") @Min(1) int size,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
             @CurrentUser SecurityUser actor) {
         return ResponseEntity.ok(itemService.getShopItems(actor.getId(), slot, cursor, size));
     }

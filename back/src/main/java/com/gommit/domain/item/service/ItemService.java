@@ -120,6 +120,6 @@ public class ItemService {
         if (userItemRepository.existsByItemId(itemId)) {
             throw new BusinessException(ErrorCode.ITEM_IN_USE);
         }
-        itemRepository.deleteById(itemId);
+        itemRepository.delete(item);
     }
 }
