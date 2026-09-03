@@ -8,6 +8,9 @@ import com.gommit.domain.media.config.MediaStorageProperties.CloudinaryAccount;
 // MediaConfig 가 provider=cloudinary 일 때 호출됨
 public final class CloudinaryClientFactory {
 
+    // http5 네트워크 타임아웃. 40MB 영상 전송 고려해 60초.
+    private static final int HTTP_TIMEOUT_SECONDS = 60;
+
     private CloudinaryClientFactory() {}
 
     public static Cloudinary create(CloudinaryAccount account) {
@@ -19,11 +22,18 @@ public final class CloudinaryClientFactory {
                     + "media.storage.cloudinary.{cloud-name,api-key,api-secret} 이 비어 있습니다.");
         }
         return new Cloudinary(ObjectUtils.asMap(
-                "cloud_name", account.cloudName(),
-                "api_key", account.apiKey(),
-                "api_secret", account.apiSecret(),
-                "secure", true,
-                "analytics", false)); // 배달 URL 뒤에 SDK 분석용 ?_a= 파라미터를 붙이지 않는다
+                "cloud_name",
+                account.cloudName(),
+                "api_key",
+                account.apiKey(),
+                "api_secret",
+                account.apiSecret(),
+                "secure",
+                true,
+                "timeout",
+                HTTP_TIMEOUT_SECONDS,
+                "analytics", // Cloudinary 내부 집계용 파라미터 ?_a= 제외.
+                false));
     }
 
     private static boolean isBlank(String value) {
