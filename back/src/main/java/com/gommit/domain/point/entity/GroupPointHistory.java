@@ -31,4 +31,17 @@ public class GroupPointHistory extends BaseEntity {
 
     @Column(nullable = false)
     private int balanceAfter;
+
+    private GroupPointHistory(Long groupId, String sourceName, int amount, GroupPointReason reason, int balanceAfter) {
+        this.groupId = groupId;
+        this.sourceName = sourceName;
+        this.amount = amount;
+        this.reason = reason;
+        this.balanceAfter = balanceAfter;
+    }
+
+    public static GroupPointHistory of(
+            Long groupId, String sourceName, int amount, GroupPointReason reason, int balanceAfter) {
+        return new GroupPointHistory(groupId, sourceName, amount, reason, balanceAfter);
+    }
 }

@@ -24,6 +24,8 @@ public enum ErrorCode {
     // ===== item =====
 
     // ===== point =====
+    POINT_INSUFFICIENT(HttpStatus.CONFLICT, "포인트가 부족합니다."),
+    POINT_HISTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 포인트 이력입니다."),
 
     // ===== record =====
 
