@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> {
-    List<GroupMember> findAllByGroupIdAndStatus(Long groupId, GroupMemberStatus groupMemberStatus);
+    List<GroupMember> findAllByGroupIdAndStatus(Long groupId, GroupMemberStatus status);
 
     Optional<GroupMember> findByGroupIdAndUserId(Long groupId, Long userId);
 

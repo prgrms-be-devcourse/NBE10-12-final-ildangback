@@ -16,4 +16,6 @@ public interface ChallengeMemberRepository extends JpaRepository<ChallengeMember
     long countByChallengeIdAndStatus(Long challengeId, ChallengeMemberStatus status);
 
     List<ChallengeMember> findAllByChallengeIdAndStatus(Long challengeId, ChallengeMemberStatus status);
+
+    List<ChallengeMember> findAllByUserIdAndStatus(Long userId, ChallengeMemberStatus status);
 }
