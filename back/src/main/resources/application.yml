@@ -34,6 +34,9 @@ springdoc:
     tags-sorter: alpha
     operations-sorter: method
 
+app:
+  time-zone: Asia/Seoul # 인증 businessDate('오늘') 판정에 쓰는 Clock 빈의 기준 타임존
+
 auth-token:
   access-token:
     expiration: 15m
