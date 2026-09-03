@@ -18,6 +18,9 @@ import com.gommit.domain.item.entity.ItemSlot;
 import com.gommit.domain.item.entity.UserItem;
 import com.gommit.domain.item.repository.ItemRepository;
 import com.gommit.domain.item.repository.UserItemRepository;
+import com.gommit.domain.point.dto.response.PointBalanceResponse;
+import com.gommit.domain.point.entity.UserPointReason;
+import com.gommit.domain.point.service.PointService;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
@@ -45,6 +48,9 @@ public class ItemServiceTest {
 
     @Mock
     private UserItemService userItemService;
+
+    @Mock
+    private PointService pointService;
 
     // 위 @Mock 필드들을 생성자 주입 방식으로 ItemService에 주입
     @InjectMocks
@@ -134,17 +140,46 @@ public class ItemServiceTest {
         ReflectionTestUtils.setField(saved, "createdAt", LocalDateTime.of(2025, 6, 1, 0, 0));
         given(userItemRepository.saveAndFlush(any(UserItem.class))).willReturn(saved);
 
+        // 차감 후 잔액 후 조회 stub - 임의의 숫자로 지정
+        given(pointService.getMyBalance(1L)).willReturn(new PointBalanceResponse(900, 0, 0, 0));
+
         // when
         ItemPurchaseResponse response = itemService.purchaseItem(1L, 1L);
 
         // then
         // 반환된 응답의 userItemId, itemId가 올바른지 검증
+        // 응답에 반영된 잔액도 stub한 값과 일치하는지 확인
         assertThat(response.userItemId()).isEqualTo(10L);
         assertThat(response.itemId()).isEqualTo(1L);
+        assertThat(response.balance()).isEqualTo(900);
 
         then(userItemRepository).should(times(1)).saveAndFlush(any(UserItem.class));
         // 구매 후 자동 착용을 위해 switchEquippedItem이 호출되었는지 검증
         then(userItemService).should(times(1)).switchEquippedItem(eq(1L), any(UserItem.class));
+        // 포인트 차감이 정확한 인자로 호출됐는지 검증
+        then(pointService).should(times(1)).deduct(eq(1L), eq(100), eq(UserPointReason.ITEM_PURCHASE), eq("기본 모자"));
+    }
+
+    @Test
+    @DisplayName("포인트 부족 시 구매가 중단되고 UserItem이 저장되지 않는다")
+    void t2fail() {
+        // given
+        given(itemRepository.findById(1L)).willReturn(Optional.of(headItem));
+        given(userItemRepository.existsByUserIdAndItemId(1L, 1L)).willReturn(false);
+
+        // deduct()는 void 메서드이므로 예외 stub은 willThrow(...).given(mock).method(...) 순서로 작성
+        org.mockito.BDDMockito.willThrow(new BusinessException(ErrorCode.POINT_INSUFFICIENT))
+                .given(pointService)
+                .deduct(eq(1L), eq(100), eq(UserPointReason.ITEM_PURCHASE), eq("기본 모자"));
+
+        // when & then
+        assertThatThrownBy(() -> itemService.purchaseItem(1L, 1L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.POINT_INSUFFICIENT);
+
+        // 포인트 부족으로 실패했으므로 UserItem은 저장되지 않아야 함
+        then(userItemRepository).should(never()).saveAndFlush(any());
     }
 
     @Test

@@ -9,6 +9,9 @@ import com.gommit.domain.item.entity.ItemSlot;
 import com.gommit.domain.item.entity.UserItem;
 import com.gommit.domain.item.repository.ItemRepository;
 import com.gommit.domain.item.repository.UserItemRepository;
+import com.gommit.domain.point.dto.response.PointBalanceResponse;
+import com.gommit.domain.point.entity.UserPointReason;
+import com.gommit.domain.point.service.PointService;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
@@ -28,6 +31,7 @@ public class ItemService {
     private final ItemRepository itemRepository;
     private final UserItemRepository userItemRepository;
     private final UserItemService userItemService;
+    private final PointService pointService;
 
     // 이미지 임시 경로
     private String uploadImage(MultipartFile image) {
@@ -87,7 +91,9 @@ public class ItemService {
         }
 
         // 포인트 차감 메서드 호출
-        // pointService.deduct(userId, item.getPrice());
+        // reason = ITEM_PURCHASE, sourceName = 아이템명으로 이력 남김
+        // 잔액 부족 시 pointService.deduct 내부에서 BusinessException(POINT_INSUFFICIENT)을 던짐.
+        pointService.deduct(userId, item.getPrice(), UserPointReason.ITEM_PURCHASE, item.getName());
 
         UserItem newUserItem = UserItem.of(userId, item);
         UserItem savedUserItem;
@@ -100,7 +106,9 @@ public class ItemService {
         userItemService.switchEquippedItem(userId, savedUserItem);
 
         // 차감 후 잔액 받아오기
-        int remainingBalance = 0;
+        PointBalanceResponse balanceResponse = pointService.getMyBalance(userId);
+        int remainingBalance = balanceResponse.balance();
+
         return new ItemPurchaseResponse(
                 savedUserItem.getId(),
                 item.getId(),
