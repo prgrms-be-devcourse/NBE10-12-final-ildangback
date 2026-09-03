@@ -276,22 +276,18 @@ class UserItemServiceTest {
     @DisplayName("슬롯 미지정 시 커서 기반 전체 조회가 호출되고 SliceResponse로 반환된다")
     void t12() {
         // given
-        // [변경] findByUserId() → findByUserIdAndIdGreaterThanOrderByIdAsc(cursor=0, pageable)
         // 서비스가 cursor=null을 0L로 변환하여 호출하므로 stub도 eq(0L)로 맞춤.
         // any(Pageable.class)는 PageRequest.of(0, size+1) 형태를 포괄적으로 매칭함.
         given(userItemRepository.findByUserIdAndIdGreaterThanOrderByIdAsc(eq(USER_ID), eq(0L), any(Pageable.class)))
                 .willReturn(List.of(unequippedUserItem, equippedUserItem));
 
         // when
-        // [변경] cursor=null(첫 요청), size=20으로 호출
         SliceResponse<UserItemResponse> response = userItemService.getMyItems(USER_ID, null, null, 20);
 
         // then
-        // [변경] responses.hasSize() → response.content().hasSize()
         // SliceResponse는 record이므로 content() 접근자로 리스트를 꺼냄
         assertThat(response.content()).hasSize(2);
 
-        // [변경] 호출 메서드 검증도 커서 기반 메서드로 교체
         then(userItemRepository)
                 .should()
                 .findByUserIdAndIdGreaterThanOrderByIdAsc(eq(USER_ID), eq(0L), any(Pageable.class));
@@ -310,7 +306,6 @@ class UserItemServiceTest {
                 .willReturn(List.of(unequippedUserItem));
 
         // when
-        // [변경] cursor=null(첫 요청), size=20으로 호출
         SliceResponse<UserItemResponse> response = userItemService.getMyItems(USER_ID, ItemSlot.HEAD, null, 20);
 
         // then
@@ -318,7 +313,6 @@ class UserItemServiceTest {
         // 반환된 아이템의 슬롯이 HEAD인지 확인
         assertThat(response.content().get(0).item().slot()).isEqualTo(ItemSlot.HEAD);
 
-        // [변경] 슬롯 필터 커서 기반 메서드가 호출되고, 전체 조회 메서드는 호출되지 않아야 함
         then(userItemRepository)
                 .should()
                 .findByUserIdAndItemSlotAndIdGreaterThanOrderByIdAsc(

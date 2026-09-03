@@ -74,8 +74,6 @@ public class UserItemService {
     }
 
     // 보유 아이템 조회
-    // [변경] 반환 타입: List<UserItemResponse> → SliceResponse<UserItemResponse>
-    // [변경] 파라미터: cursor, size 추가
     // - cursor: 마지막으로 받은 userItemId. null이면 첫 요청.
     // - size: 한 번에 가져올 아이템 수.
     public SliceResponse<UserItemResponse> getMyItems(Long userId, ItemSlot slot, Long cursor, int size) {

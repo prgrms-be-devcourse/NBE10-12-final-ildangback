@@ -93,7 +93,6 @@ public class ItemServiceTest {
     @DisplayName("슬롯 미지정 시 전체 아이템 조회, 보유·장착 상태가 응답에 정확히 반영된다")
     void t1() {
         // given
-        // [변경] findAll() → findByIdGreaterThanOrderByIdAsc(cursor=0, pageable)
         // 서비스가 cursor=null을 0으로 변환하여 이 메서드를 호출하므로 stub도 동일하게 맞춤.
         // any(Pageable.class)는 PageRequest.of(0, size+1) 형태의 Pageable을 포괄적으로 매칭함.
         given(itemRepository.findByIdGreaterThanOrderByIdAsc(eq(0L), any(Pageable.class)))
@@ -102,11 +101,9 @@ public class ItemServiceTest {
         given(userItemRepository.findByUserId(1L)).willReturn(List.of(ownedAndEquipped, ownedNotEquipped));
 
         // when
-        // [변경] cursor=null(첫 요청), size=20으로 호출
         SliceResponse<ShopItemResponse> response = itemService.getShopItems(1L, null, null, 20);
 
         // then
-        // [변경] getContent() → content() : SliceResponse는 record이므로 접근자가 필드명 그대로임
         assertThat(response.content()).hasSize(2);
 
         // 첫 번째 항목 = headItem: 보유하고 착용 중이므로 owned=true, equipped=true
@@ -117,7 +114,6 @@ public class ItemServiceTest {
         assertThat(response.content().get(1).owned()).isTrue();
         assertThat(response.content().get(1).equipped()).isFalse();
 
-        // [변경] slot=null일 때 커서 기반 전체 조회 메서드가 호출되어야 함
         then(itemRepository).should().findByIdGreaterThanOrderByIdAsc(eq(0L), any(Pageable.class));
         then(itemRepository).should(never()).findBySlotAndIdGreaterThanOrderByIdAsc(any(), any(), any());
     }

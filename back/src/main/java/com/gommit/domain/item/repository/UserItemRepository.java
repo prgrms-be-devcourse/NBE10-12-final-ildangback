@@ -28,7 +28,7 @@ public interface UserItemRepository extends JpaRepository<UserItem, Long> {
     @EntityGraph(attributePaths = "item")
     List<UserItem> findByUserIdAndIdGreaterThanOrderByIdAsc(Long userId, Long cursor, Pageable pageable);
 
-    // [변경] getMyItems 슬롯 필터 조회: slot + cursor 두 조건으로 size+1개 가져옴.
+    // getMyItems 슬롯 필터 조회: slot + cursor 두 조건으로 size+1개 가져옴.
     @EntityGraph(attributePaths = "item")
     List<UserItem> findByUserIdAndItemSlotAndIdGreaterThanOrderByIdAsc(
             Long userId, ItemSlot slot, Long cursor, Pageable pageable);

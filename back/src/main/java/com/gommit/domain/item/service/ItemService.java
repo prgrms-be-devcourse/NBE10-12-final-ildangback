@@ -41,7 +41,6 @@ public class ItemService {
     }
 
     // 상점 아이템 목록 조회
-    // [변경] 파라미터: cursor, size 추가
     // - cursor: 마지막으로 받은 itemId. null이면 첫 요청(처음부터 조회).
     // - size: 한 번에 가져올 아이템 수.
     public SliceResponse<ShopItemResponse> getShopItems(Long userId, ItemSlot slot, Long cursor, int size) {
