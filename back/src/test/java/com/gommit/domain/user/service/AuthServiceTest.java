@@ -36,6 +36,9 @@ class AuthServiceTest {
     private RefreshTokenService refreshTokenService;
 
     @Mock
+    private EmailVerificationService emailVerificationService;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock

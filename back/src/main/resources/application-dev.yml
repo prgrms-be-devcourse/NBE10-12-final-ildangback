@@ -15,6 +15,10 @@ logging:
     org.hibernate.SQL: debug
     org.hibernate.orm.jdbc.bind: trace
 
+app:
+  frontend-base-url: http://localhost:5173
+  api-base-url: http://localhost:8080
+
 auth-token:
   secret-key: dev-secret-key-for-gommit-local-only-minimum-32bytes-required
 

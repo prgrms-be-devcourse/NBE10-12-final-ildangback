@@ -14,6 +14,10 @@ media:
     local:
       base-dir: ${java.io.tmpdir}/gommit-media-test  # feat/8 LocalStorageService 테스트 파일 저장 루트
 
+app:
+  frontend-base-url: http://localhost:5173
+  api-base-url: http://localhost:8080
+
 auth-token:
   secret-key: test-secret-key-for-gommit-unit-testing-minimum-32bytes-required
 
