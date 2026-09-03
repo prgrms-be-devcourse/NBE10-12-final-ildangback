@@ -32,6 +32,8 @@ public enum ErrorCode {
     ITEM_IN_USE(HttpStatus.CONFLICT, "이미 보유중인 사용자가 있어 삭제할 수 없습니다."),
 
     // ===== point =====
+    POINT_INSUFFICIENT(HttpStatus.CONFLICT, "포인트가 부족합니다."),
+    POINT_HISTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 포인트 이력입니다."),
 
     // ===== record =====
 

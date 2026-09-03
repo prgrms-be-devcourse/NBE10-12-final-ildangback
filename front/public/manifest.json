@@ -1,0 +1,32 @@
+{
+  "id": "/",
+  "name": "꼬밋",
+  "short_name": "꼬밋",
+  "description": "소규모 그룹이 매일 사진으로 인증하며 습관을 함께 만드는 챌린지 서비스",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#8058C4",
+  "background_color": "#FFFFFF",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
