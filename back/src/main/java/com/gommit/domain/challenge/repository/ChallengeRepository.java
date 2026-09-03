@@ -12,4 +12,6 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
     List<Challenge> findAllByGroupIdInAndStatus(List<Long> groupIds, ChallengeStatus challengeStatus);
 
     Optional<Challenge> findByGroupIdAndSeqNo(Long groupId, int seqNo);
+
+    List<Challenge> findAllByStatus(ChallengeStatus status);
 }

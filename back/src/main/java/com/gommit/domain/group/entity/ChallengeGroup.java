@@ -68,4 +68,12 @@ public class ChallengeGroup extends BaseEntity {
     public void changeOwner(Long ownerId) {
         this.ownerId = ownerId;
     }
+
+    public void activate() {
+        this.status = GroupStatus.ACTIVE;
+    }
+
+    public void end() {
+        this.status = GroupStatus.ENDED;
+    }
 }
