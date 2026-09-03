@@ -1,12 +1,12 @@
 package com.gommit.domain.item;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
 import com.gommit.support.IntegrationTestSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 // IntegrationTestSupport를 상속받아 MySQL Testcontainer + MockMvc 환경을 재사용한다.
 // @BeforeEach에서 clearDatabase()가 실행되므로 각 테스트는 빈 DB 상태에서 시작한다.
@@ -52,7 +52,7 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
         @Test
         @DisplayName("미인증이면 401")
-        void 미인증_401() throws Exception {
+        void t1() throws Exception {
             mockMvc.perform(get("/api/users/me/character"))
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
@@ -60,7 +60,7 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
         @Test
         @DisplayName("인증하면 200 과 슬롯 맵을 돌려준다")
-        void 인증_200() throws Exception {
+        void t2() throws Exception {
             var tokens = loginAs();
 
             mockMvc.perform(withToken(get("/api/users/me/character"), tokens.accessToken()))
@@ -78,13 +78,13 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
         @Test
         @DisplayName("미인증이면 401")
-        void 미인증_401() throws Exception {
+        void t3() throws Exception {
             mockMvc.perform(get("/api/users/me/items")).andExpect(status().isUnauthorized());
         }
 
         @Test
         @DisplayName("인증하면 200 과 SliceResponse 구조를 돌려준다")
-        void 인증_200() throws Exception {
+        void t4() throws Exception {
             var tokens = loginAs();
 
             // 보유 아이템이 없어도 빈 content 배열과 hasNext=false로 200이 응답되어야 한다.
@@ -96,13 +96,12 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
         @Test
         @DisplayName("size=0 이면 400 — @Min(1) 제약")
-        void size_0이면_400() throws Exception {
+        void t5() throws Exception {
             var tokens = loginAs();
 
             // ItemController와 동일하게 @Min(1)이 컨트롤러에 선언되어 있으므로
             // Bean Validation이 서비스 호출 전에 400을 반환한다.
-            mockMvc.perform(withToken(
-                            get("/api/users/me/items").param("size", "0"), tokens.accessToken()))
+            mockMvc.perform(withToken(get("/api/users/me/items").param("size", "0"), tokens.accessToken()))
                     .andExpect(status().isBadRequest());
         }
     }
@@ -115,13 +114,13 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
         @Test
         @DisplayName("미인증이면 401")
-        void 미인증_401() throws Exception {
+        void t6() throws Exception {
             mockMvc.perform(put("/api/users/me/items/1/equip")).andExpect(status().isUnauthorized());
         }
 
         @Test
         @DisplayName("보유한 아이템 착용 시 200 과 equippedSlot 이 채워진다")
-        void 착용성공_200() throws Exception {
+        void t7() throws Exception {
             String email = "equip@example.com";
             // 이 테스트 전용 이메일과 닉네임을 사용해 다른 테스트와 충돌을 방지한다.
             var tokens = loginAs(email, "착용테스터");
@@ -130,8 +129,7 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
             // 구매 API 대신 DB 직접 삽입으로 보유 상태를 만든다 (테스트 속도 향상)
             long userItemId = insertUserItem(userId, itemId);
 
-            mockMvc.perform(withToken(
-                            put("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()))
+            mockMvc.perform(withToken(put("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()))
                     .andExpect(status().isOk())
                     // 착용 후 equippedSlot이 해당 슬롯 문자열로 채워져야 한다
                     .andExpect(jsonPath("$.equippedSlot").value("HEAD"));
@@ -139,19 +137,18 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
         @Test
         @DisplayName("존재하지 않는 userItemId 착용 시 404")
-        void 없는아이템_404() throws Exception {
+        void t8() throws Exception {
             var tokens = loginAs();
 
             // DB에 없는 userItemId → UserItemService에서 USER_ITEM_NOT_FOUND → 404
-            mockMvc.perform(withToken(
-                            put("/api/users/me/items/999999/equip"), tokens.accessToken()))
+            mockMvc.perform(withToken(put("/api/users/me/items/999999/equip"), tokens.accessToken()))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.code").value("USER_ITEM_NOT_FOUND"));
         }
 
         @Test
         @DisplayName("다른 유저의 아이템 착용 시도 시 403")
-        void 타인아이템_403() throws Exception {
+        void t9() throws Exception {
             // 소유자 계정을 만들고 아이템을 보유시킨다
             String ownerEmail = "owner@example.com";
             loginAs(ownerEmail, "소유자");
@@ -162,15 +159,14 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
             // 별개의 유저가 소유자의 userItemId로 착용 시도
             // isOwnedBy(userId) 검사에서 false → NOT_ITEM_OWNER → 403
             var other = loginAs("other@example.com", "타인");
-            mockMvc.perform(withToken(
-                            put("/api/users/me/items/" + userItemId + "/equip"), other.accessToken()))
+            mockMvc.perform(withToken(put("/api/users/me/items/" + userItemId + "/equip"), other.accessToken()))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.code").value("NOT_ITEM_OWNER"));
         }
 
         @Test
         @DisplayName("이미 착용 중인 아이템 재착용 시 409")
-        void 이미착용중_409() throws Exception {
+        void t10() throws Exception {
             String email = "alreadyequip@example.com";
             var tokens = loginAs(email, "중복착용테스터");
             long userId = getUserId(email);
@@ -178,12 +174,10 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
             long userItemId = insertUserItem(userId, itemId);
 
             // 첫 번째 착용 (성공)
-            mockMvc.perform(withToken(
-                    put("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()));
+            mockMvc.perform(withToken(put("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()));
 
             // 두 번째 착용 시도 → isEquipped()가 true → ALREADY_EQUIPPED → 409
-            mockMvc.perform(withToken(
-                            put("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()))
+            mockMvc.perform(withToken(put("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.code").value("ALREADY_EQUIPPED"));
         }
@@ -197,14 +191,13 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
         @Test
         @DisplayName("미인증이면 401")
-        void 미인증_401() throws Exception {
-            mockMvc.perform(delete("/api/users/me/items/1/equip"))
-                    .andExpect(status().isUnauthorized());
+        void t11() throws Exception {
+            mockMvc.perform(delete("/api/users/me/items/1/equip")).andExpect(status().isUnauthorized());
         }
 
         @Test
         @DisplayName("착용 중인 아이템 해제 시 200 과 equippedSlot 이 사라진다")
-        void 해제성공_200() throws Exception {
+        void t12() throws Exception {
             String email = "unequip@example.com";
             var tokens = loginAs(email, "해제테스터");
             long userId = getUserId(email);
@@ -212,12 +205,10 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
             long userItemId = insertUserItem(userId, itemId);
 
             // 먼저 착용 상태로 만든다
-            mockMvc.perform(withToken(
-                    put("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()));
+            mockMvc.perform(withToken(put("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()));
 
             // 착용 해제 요청 → unequip() 호출 → equippedSlot = null
-            mockMvc.perform(withToken(
-                            delete("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()))
+            mockMvc.perform(withToken(delete("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()))
                     .andExpect(status().isOk())
                     // Jackson이 null 필드를 직렬화하는 방식에 따라
                     // doesNotExist() 또는 value((Object) null) 중 하나로 조정한다
@@ -226,7 +217,7 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
 
         @Test
         @DisplayName("미착용 상태 아이템 해제 시 400")
-        void 미착용해제_400() throws Exception {
+        void t13() throws Exception {
             String email = "notequip@example.com";
             var tokens = loginAs(email, "미착용테스터");
             long userId = getUserId(email);
@@ -235,15 +226,14 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
             long userItemId = insertUserItem(userId, itemId);
 
             // isEquipped()가 false → NOT_EQUIPPED(HttpStatus.BAD_REQUEST) → 400
-            mockMvc.perform(withToken(
-                            delete("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()))
+            mockMvc.perform(withToken(delete("/api/users/me/items/" + userItemId + "/equip"), tokens.accessToken()))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("NOT_EQUIPPED"));
         }
 
         @Test
         @DisplayName("다른 유저의 아이템 해제 시도 시 403")
-        void 타인아이템_403() throws Exception {
+        void t14() throws Exception {
             // 소유자가 아이템을 보유하고 착용한다
             String ownerEmail = "owner2@example.com";
             var ownerTokens = loginAs(ownerEmail, "소유자2");
@@ -251,13 +241,11 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
             long itemId = insertItem("TOP", "기본 상의", 200);
             long userItemId = insertUserItem(ownerId, itemId);
 
-            mockMvc.perform(withToken(
-                    put("/api/users/me/items/" + userItemId + "/equip"), ownerTokens.accessToken()));
+            mockMvc.perform(withToken(put("/api/users/me/items/" + userItemId + "/equip"), ownerTokens.accessToken()));
 
             // 타인이 소유자의 착용 아이템을 해제 시도 → NOT_ITEM_OWNER → 403
             var other = loginAs("other2@example.com", "타인2");
-            mockMvc.perform(withToken(
-                            delete("/api/users/me/items/" + userItemId + "/equip"), other.accessToken()))
+            mockMvc.perform(withToken(delete("/api/users/me/items/" + userItemId + "/equip"), other.accessToken()))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.code").value("NOT_ITEM_OWNER"));
         }

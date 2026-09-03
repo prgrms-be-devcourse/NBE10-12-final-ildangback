@@ -10,16 +10,15 @@ import com.gommit.domain.item.repository.UserItemRepository;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -30,12 +29,13 @@ public class UserItemService {
     // 아이템 착용
     @Transactional
     public UserItemResponse equipItem(Long userId, Long userItemId) {
-        UserItem targetUserItem = userItemRepository.findById(userItemId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.USER_ITEM_NOT_FOUND));
-        if(!targetUserItem.isOwnedBy(userId)) {
+        UserItem targetUserItem = userItemRepository
+                .findById(userItemId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_ITEM_NOT_FOUND));
+        if (!targetUserItem.isOwnedBy(userId)) {
             throw new BusinessException(ErrorCode.NOT_ITEM_OWNER);
         }
-        if(targetUserItem.isEquipped()) {
+        if (targetUserItem.isEquipped()) {
             throw new BusinessException(ErrorCode.ALREADY_EQUIPPED);
         }
 
@@ -47,20 +47,23 @@ public class UserItemService {
 
     void switchEquippedItem(Long userId, UserItem targetUserItem) {
         ItemSlot slot = targetUserItem.getItem().getSlot();
-        userItemRepository.findByUserIdAndEquippedSlot(userId, slot)
-            .ifPresent(UserItem::unequip);
-        targetUserItem.equip();
+        userItemRepository.findByUserIdAndEquippedSlot(userId, slot).ifPresent(existing -> {
+            existing.unequip();
+            userItemRepository.flush(); // unequip UPDATE를 db에 반영
+        });
+        targetUserItem.equip(); // 이후 equip
     }
 
     // 아이템 착용 해제
     @Transactional
     public UserItemResponse unequipItem(Long userId, Long userItemId) {
-        UserItem targetUserItem =  userItemRepository.findById(userItemId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.USER_ITEM_NOT_FOUND));
-        if(!targetUserItem.isOwnedBy(userId)) {
+        UserItem targetUserItem = userItemRepository
+                .findById(userItemId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_ITEM_NOT_FOUND));
+        if (!targetUserItem.isOwnedBy(userId)) {
             throw new BusinessException(ErrorCode.NOT_ITEM_OWNER);
         }
-        if(!targetUserItem.isEquipped()) {
+        if (!targetUserItem.isEquipped()) {
             throw new BusinessException(ErrorCode.NOT_EQUIPPED);
         }
 
@@ -71,8 +74,6 @@ public class UserItemService {
     }
 
     // 보유 아이템 조회
-    // [변경] 반환 타입: List<UserItemResponse> → SliceResponse<UserItemResponse>
-    // [변경] 파라미터: cursor, size 추가
     // - cursor: 마지막으로 받은 userItemId. null이면 첫 요청.
     // - size: 한 번에 가져올 아이템 수.
     public SliceResponse<UserItemResponse> getMyItems(Long userId, ItemSlot slot, Long cursor, int size) {
@@ -83,16 +84,17 @@ public class UserItemService {
         Pageable pageable = PageRequest.of(0, size + 1);
 
         List<UserItem> userItems;
-        if(slot == null) {
+        if (slot == null) {
             // 슬롯 미지정: 보유 아이템 전체를 커서 기반으로 조회
             userItems = userItemRepository.findByUserIdAndIdGreaterThanOrderByIdAsc(userId, effectiveCursor, pageable);
         } else {
             // 슬롯 지정: 해당 슬롯 아이템만 커서 기반으로 조회
-            userItems = userItemRepository.findByUserIdAndItem_SlotAndIdGreaterThanOrderByIdAsc(userId, slot, effectiveCursor, pageable);
+            userItems = userItemRepository.findByUserIdAndItemSlotAndIdGreaterThanOrderByIdAsc(
+                    userId, slot, effectiveCursor, pageable);
         }
 
         List<UserItemResponse> responseList = new ArrayList<>();
-        for(UserItem userItem : userItems) {
+        for (UserItem userItem : userItems) {
             ItemResponse itemResponse = new ItemResponse(userItem.getItem());
             responseList.add(new UserItemResponse(userItem, itemResponse));
         }
@@ -107,10 +109,10 @@ public class UserItemService {
         List<UserItem> equippedItems = userItemRepository.findByUserIdAndEquippedSlotNotNull(userId);
 
         Map<ItemSlot, String> slotMap = new HashMap<>();
-        for(ItemSlot slot : ItemSlot.values()) {
+        for (ItemSlot slot : ItemSlot.values()) {
             slotMap.put(slot, null);
         }
-        for(UserItem userItem : equippedItems) {
+        for (UserItem userItem : equippedItems) {
             slotMap.put(userItem.getEquippedSlot(), userItem.getItem().getImageUrl());
         }
 

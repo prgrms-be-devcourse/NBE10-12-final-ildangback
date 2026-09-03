@@ -9,16 +9,18 @@ import com.gommit.global.security.CurrentUser;
 import com.gommit.global.security.SecurityUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
 
 @Tag(name = "UserItem", description = "보유 아이템/캐릭터 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/users/me")
+@Validated
 public class UserItemController {
     private final UserItemService userItemService;
 
@@ -29,28 +31,24 @@ public class UserItemController {
      */
     @GetMapping("/character")
     @Operation(summary = "내 캐릭터 조회")
-    public ResponseEntity<CharacterResponse> getMyCharacter(
-        @CurrentUser SecurityUser actor
-    ) {
+    public ResponseEntity<CharacterResponse> getMyCharacter(@CurrentUser SecurityUser actor) {
         return ResponseEntity.ok(userItemService.getMyCharacter(actor.getId()));
     }
 
     /**
      * 보유 아이템 조회
      * - slot 쿼리 파라미터가 있으면 해당 슬롯만, 없으면 전체 보유 아이템 반환.
-     * [변경] 반환 타입: List<UserItemResponse> → SliceResponse<UserItemResponse>
-     * [변경] 파라미터 추가:
      *   cursor - 마지막으로 받은 userItemId. 첫 요청 시 생략(null).
-     *   size   - 한 번에 받을 개수. 기본 20. @Min(1)로 0 이하 입력을 컨트롤러 레벨에서 차단.
+     *   size   - 한 번에 받을 개수. 기본 20. @Min(1), @Max(100)로 0 이하 입력을 컨트롤러 레벨에서 차단.
+     *   Max(100) - DB에서의 수백만 건을 한 번에 조회 시도 최댓값 제약
      */
     @GetMapping("/items")
     @Operation(summary = "보유 아이템 조회")
     public ResponseEntity<SliceResponse<UserItemResponse>> getMyItems(
-        @RequestParam(required = false) ItemSlot slot,
-        @RequestParam(required = false) Long cursor,
-        @RequestParam(defaultValue = "20") @Min(1) int size,
-        @CurrentUser SecurityUser actor
-    ) {
+            @RequestParam(required = false) ItemSlot slot,
+            @RequestParam(required = false) Long cursor,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @CurrentUser SecurityUser actor) {
         return ResponseEntity.ok(userItemService.getMyItems(actor.getId(), slot, cursor, size));
     }
 
@@ -63,10 +61,7 @@ public class UserItemController {
      */
     @PutMapping("/items/{userItemId}/equip")
     @Operation(summary = "아이템 착용")
-    public ResponseEntity<UserItemResponse> equipItem(
-        @PathVariable Long userItemId,
-        @CurrentUser SecurityUser actor
-    ) {
+    public ResponseEntity<UserItemResponse> equipItem(@PathVariable Long userItemId, @CurrentUser SecurityUser actor) {
         return ResponseEntity.ok(userItemService.equipItem(actor.getId(), userItemId));
     }
 
@@ -79,10 +74,7 @@ public class UserItemController {
     @DeleteMapping("/items/{userItemId}/equip")
     @Operation(summary = "아이템 착용 해제")
     public ResponseEntity<UserItemResponse> unequipItem(
-        @PathVariable Long userItemId,
-        @CurrentUser SecurityUser actor
-    ) {
+            @PathVariable Long userItemId, @CurrentUser SecurityUser actor) {
         return ResponseEntity.ok(userItemService.unequipItem(actor.getId(), userItemId));
     }
-
 }
