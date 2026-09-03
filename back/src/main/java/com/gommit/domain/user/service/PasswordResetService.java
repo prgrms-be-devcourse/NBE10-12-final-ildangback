@@ -4,13 +4,10 @@ import com.gommit.domain.user.dto.response.PasswordResetTargetResponse;
 import com.gommit.domain.user.entity.EmailToken;
 import com.gommit.domain.user.entity.EmailTokenType;
 import com.gommit.domain.user.entity.User;
-import com.gommit.domain.user.repository.EmailTokenRepository;
 import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
-import com.gommit.global.security.SecureTokenProvider;
 import java.time.Duration;
-import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PasswordResetService {
 
+    private static final EmailTokenType TOKEN_TYPE = EmailTokenType.PASSWORD_RESET;
     private static final Duration TOKEN_EXPIRATION = Duration.ofHours(1);
     private static final Duration RESEND_MIN_INTERVAL = Duration.ofSeconds(60);
     private static final String LINK_FORMAT = "%s/reset-password?token=%s";
@@ -43,9 +41,8 @@ public class PasswordResetService {
 
             요청한 적이 없다면 이 메일을 무시해 주세요.""";
 
-    private final EmailTokenRepository emailTokenRepository;
+    private final EmailTokenService emailTokenService;
     private final UserRepository userRepository;
-    private final SecureTokenProvider secureTokenProvider;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
     private final EmailVerificationService emailVerificationService;
@@ -68,11 +65,11 @@ public class PasswordResetService {
             return;
         }
 
-        if (hasRecentToken(user.getId())) {
+        if (emailTokenService.hasRecent(user.getId(), TOKEN_TYPE, RESEND_MIN_INTERVAL)) {
             return;
         }
 
-        String rawToken = issue(user);
+        String rawToken = emailTokenService.issue(user, TOKEN_TYPE, TOKEN_EXPIRATION);
         try {
             String link = LINK_FORMAT.formatted(frontendBaseUrl, rawToken);
             mailSender.send(user.getEmail(), SUBJECT, BODY_FORMAT.formatted(TOKEN_EXPIRATION.toHours(), link));
@@ -84,17 +81,16 @@ public class PasswordResetService {
     // 재설정 대상 조회
     @Transactional(readOnly = true)
     public PasswordResetTargetResponse findTarget(String rawToken) {
-        return new PasswordResetTargetResponse(findUsableToken(rawToken).getUser());
+        return new PasswordResetTargetResponse(
+                emailTokenService.findUsable(rawToken, TOKEN_TYPE).getUser());
     }
 
     // 새 비밀번호 설정
     @Transactional
     public void reset(String rawToken, String newPassword) {
-        EmailToken token = findUsableToken(rawToken);
+        EmailToken token = emailTokenService.findUsable(rawToken, TOKEN_TYPE);
         Long userId = token.getUser().getId();
-        if (emailTokenRepository.useIfUnused(token.getId(), LocalDateTime.now()) == 0) {
-            throw new BusinessException(ErrorCode.EMAIL_TOKEN_INVALID);
-        }
+        emailTokenService.consume(token);
 
         User user = userRepository
                 .findByIdAndDeletedAtIsNull(userId)
@@ -102,36 +98,5 @@ public class PasswordResetService {
         user.changePassword(passwordEncoder.encode(newPassword));
 
         refreshTokenService.revokeAll(userId);
-    }
-
-    // 쓸 수 있는 재설정 토큰 조회
-    private EmailToken findUsableToken(String rawToken) {
-        EmailToken token = emailTokenRepository
-                .findByTokenHash(secureTokenProvider.hash(rawToken))
-                .orElseThrow(() -> new BusinessException(ErrorCode.EMAIL_TOKEN_INVALID));
-
-        if (token.getTokenType() != EmailTokenType.PASSWORD_RESET || token.isExpired() || token.isUsed()) {
-            throw new BusinessException(ErrorCode.EMAIL_TOKEN_INVALID);
-        }
-        return token;
-    }
-
-    // 토큰 발급
-    private String issue(User user) {
-        String rawToken = secureTokenProvider.generate();
-        emailTokenRepository.save(new EmailToken(
-                user,
-                secureTokenProvider.hash(rawToken),
-                EmailTokenType.PASSWORD_RESET,
-                LocalDateTime.now().plus(TOKEN_EXPIRATION)));
-        return rawToken;
-    }
-
-    // 직전 재설정 메일이 최근인지 확인한다
-    private boolean hasRecentToken(Long userId) {
-        return emailTokenRepository
-                .findFirstByUserIdAndTokenTypeOrderByIdDesc(userId, EmailTokenType.PASSWORD_RESET)
-                .filter(token -> token.getCreatedAt().plus(RESEND_MIN_INTERVAL).isAfter(LocalDateTime.now()))
-                .isPresent();
     }
 }

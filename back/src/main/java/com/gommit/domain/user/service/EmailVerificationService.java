@@ -3,14 +3,11 @@ package com.gommit.domain.user.service;
 import com.gommit.domain.user.entity.EmailToken;
 import com.gommit.domain.user.entity.EmailTokenType;
 import com.gommit.domain.user.entity.User;
-import com.gommit.domain.user.repository.EmailTokenRepository;
 import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
-import com.gommit.global.security.SecureTokenProvider;
 import java.net.URI;
 import java.time.Duration;
-import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class EmailVerificationService {
 
+    private static final EmailTokenType TOKEN_TYPE = EmailTokenType.SIGNUP_VERIFY;
     private static final Duration TOKEN_EXPIRATION = Duration.ofHours(24);
     private static final Duration RESEND_MIN_INTERVAL = Duration.ofSeconds(60);
     private static final String LINK_FORMAT = "%s/api/auth/verify-email?token=%s";
@@ -29,9 +27,8 @@ public class EmailVerificationService {
     private static final String SUBJECT = "[꼬밋] 이메일 인증을 완료해 주세요";
     private static final String BODY_FORMAT = "아래 링크를 눌러 이메일 인증을 완료해 주세요.%n%n%s";
 
-    private final EmailTokenRepository emailTokenRepository;
+    private final EmailTokenService emailTokenService;
     private final UserRepository userRepository;
-    private final SecureTokenProvider secureTokenProvider;
     private final EmailSender mailSender;
 
     @Value("${app.frontend-base-url}")
@@ -49,14 +46,14 @@ public class EmailVerificationService {
     // 최소 간격이 지났을 때만 인증 메일 발송
     @Transactional
     public void sendIfDue(User user, String subject, String bodyFormat) {
-        if (!hasRecentToken(user.getId())) {
+        if (!emailTokenService.hasRecent(user.getId(), TOKEN_TYPE, RESEND_MIN_INTERVAL)) {
             sendMail(user, subject, bodyFormat);
         }
     }
 
     // 토큰을 발급해 메일로 보낸다
     private void sendMail(User user, String subject, String bodyFormat) {
-        String rawToken = issue(user);
+        String rawToken = emailTokenService.issue(user, TOKEN_TYPE, TOKEN_EXPIRATION);
         try {
             String link = LINK_FORMAT.formatted(apiBaseUrl, rawToken);
             mailSender.send(user.getEmail(), subject, bodyFormat.formatted(link));
@@ -75,7 +72,7 @@ public class EmailVerificationService {
         if (user.isEmailVerified()) {
             throw new BusinessException(ErrorCode.EMAIL_ALREADY_VERIFIED);
         }
-        if (hasRecentToken(userId)) {
+        if (emailTokenService.hasRecent(userId, TOKEN_TYPE, RESEND_MIN_INTERVAL)) {
             throw new BusinessException(ErrorCode.EMAIL_RESEND_TOO_SOON);
         }
 
@@ -90,41 +87,13 @@ public class EmailVerificationService {
     // 토큰 검증
     @Transactional
     public void verify(String rawToken) {
-        EmailToken token = emailTokenRepository
-                .findByTokenHash(secureTokenProvider.hash(rawToken))
-                .orElseThrow(() -> new BusinessException(ErrorCode.EMAIL_TOKEN_INVALID));
-
-        if (token.getTokenType() != EmailTokenType.SIGNUP_VERIFY || token.isExpired() || token.isUsed()) {
-            throw new BusinessException(ErrorCode.EMAIL_TOKEN_INVALID);
-        }
-
+        EmailToken token = emailTokenService.findUsable(rawToken, TOKEN_TYPE);
         Long userId = token.getUser().getId();
-        if (emailTokenRepository.useIfUnused(token.getId(), LocalDateTime.now()) == 0) {
-            throw new BusinessException(ErrorCode.EMAIL_TOKEN_INVALID);
-        }
+        emailTokenService.consume(token);
 
         userRepository
                 .findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND))
                 .verifyEmail();
-    }
-
-    // 토큰 발급
-    private String issue(User user) {
-        String rawToken = secureTokenProvider.generate();
-        emailTokenRepository.save(new EmailToken(
-                user,
-                secureTokenProvider.hash(rawToken),
-                EmailTokenType.SIGNUP_VERIFY,
-                LocalDateTime.now().plus(TOKEN_EXPIRATION)));
-        return rawToken;
-    }
-
-    // 직전 메일 발송이 최근인지 확인한다
-    private boolean hasRecentToken(Long userId) {
-        return emailTokenRepository
-                .findFirstByUserIdAndTokenTypeOrderByIdDesc(userId, EmailTokenType.SIGNUP_VERIFY)
-                .filter(token -> token.getCreatedAt().plus(RESEND_MIN_INTERVAL).isAfter(LocalDateTime.now()))
-                .isPresent();
     }
 }
