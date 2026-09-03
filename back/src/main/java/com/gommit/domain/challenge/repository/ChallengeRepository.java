@@ -1,7 +1,6 @@
 package com.gommit.domain.challenge.repository;
 
-import com.gommit.domain.challenge.entity.Challenge;
-import com.gommit.domain.challenge.entity.ChallengeStatus;
+import com.gommit.domain.challenge.entity.*;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
