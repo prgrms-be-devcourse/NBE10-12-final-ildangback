@@ -10,24 +10,20 @@ import org.springframework.stereotype.Component;
 @Component
 @Profile("prod")
 @RequiredArgsConstructor
-public class SmtpMailSender implements VerificationMailSender {
-
-    private static final String SUBJECT = "[꼬밋] 이메일 인증을 완료해 주세요";
-    private static final String BODY_FORMAT = "아래 링크를 눌러 이메일 인증을 완료해 주세요.%n%n%s";
+public class SmtpMailSender implements EmailSender {
 
     private final JavaMailSender javaMailSender;
 
-    // Gmail 은 인증한 계정으로만 보낼 수 있어 MAIL_USERNAME 과 같아야 한다. SES, SendGrid 는 갈린다
     @Value("${app.mail-from}")
     private String from;
 
     @Override
-    public void send(String email, String verificationLink) {
+    public void send(String to, String subject, String body) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);
-        message.setTo(email);
-        message.setSubject(SUBJECT);
-        message.setText(BODY_FORMAT.formatted(verificationLink));
+        message.setTo(to);
+        message.setSubject(subject);
+        message.setText(body);
         javaMailSender.send(message);
     }
 }

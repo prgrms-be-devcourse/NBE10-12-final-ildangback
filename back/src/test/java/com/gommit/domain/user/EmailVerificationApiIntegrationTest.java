@@ -45,7 +45,7 @@ class EmailVerificationApiIntegrationTest extends IntegrationTestSupport {
         void linksToBackendEndpoint() throws Exception {
             signUp();
 
-            assertThat(mailSender.lastLink()).startsWith("http://localhost:8080/api/auth/verify-email?token=");
+            assertThat(mailSender.lastBody()).contains("http://localhost:8080/api/auth/verify-email?token=");
         }
 
         @Test
@@ -100,6 +100,18 @@ class EmailVerificationApiIntegrationTest extends IntegrationTestSupport {
         }
 
         @Test
+        @DisplayName("내 정보 응답의 emailVerified 가 인증 전후로 바뀐다")
+        void exposesVerifiedFlagInProfile() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+
+            me(tokens.accessToken()).andExpect(jsonPath("$.emailVerified").value(false));
+
+            verify(mailSender.lastToken());
+
+            me(tokens.accessToken()).andExpect(jsonPath("$.emailVerified").value(true));
+        }
+
+        @Test
         @DisplayName("없는 토큰은 실패 화면으로 보낸다")
         void rejectsUnknownToken() throws Exception {
             verify("never-existed").andExpect(redirectedUrl("http://localhost:5173/verify-result?status=invalid"));
@@ -149,6 +161,10 @@ class EmailVerificationApiIntegrationTest extends IntegrationTestSupport {
         void requiresAuthentication() throws Exception {
             mockMvc.perform(post("/api/auth/verify-email/resend")).andExpect(status().isUnauthorized());
         }
+    }
+
+    private ResultActions me(String accessToken) throws Exception {
+        return mockMvc.perform(withToken(get("/api/users/me"), accessToken));
     }
 
     private ResultActions resend(String accessToken) throws Exception {
