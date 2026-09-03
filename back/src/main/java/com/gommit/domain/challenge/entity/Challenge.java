@@ -91,4 +91,11 @@ public class Challenge extends BaseEntity {
         this.requiredDayCount = requiredDayCount;
         this.allowPhoto = allowPhoto;
     }
+
+    public void activate() {
+        this.status = ChallengeStatus.ACTIVE;
+    }
+    public void end() {
+        this.status = ChallengeStatus.ENDED;
+    }
 }
