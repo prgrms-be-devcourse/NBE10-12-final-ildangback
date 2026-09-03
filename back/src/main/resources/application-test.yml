@@ -9,13 +9,22 @@ spring:
     console:
       enabled: false
 
+  servlet:
+    multipart:
+      max-file-size: 12MB
+      max-request-size: 15MB
+
 media:
   storage:
     local:
-      base-dir: ${java.io.tmpdir}/gommit-media-test  # LocalStorageService 테스트 파일 저장 루트. OS 임시 디렉터리로 정리 부담 없음
+      base-dir: ${java.io.tmpdir}/gommit-media-test  # feat/8 LocalStorageService 테스트 파일 저장 루트
 
 auth-token:
   secret-key: test-secret-key-for-gommit-unit-testing-minimum-32bytes-required
 
 cors:
   allowed-origins: http://localhost:5173
+
+checkin:
+  media:
+    base-dir: build/test-media # 통합 테스트가 실제 파일을 쓰는 위치. build/ 는 gitignore 대상.
