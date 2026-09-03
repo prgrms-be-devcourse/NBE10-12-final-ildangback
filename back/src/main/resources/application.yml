@@ -7,7 +7,7 @@ spring:
 
   servlet:
     multipart:
-      # 사용자 업로드 경로(CHECKIN/ITEM, 이미지)만 커버. DAILYLOG 는 서버 생성이라 무관.
+      # 사용자 업로드(CHECKIN/ITEM). 앱단 검증(5MB)보다 높게 잡아 5~12MB 는 FILE_TOO_LARGE(413) 로 떨어진다.
       max-file-size: 12MB
       max-request-size: 15MB
 

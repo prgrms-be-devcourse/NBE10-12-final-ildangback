@@ -37,6 +37,7 @@ import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -431,6 +432,28 @@ class CheckInServiceTest {
             assertThat(response.content()).hasSize(1);
             assertThat(response.content().get(0).challengeId()).isEqualTo(CHALLENGE_ID);
             assertThat(response.meta().totalCount()).isEqualTo(7L);
+        }
+
+        @Test
+        @DisplayName("month 를 주면 그 달의 첫날~마지막날로 조회한다")
+        void filtersByMonth() {
+            YearMonth month = YearMonth.of(2026, 9);
+            when(checkInRepository.findMine(
+                            eq(USER_ID),
+                            eq(null),
+                            any(),
+                            eq(LocalDate.of(2026, 9, 1)),
+                            eq(LocalDate.of(2026, 9, 30)),
+                            any(),
+                            any(Pageable.class)))
+                    .thenReturn(List.of());
+            when(checkInRepository.countMine(
+                            eq(USER_ID), eq(null), any(), eq(LocalDate.of(2026, 9, 1)), eq(LocalDate.of(2026, 9, 30))))
+                    .thenReturn(0L);
+
+            assertThat(service.getMyCheckIns(USER_ID, null, null, month, null, 20)
+                            .content())
+                    .isEmpty();
         }
     }
 
