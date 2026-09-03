@@ -30,6 +30,9 @@ public class User extends BaseEntity {
     @Column(length = 255)
     private String introduction;
 
+    @Column(nullable = false)
+    private boolean emailVerified;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private UserRole role;
@@ -51,6 +54,10 @@ public class User extends BaseEntity {
         this.role = UserRole.USER;
         this.personalStreak = 0;
         this.bestStreak = 0;
+    }
+
+    public void verifyEmail() {
+        this.emailVerified = true;
     }
 
     public void updateNickname(String nickname) {

@@ -15,6 +15,7 @@ import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import com.gommit.global.security.AuthTokenProperties;
+import com.gommit.global.security.SecureTokenProvider;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -39,6 +40,9 @@ class RefreshTokenServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Spy
+    private SecureTokenProvider secureTokenProvider = new SecureTokenProvider();
 
     @Spy
     private AuthTokenProperties authTokenProperties = new AuthTokenProperties(

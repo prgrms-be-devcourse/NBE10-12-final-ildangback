@@ -8,7 +8,11 @@ import com.gommit.domain.user.dto.response.LoginResponse;
 import com.gommit.domain.user.dto.response.TokenResponse;
 import com.gommit.domain.user.dto.response.UserSummaryResponse;
 import com.gommit.domain.user.service.AuthService;
+import com.gommit.domain.user.service.EmailVerificationService;
 import com.gommit.domain.user.service.UserService;
+import com.gommit.global.exception.BusinessException;
+import com.gommit.global.security.CurrentUser;
+import com.gommit.global.security.SecurityUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -31,6 +35,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final UserService userService;
+    private final EmailVerificationService emailVerificationService;
 
     @Operation(summary = "회원가입")
     @PostMapping("/signup")
@@ -79,5 +84,26 @@ public class AuthController {
                             message = "닉네임은 한글·영문·숫자만 쓸 수 있습니다.")
                     String nickname) {
         return ResponseEntity.ok(new AvailabilityResponse(userService.isNicknameAvailable(nickname)));
+    }
+
+    @Operation(summary = "이메일 인증")
+    @GetMapping("/verify-email")
+    public ResponseEntity<Void> verifyEmail(@RequestParam String token) {
+        boolean verified = true;
+        try {
+            emailVerificationService.verify(token);
+        } catch (BusinessException e) {
+            verified = false;
+        }
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(emailVerificationService.verifyResultUrl(verified))
+                .build();
+    }
+
+    @Operation(summary = "인증 메일 재발송")
+    @PostMapping("/verify-email/resend")
+    public ResponseEntity<Void> resendVerificationEmail(@CurrentUser SecurityUser actor) {
+        emailVerificationService.resend(actor.getId());
+        return ResponseEntity.noContent().build();
     }
 }

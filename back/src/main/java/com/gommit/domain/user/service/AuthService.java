@@ -24,6 +24,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final RefreshTokenService refreshTokenService;
+    private final EmailVerificationService emailVerificationService;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
 
@@ -42,10 +43,13 @@ public class AuthService {
 
         User user = new User(email, passwordEncoder.encode(request.password()), nickname);
         try {
-            return new UserSummaryResponse(userRepository.saveAndFlush(user));
+            user = userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException e) {
             throw new BusinessException(ErrorCode.ACCOUNT_INFO_DUPLICATED);
         }
+
+        emailVerificationService.send(user);
+        return new UserSummaryResponse(user);
     }
 
     // 로그인

@@ -17,6 +17,14 @@ spring:
   flyway:
     enabled: true
 
+  mail:
+    properties:
+      mail:
+        smtp:
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
   data:
     web:
       pageable:

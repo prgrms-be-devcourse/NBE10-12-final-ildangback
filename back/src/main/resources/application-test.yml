@@ -9,6 +9,10 @@ spring:
     console:
       enabled: false
 
+app:
+  frontend-base-url: http://localhost:5173
+  api-base-url: http://localhost:8080
+
 auth-token:
   secret-key: test-secret-key-for-gommit-unit-testing-minimum-32bytes-required
 
