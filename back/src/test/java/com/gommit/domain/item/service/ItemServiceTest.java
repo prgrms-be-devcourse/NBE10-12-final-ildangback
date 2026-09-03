@@ -129,12 +129,10 @@ public class ItemServiceTest {
         // userId=1은 itemId=1을 아직 보유하지 않음
         given(userItemRepository.existsByUserIdAndItemId(1L, 1L)).willReturn(false);
 
-        // save() 호출 시 id와 createdAt이 부여된 영속 상태 UserItem을 반환하도록 stub
-        // (실제 DB라면 INSERT 후 AUTO_INCREMENT·JPA Auditing이 채워주는 값들을 직접 세팅)
         UserItem saved = UserItem.of(1L, headItem);
         ReflectionTestUtils.setField(saved, "id", 10L);
         ReflectionTestUtils.setField(saved, "createdAt", LocalDateTime.of(2025, 6, 1, 0, 0));
-        given(userItemRepository.save(any(UserItem.class))).willReturn(saved);
+        given(userItemRepository.saveAndFlush(any(UserItem.class))).willReturn(saved);
 
         // when
         ItemPurchaseResponse response = itemService.purchaseItem(1L, 1L);
@@ -144,8 +142,7 @@ public class ItemServiceTest {
         assertThat(response.userItemId()).isEqualTo(10L);
         assertThat(response.itemId()).isEqualTo(1L);
 
-        // save()가 정확히 1번 호출되었는지 검증
-        then(userItemRepository).should(times(1)).save(any(UserItem.class));
+        then(userItemRepository).should(times(1)).saveAndFlush(any(UserItem.class));
         // 구매 후 자동 착용을 위해 switchEquippedItem이 호출되었는지 검증
         then(userItemService).should(times(1)).switchEquippedItem(eq(1L), any(UserItem.class));
     }
@@ -211,7 +208,7 @@ public class ItemServiceTest {
     // ─────────────────────────────────────────────────
 
     @Test
-    @DisplayName("보유자 없는 아이템 삭제 시 deleteById가 호출된다")
+    @DisplayName("보유자 없는 아이템 삭제 시 delete가 호출된다")
     void t5() {
         // given
         given(itemRepository.findById(1L)).willReturn(Optional.of(headItem));
@@ -222,8 +219,8 @@ public class ItemServiceTest {
         itemService.deleteItem(1L);
 
         // then
-        // deleteById()가 정확히 1번 호출되어야 함
-        then(itemRepository).should(times(1)).deleteById(1L);
+        // delete(headItem)가 정확히 1번 호출되어야 함
+        then(itemRepository).should(times(1)).delete(headItem);
     }
 
     @Test
@@ -238,8 +235,8 @@ public class ItemServiceTest {
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.ITEM_NOT_FOUND);
 
-        // 아이템이 없으므로 deleteById() 호출 없어야 함
-        then(itemRepository).should(never()).deleteById(any());
+        // 아이템이 없으므로 delete() 호출 없어야 함
+        then(itemRepository).should(never()).delete(any());
     }
 
     @Test
@@ -256,7 +253,7 @@ public class ItemServiceTest {
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.ITEM_IN_USE);
 
-        // 보유자가 있으므로 deleteById() 호출 없어야 함
-        then(itemRepository).should(never()).deleteById(any());
+        // 보유자가 있으므로 delete() 호출 없어야 함
+        then(itemRepository).should(never()).delete(any());
     }
 }

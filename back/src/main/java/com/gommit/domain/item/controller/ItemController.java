@@ -30,10 +30,10 @@ public class ItemController {
     private final ItemService itemService;
 
     // 상점 아이템 목록 조회
-    // [변경] 반환 타입: ShopItemListResponse → SliceResponse<ShopItemResponse>
     // [변경] 파라미터 추가:
     //   cursor - 마지막으로 받은 itemId. 첫 요청 시 생략(null).
-    //   size   - 한 번에 받을 개수. 기본 20. @Min(1)로 0 이하 입력을 컨트롤러 레벨에서 차단.
+    //   size   - 한 번에 받을 개수. 기본 20. @Min(1), @Max(100)로 0 이하 입력을 컨트롤러 레벨에서 차단.
+    // Max(100) - DB에서의 수백만 건을 한 번에 조회 시도 최댓값 제약
     @GetMapping("/items")
     @Operation(summary = "상점 아이템 목록 조회")
     public ResponseEntity<SliceResponse<ShopItemResponse>> getShopItems(

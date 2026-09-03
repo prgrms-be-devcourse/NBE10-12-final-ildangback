@@ -47,8 +47,11 @@ public class UserItemService {
 
     void switchEquippedItem(Long userId, UserItem targetUserItem) {
         ItemSlot slot = targetUserItem.getItem().getSlot();
-        userItemRepository.findByUserIdAndEquippedSlot(userId, slot).ifPresent(UserItem::unequip);
-        targetUserItem.equip();
+        userItemRepository.findByUserIdAndEquippedSlot(userId, slot).ifPresent(existing -> {
+            existing.unequip();
+            userItemRepository.flush(); // unequip UPDATE를 db에 반영
+        });
+        targetUserItem.equip(); // 이후 equip
     }
 
     // 아이템 착용 해제

@@ -14,6 +14,7 @@ import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -36,7 +37,6 @@ public class ItemService {
     }
 
     // 상점 아이템 목록 조회
-    // [변경] 반환 타입: ShopItemListResponse → SliceResponse<ShopItemResponse>
     // [변경] 파라미터: cursor, size 추가
     // - cursor: 마지막으로 받은 itemId. null이면 첫 요청(처음부터 조회).
     // - size: 한 번에 가져올 아이템 수.
@@ -90,7 +90,12 @@ public class ItemService {
         // pointService.deduct(userId, item.getPrice());
 
         UserItem newUserItem = UserItem.of(userId, item);
-        UserItem savedUserItem = userItemRepository.save(newUserItem);
+        UserItem savedUserItem;
+        try {
+            savedUserItem = userItemRepository.saveAndFlush(newUserItem);
+        } catch (DataIntegrityViolationException e) {
+            throw new BusinessException(ErrorCode.ALREADY_OWNED_ITEM);
+        }
 
         userItemService.switchEquippedItem(userId, savedUserItem);
 
