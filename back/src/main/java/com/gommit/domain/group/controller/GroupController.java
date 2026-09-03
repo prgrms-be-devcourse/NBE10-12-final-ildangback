@@ -4,8 +4,10 @@ import com.gommit.domain.group.dto.request.GroupCreateRequest;
 import com.gommit.domain.group.dto.response.GroupDetailResponse;
 import com.gommit.domain.group.dto.response.GroupJoinResponse;
 import com.gommit.domain.group.dto.response.GroupSummaryCursorResponse;
+import com.gommit.domain.group.dto.response.MyGroupCursorResponse;
 import com.gommit.domain.group.entity.GroupCategory;
 import com.gommit.domain.group.entity.GroupSort;
+import com.gommit.domain.group.entity.GroupStatus;
 import com.gommit.domain.group.service.GroupService;
 import com.gommit.global.security.CurrentUser;
 import com.gommit.global.security.SecurityUser;
@@ -44,6 +46,18 @@ public class GroupController {
         @RequestParam(defaultValue = "20") int size
     ) {
         GroupSummaryCursorResponse response = groupService.getPublicGroups(keyword, category, sort, cursor, size);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<MyGroupCursorResponse> getMyGroups(
+        @CurrentUser SecurityUser actor,
+        @RequestParam(required = false) GroupStatus status,
+        @RequestParam(required = false) Long cursor,
+        @RequestParam(defaultValue = "20") int size
+    ) {
+        MyGroupCursorResponse response = groupService.getMyGroups(actor.getId(), status, cursor, size);
 
         return ResponseEntity.ok(response);
     }

@@ -5,6 +5,7 @@ import com.gommit.domain.challenge.entity.*;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.challenge.service.ChallengeService;
+import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.group.dto.request.GroupCreateRequest;
 import com.gommit.domain.challenge.dto.request.InitialChallengeSettingRequest;
 import com.gommit.domain.group.dto.response.*;
@@ -20,6 +21,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +38,7 @@ public class GroupService {
     private final ChallengeRepository challengeRepository;
     private final UserRepository userRepository;
     private final ChallengeMemberRepository challengeMemberRepository;
+    private final CheckInRepository checkInRepository;
 
     @Transactional
     public GroupDetailResponse createGroup(Long userId, GroupCreateRequest request) {
@@ -327,6 +332,7 @@ public class GroupService {
         );
     }
 
+    // 그룹 퇴장
     @Transactional
     public void leaveGroup(Long groupId, Long userId) {
         ChallengeGroup group = challengeGroupRepository.findById(groupId).orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
@@ -359,5 +365,199 @@ public class GroupService {
                 member.getStatus() == ChallengeMemberStatus.ACTIVE
             )
             .ifPresent(ChallengeMember::leave);
+    }
+
+    // 내 그룹 목록 조회
+    @Transactional(readOnly = true)
+    public MyGroupCursorResponse getMyGroups(Long userId, GroupStatus status, Long cursor, int size) {
+        // 내가 현재 참여 중이거나 정상 종료한 챌린지 멤버 조회
+        List<ChallengeMember> challengeMembers = challengeMemberRepository.findAllByUserIdAndStatus(userId, ChallengeMemberStatus.ACTIVE);
+
+        // 현재 참여 중인 그룹 Id 조회
+        List<Long> currentGroupIds = challengeMembers.stream().map(ChallengeMember::getChallenge).filter(challenge -> challenge.getStatus() == ChallengeStatus.READY || challenge.getStatus() == ChallengeStatus.ACTIVE)
+            .map(Challenge::getGroupId)
+            .distinct()
+            .toList();
+
+        // 화면에 보여줄 챌린지 필터링
+        List<ChallengeMember> displayMembers = challengeMembers.stream().filter(member -> {
+            Challenge challenge = member.getChallenge();
+
+            // 현재 참여 중인 시즌
+            if(challenge.getStatus() == ChallengeStatus.READY || challenge.getStatus() == ChallengeStatus.ACTIVE) {
+                return true;
+            }
+
+            // 정상 종료한 시즌
+            if(challenge.getStatus() == ChallengeStatus.ENDED) {
+                // 같은 그룹의 다음시즌에 현재 참여 중이라면 이전 챌린지 영역에 중복 표시하지 않음
+                return !currentGroupIds.contains(challenge.getGroupId());
+            }
+            return false;
+        }).toList();
+
+        // 그룹 필터링
+        if(status != null) {
+            displayMembers = displayMembers.stream().filter(member -> {
+                Long groupId = member.getChallenge().getGroupId();
+
+                ChallengeGroup group = challengeGroupRepository.findById(groupId).orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+
+                return group.getStatus() == status;
+            }).toList();
+        }
+
+        // 커서 기준 정렬
+        displayMembers = displayMembers.stream()
+            .sorted(
+                Comparator.comparing(ChallengeMember::getId).reversed()
+            ).toList();
+
+        // cursor가 있으면 cursor보다 작은 Id만 남김
+        if(cursor != null) {
+            displayMembers = displayMembers.stream().filter(member -> member.getId() < cursor).toList();
+        }
+
+        // hasNext 확인을 위해 size + 1 개 조회
+        List<ChallengeMember> pageMembers = displayMembers.stream().limit(size + 1L).toList();
+
+        boolean hasNext = pageMembers.size() > size;
+
+        // 실제 응답에는 size개만 반환
+        if(hasNext) {
+            pageMembers = pageMembers.subList(0, size);
+        }
+
+        List<MyGroupSummaryResponse> content = pageMembers.stream().map(member -> toMyGroupSummaryResponse(member, userId)).toList();
+
+        // 다음 커서 생성
+        Long nextCursor = null;
+        if(hasNext && !pageMembers.isEmpty()) {
+            nextCursor = pageMembers.get(pageMembers.size() - 1).getId();
+        }
+
+        // meta 생성
+        CursorMetaResponse meta =  new CursorMetaResponse(nextCursor, hasNext, content.size());
+
+        return new MyGroupCursorResponse(content, meta);
+    }
+
+    private MyGroupSummaryResponse toMyGroupSummaryResponse(ChallengeMember member, Long userId) {
+        Challenge challenge = member.getChallenge();
+
+        ChallengeGroup group = challengeGroupRepository.findById(challenge.getGroupId()).orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+
+        // 현재 시즌 참여 인원
+        int participantCount = (int) challengeMemberRepository.countByChallengeIdAndStatus(challenge.getId(), ChallengeMemberStatus.ACTIVE);
+
+        // day 계산
+        int currentDay = calculateCurrentDay(challenge, LocalDate.now());
+
+        int totalDays = challenge.getRequiredDayCount();
+        // 진행률 계산
+        double periodProgressRate = calculatePeriodProgressRate(currentDay, totalDays);
+
+        // 오늘 인증 횟수
+        int todayCheckInCount = 0;
+
+        if(challenge.getStatus() == ChallengeStatus.ACTIVE) {
+            todayCheckInCount = (int) checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challenge.getId(), userId, LocalDate.now());
+        }
+
+        // 오늘 인증 완료 여부
+        boolean todayCompleted = challenge.getStatus() == ChallengeStatus.ACTIVE && todayCheckInCount >= challenge.getDailyCheckInCount();
+
+        return new MyGroupSummaryResponse(
+            group.getId(),
+            challenge.getId(),
+            group.getName(),
+            group.getCategory(),
+            group.getStatus(),
+            challenge.getStatus(),
+            participantCount,
+            currentDay,
+            totalDays,
+            periodProgressRate,
+            todayCheckInCount,
+            challenge.getDailyCheckInCount(),
+            todayCompleted
+        );
+    }
+
+    private int calculateCurrentDay(Challenge challenge, LocalDate today) {
+        // 시작 전이면 아직 Day 0
+        if(today.isBefore(challenge.getStartDate())) {
+            return 0;
+        }
+
+        // 종료 이후라면 전체 예정 인증일 수 반환
+        if(today.isAfter(challenge.getEndDate())) {
+            return challenge.getRequiredDayCount();
+        }
+
+        return switch (challenge.getFrequencyType()) {
+            case DAILY -> calculateDailyCurrentDay(challenge, today);
+            case DAYS_OF_WEEK -> calculateDaysOfWeekCurrentDay(challenge, today);
+            case EVERY_N_DAYS -> calculateEveryNDaysCurrentDay(challenge, today);
+        };
+    }
+
+    private double calculatePeriodProgressRate(int currentDay, int totalDays) {
+        if (totalDays == 0) {
+            return 0.0;
+        }
+        return Math.round(
+            ((double) currentDay / totalDays) * 1000
+        ) / 10.0;
+    }
+
+    private int calculateDailyCurrentDay(Challenge challenge, LocalDate today) {
+
+        return (int) ChronoUnit.DAYS.between(
+            challenge.getStartDate(),
+            today
+        ) + 1;
+    }
+
+    private int calculateDaysOfWeekCurrentDay(Challenge challenge, LocalDate today) {
+
+        List<DaysOfWeek> scheduledDays =
+            Arrays.stream(challenge.getDaysOfWeek().split(","))
+                .map(DaysOfWeek::valueOf)
+                .toList();
+
+        int count = 0;
+
+        for (
+            LocalDate date = challenge.getStartDate();
+            !date.isAfter(today);
+            date = date.plusDays(1)
+        ) {
+
+            DaysOfWeek currentDay =
+                DaysOfWeek.getDaysOfWeek(
+                    date.getDayOfWeek()
+                );
+
+            if (scheduledDays.contains(currentDay)) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private int calculateEveryNDaysCurrentDay(
+        Challenge challenge,
+        LocalDate today
+    ) {
+
+        long days =
+            ChronoUnit.DAYS.between(
+                challenge.getStartDate(),
+                today
+            );
+
+        return (int) (days / challenge.getFrequencyValue()) + 1;
     }
 }
