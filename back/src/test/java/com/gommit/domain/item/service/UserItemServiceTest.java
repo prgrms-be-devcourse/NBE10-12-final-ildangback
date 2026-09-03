@@ -304,7 +304,6 @@ class UserItemServiceTest {
     @DisplayName("슬롯 지정 시 커서 기반 슬롯 필터 조회가 호출되고 해당 슬롯 아이템만 반환된다")
     void t13() {
         // given
-        // [변경] findByUserIdAndItem_Slot() → findByUserIdAndItem_SlotAndIdGreaterThanOrderByIdAsc()
         // 슬롯 + cursor=0 + pageable 세 조건으로 커서 기반 조회
         given(userItemRepository.findByUserIdAndItemSlotAndIdGreaterThanOrderByIdAsc(
                         eq(USER_ID), eq(ItemSlot.HEAD), eq(0L), any(Pageable.class)))

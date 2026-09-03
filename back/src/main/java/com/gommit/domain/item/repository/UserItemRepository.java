@@ -23,7 +23,6 @@ public interface UserItemRepository extends JpaRepository<UserItem, Long> {
     @EntityGraph(attributePaths = "item")
     List<UserItem> findByUserId(Long userId);
 
-    // [변경] 기존 findByUserIdAndItem_Slot() 제거 → 커서 기반 버전으로 교체.
     // getMyItems 전체 조회: cursor 이후 UserItem을 size+1개 가져옴.
     // @EntityGraph로 item을 즉시 로딩해 N+1 방지.
     @EntityGraph(attributePaths = "item")
