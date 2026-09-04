@@ -17,6 +17,7 @@ import java.security.SecureRandom;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -86,7 +87,7 @@ public class SocialAuthService {
             User user = userRepository.saveAndFlush(new User(oAuthUser.email(), generateNickname()));
             authIdentityRepository.saveAndFlush(new AuthIdentity(user, provider, oAuthUser.providerUserId()));
             return user;
-        } catch (DataIntegrityViolationException e) {
+        } catch (DataIntegrityViolationException | ConcurrencyFailureException e) {
             throw new BusinessException(ErrorCode.OAUTH_FAILED);
         }
     }
