@@ -266,7 +266,7 @@ class PointServiceTest {
 
             // when
             SliceResponse<?> result =
-                    pointService.getMyHistories(1L, PeriodFilter.ALL, PointChangeType.ALL, null, null, 2);
+                    pointService.getMyHistories(1L, PeriodFilter.ALL, PointChangeType.ALL, null, null, null, null, 2);
 
             // then
             assertThat(result.content()).hasSize(2);
@@ -284,7 +284,7 @@ class PointServiceTest {
 
             // when
             SliceResponse<?> result =
-                    pointService.getMyHistories(1L, PeriodFilter.ALL, PointChangeType.ALL, null, null, 20);
+                    pointService.getMyHistories(1L, PeriodFilter.ALL, PointChangeType.ALL, null, null, null, null, 20);
 
             // then
             assertThat(result.content()).hasSize(1);
@@ -300,7 +300,7 @@ class PointServiceTest {
                     .thenReturn(List.of());
 
             // when
-            pointService.getMyHistories(1L, PeriodFilter.THIS_MONTH, PointChangeType.ALL, null, null, 20);
+            pointService.getMyHistories(1L, PeriodFilter.THIS_MONTH, PointChangeType.ALL, null, null, null, null, 20);
 
             // then
             ArgumentCaptor<LocalDateTime> from = ArgumentCaptor.forClass(LocalDateTime.class);
@@ -320,7 +320,7 @@ class PointServiceTest {
                     .thenReturn(List.of());
 
             // when
-            pointService.getMyHistories(1L, PeriodFilter.LAST_MONTH, PointChangeType.ALL, null, null, 20);
+            pointService.getMyHistories(1L, PeriodFilter.LAST_MONTH, PointChangeType.ALL, null, null, null, null, 20);
 
             // then
             ArgumentCaptor<LocalDateTime> from = ArgumentCaptor.forClass(LocalDateTime.class);
@@ -331,6 +331,33 @@ class PointServiceTest {
             assertThat(from.getValue())
                     .isEqualTo(thisMonthFirstDay.minusMonths(1).atTime(4, 0));
             assertThat(to.getValue()).isEqualTo(thisMonthFirstDay.atTime(4, 0));
+        }
+
+        @Test
+        @DisplayName("from/to(직접설정)가 있으면 period는 무시하고 그 범위를 쓴다")
+        void customRangeOverridesPeriod() {
+            // given
+            when(userPointHistoryRepository.findHistories(any(), any(), any(), any(), any(), any(), any()))
+                    .thenReturn(List.of());
+
+            // when: period가 THIS_MONTH여도 from/to가 있으면 그쪽을 따른다
+            pointService.getMyHistories(
+                    1L,
+                    PeriodFilter.THIS_MONTH,
+                    PointChangeType.ALL,
+                    null,
+                    LocalDate.of(2026, 8, 1),
+                    LocalDate.of(2026, 8, 31),
+                    null,
+                    20);
+
+            // then: to는 그날 하루까지 포함해야 하므로 다음날 00:00이 배타적 상한이다
+            ArgumentCaptor<LocalDateTime> from = ArgumentCaptor.forClass(LocalDateTime.class);
+            ArgumentCaptor<LocalDateTime> to = ArgumentCaptor.forClass(LocalDateTime.class);
+            verify(userPointHistoryRepository)
+                    .findHistories(any(), any(), from.capture(), to.capture(), any(), any(), any());
+            assertThat(from.getValue()).isEqualTo(LocalDateTime.of(2026, 8, 1, 0, 0));
+            assertThat(to.getValue()).isEqualTo(LocalDateTime.of(2026, 9, 1, 0, 0));
         }
     }
 

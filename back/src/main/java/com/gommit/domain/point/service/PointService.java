@@ -94,8 +94,15 @@ public class PointService {
     }
 
     public SliceResponse<UserPointHistoryResponse> getMyHistories(
-            Long userId, PeriodFilter period, PointChangeType type, UserPointReason reason, Long cursor, int size) {
-        LocalDateTime[] range = toDateRange(period);
+            Long userId,
+            PeriodFilter period,
+            PointChangeType type,
+            UserPointReason reason,
+            LocalDate from,
+            LocalDate to,
+            Long cursor,
+            int size) {
+        LocalDateTime[] range = toDateRange(period, from, to);
         var rows = userPointHistoryRepository.findHistories(
                 userId, cursor, range[0], range[1], reason, toEarnFlag(type), PageRequest.of(0, size + 1));
         var content = rows.stream().map(UserPointHistoryResponse::from).toList();
@@ -124,8 +131,15 @@ public class PointService {
     }
 
     public SliceResponse<GroupPointHistoryResponse> getGroupHistories(
-            Long groupId, PeriodFilter period, PointChangeType type, GroupPointReason reason, Long cursor, int size) {
-        LocalDateTime[] range = toDateRange(period);
+            Long groupId,
+            PeriodFilter period,
+            PointChangeType type,
+            GroupPointReason reason,
+            LocalDate from,
+            LocalDate to,
+            Long cursor,
+            int size) {
+        LocalDateTime[] range = toDateRange(period, from, to);
         var rows = groupPointHistoryRepository.findHistories(
                 groupId, cursor, range[0], range[1], reason, toEarnFlag(type), PageRequest.of(0, size + 1));
         var content = rows.stream().map(GroupPointHistoryResponse::from).toList();
@@ -170,7 +184,15 @@ public class PointService {
         return type == PointChangeType.EARN;
     }
 
-    private static LocalDateTime[] toDateRange(PeriodFilter period) {
+    // from/to(직접설정)가 오면 period는 무시하고 그 범위를 그대로 쓴다.
+    // to는 그날 하루를 포함하도록 다음날 00:00을 배타적 상한으로 삼는다.
+    private static LocalDateTime[] toDateRange(PeriodFilter period, LocalDate from, LocalDate to) {
+        if (from != null || to != null) {
+            LocalDateTime start = from != null ? from.atStartOfDay() : null;
+            LocalDateTime end = to != null ? to.plusDays(1).atStartOfDay() : null;
+            return new LocalDateTime[] {start, end};
+        }
+
         if (period == null || period == PeriodFilter.ALL) {
             return new LocalDateTime[] {null, null};
         }
