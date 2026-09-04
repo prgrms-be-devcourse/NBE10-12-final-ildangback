@@ -47,14 +47,13 @@ public class ChallengeGroup extends BaseEntity {
 
     @Builder
     private ChallengeGroup(
-        String name,
-        String description,
-        GroupCategory category,
-        MapType mapType,
-        Visibility visibility,
-        int maxMembers,
-        Long ownerId
-    ) {
+            String name,
+            String description,
+            GroupCategory category,
+            MapType mapType,
+            Visibility visibility,
+            int maxMembers,
+            Long ownerId) {
         this.name = name;
         this.description = description;
         this.category = category;

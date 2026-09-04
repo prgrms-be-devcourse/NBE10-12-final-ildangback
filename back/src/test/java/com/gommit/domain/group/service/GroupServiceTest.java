@@ -14,7 +14,6 @@ import com.gommit.domain.challenge.entity.ChallengeMember;
 import com.gommit.domain.challenge.entity.ChallengeMemberRole;
 import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.entity.ChallengeStatus;
-import com.gommit.domain.challenge.entity.DaysOfWeek;
 import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
@@ -87,14 +86,7 @@ class GroupServiceTest {
     private GroupService groupService;
 
     private GroupCreateRequest createRequest(GroupCategory category, MapType mapType) {
-        return new GroupCreateRequest(
-                "오운완 모임",
-                "매일 운동 인증",
-                category,
-                mapType,
-                Visibility.PUBLIC,
-                6,
-                initialSetting());
+        return new GroupCreateRequest("오운완 모임", "매일 운동 인증", category, mapType, Visibility.PUBLIC, 6, initialSetting());
     }
 
     private InitialChallengeSettingRequest initialSetting() {
@@ -154,7 +146,11 @@ class GroupServiceTest {
     }
 
     private ChallengeMember challengeMember(Long id, Challenge challenge, Long userId, ChallengeMemberRole role) {
-        ChallengeMember member = ChallengeMember.builder().challenge(challenge).userId(userId).role(role).build();
+        ChallengeMember member = ChallengeMember.builder()
+                .challenge(challenge)
+                .userId(userId)
+                .role(role)
+                .build();
         setBaseFields(member, id);
         return member;
     }
@@ -206,7 +202,8 @@ class GroupServiceTest {
             Challenge savedChallenge = challenge(50L, 12L, ChallengeStatus.READY);
             when(challengeGroupRepository.save(any())).thenReturn(savedGroup);
             when(groupMemberRepository.save(any())).thenReturn(savedMember);
-            when(challengeService.createInitialChallenge(12L, 1L, request.challenge())).thenReturn(savedChallenge);
+            when(challengeService.createInitialChallenge(12L, 1L, request.challenge()))
+                    .thenReturn(savedChallenge);
             when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "꼬밋러")));
 
             // when
@@ -372,13 +369,13 @@ class GroupServiceTest {
             ChallengeGroup group = group(12L, "오운완 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
             Challenge challenge = challenge(50L, 12L, ChallengeStatus.READY);
             GroupMember savedGroupMember = groupMember(30L, group, 2L);
-            ChallengeMember savedChallengeMember =
-                    challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
+            ChallengeMember savedChallengeMember = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
             when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
             when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.READY))
                     .thenReturn(Optional.of(challenge));
             when(groupMemberRepository.existsByGroupIdAndUserId(12L, 2L)).thenReturn(false);
-            when(groupMemberRepository.countByGroupIdAndStatus(12L, GroupMemberStatus.ACTIVE)).thenReturn(1L);
+            when(groupMemberRepository.countByGroupIdAndStatus(12L, GroupMemberStatus.ACTIVE))
+                    .thenReturn(1L);
             when(groupMemberRepository.save(any())).thenReturn(savedGroupMember);
             when(challengeMemberService.createChallengeMember(challenge, 2L, ChallengeMemberRole.MEMBER))
                     .thenReturn(savedChallengeMember);
@@ -443,7 +440,8 @@ class GroupServiceTest {
             when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.READY))
                     .thenReturn(Optional.of(challenge));
             when(groupMemberRepository.existsByGroupIdAndUserId(12L, 2L)).thenReturn(false);
-            when(groupMemberRepository.countByGroupIdAndStatus(12L, GroupMemberStatus.ACTIVE)).thenReturn(2L);
+            when(groupMemberRepository.countByGroupIdAndStatus(12L, GroupMemberStatus.ACTIVE))
+                    .thenReturn(2L);
 
             // when & then
             assertBusinessException(() -> groupService.joinGroup(12L, 2L), ErrorCode.GROUP_FULL);
@@ -528,7 +526,8 @@ class GroupServiceTest {
             when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
             when(challengeMemberRepository.countByChallengeIdAndStatus(50L, ChallengeMemberStatus.ACTIVE))
                     .thenReturn(3L);
-            when(challengeProgressCalculator.calculateCurrentDay(eq(challenge), any(LocalDate.class))).thenReturn(2);
+            when(challengeProgressCalculator.calculateCurrentDay(eq(challenge), any(LocalDate.class)))
+                    .thenReturn(2);
             when(challengeProgressCalculator.calculatePeriodProgressRate(2, 7)).thenReturn(28.6);
 
             // when

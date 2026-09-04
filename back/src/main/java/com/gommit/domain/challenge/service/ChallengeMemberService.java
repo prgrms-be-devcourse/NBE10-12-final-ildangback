@@ -15,10 +15,10 @@ public class ChallengeMemberService {
     // 그룹 생성자를 챌린지멤버 등록
     public ChallengeMember createChallengeMember(Challenge challenge, Long userId, ChallengeMemberRole role) {
         ChallengeMember challengeMember = ChallengeMember.builder()
-            .challenge(challenge)
-            .userId(userId)
-            .role(role)
-            .build();
+                .challenge(challenge)
+                .userId(userId)
+                .role(role)
+                .build();
 
         return challengeMemberRepository.save(challengeMember);
     }
