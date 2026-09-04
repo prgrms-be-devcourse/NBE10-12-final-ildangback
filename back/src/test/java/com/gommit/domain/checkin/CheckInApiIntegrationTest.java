@@ -155,9 +155,10 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
     class Submit {
 
         @Test
-        @DisplayName("제출하면 201 과 인증 결과를 준다 — roundNo 1")
+        @DisplayName("제출하면 201 과 인증 결과를 주고 포인트가 적립된다 — roundNo 1")
         void submitReturns201() throws Exception {
             var tokens = loginAs(EMAIL, NICKNAME);
+            long userId = userIdOf(EMAIL);
             long challengeId = setUpChallenge(EMAIL, 3);
 
             submit(challengeId, tokens.accessToken())
@@ -168,7 +169,17 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(jsonPath("$.currentCount").value(1))
                     .andExpect(jsonPath("$.targetCount").value(3))
                     .andExpect(jsonPath("$.dailyCompleted").value(false))
-                    .andExpect(jsonPath("$.earnedUserPoints").value(0));
+                    .andExpect(jsonPath("$.earnedUserPoints").value(10));
+
+            assertThat(jdbcTemplate.queryForObject(
+                            "select balance from user_points where user_id = ?", Integer.class, userId))
+                    .isEqualTo(10);
+            var history = jdbcTemplate.queryForMap(
+                    "select amount, reason, source_name from user_point_histories where user_id = ?", userId);
+            assertThat(history)
+                    .containsEntry("amount", 10)
+                    .containsEntry("reason", "CHECK_IN")
+                    .containsEntry("source_name", "인증");
         }
 
         @Test

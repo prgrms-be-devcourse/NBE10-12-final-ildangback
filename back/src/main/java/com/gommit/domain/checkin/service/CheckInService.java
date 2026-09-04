@@ -24,6 +24,8 @@ import com.gommit.domain.checkin.policy.CheckInPolicy;
 import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.checkin.support.CheckInGuard;
 import com.gommit.domain.checkin.support.CheckInGuard.ReadAccess;
+import com.gommit.domain.point.entity.UserPointReason;
+import com.gommit.domain.point.service.PointService;
 import com.gommit.domain.user.service.UserService;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
@@ -51,6 +53,7 @@ public class CheckInService {
     private final CheckInGuard guard;
     private final CheckInPolicy policy;
     private final CheckInMediaStore mediaStore;
+    private final PointService pointService;
     private final UserService userService;
     private final Clock clock;
 
@@ -115,10 +118,15 @@ public class CheckInService {
             throw new BusinessException(ErrorCode.DAILY_LIMIT_EXCEEDED);
         }
 
-        String nickname = nicknameOf(userId);
-        mediaStore.write(media, mediaKey); // row 확정 후에만 기록. 실패 시 트랜잭션 롤백으로 row 도 함께 사라진다.
+        // 포인트 적립 — 같은 트랜잭션. 실패 시 인증도 롤백된다.
+        // PointService.reward는 전달한 sourceName 을 그대로 저장.
+        // 포인트 이력 화면이 챌린지/그룹명을 요구하면 checkin 이 ChallengeGroup 을 조회해 넘겨야 함, 지금은 고정 라벨 사용.
+        int earnedUserPoints = policy.checkInReward();
+        pointService.reward(userId, challengeId, earnedUserPoints, UserPointReason.CHECK_IN, "인증");
 
-        int earnedUserPoints = 0; // TODO(feat/7): pointService.reward(...) 로 실제 적립
+        String nickname = nicknameOf(userId);
+        mediaStore.write(media, mediaKey); // row·적립 확정 후에만 기록. 실패 시 트랜잭션 롤백으로 함께 사라진다.
+
         boolean dailyCompleted = roundNo >= target;
         return new CheckInResultResponse(
                 CheckInResponse.of(checkIn, nickname), roundNo, target, dailyCompleted, earnedUserPoints, 0, 0, 0);

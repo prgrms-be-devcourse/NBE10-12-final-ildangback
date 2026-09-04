@@ -5,7 +5,9 @@ import static com.gommit.domain.checkin.CheckInFixture.dailyChallenge;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
@@ -32,6 +34,8 @@ import com.gommit.domain.checkin.policy.CheckInPolicy;
 import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.checkin.support.CheckInGuard;
 import com.gommit.domain.checkin.support.CheckInGuard.ReadAccess;
+import com.gommit.domain.point.entity.UserPointReason;
+import com.gommit.domain.point.service.PointService;
 import com.gommit.domain.user.service.UserService;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
@@ -84,6 +88,9 @@ class CheckInServiceTest {
     private CheckInMediaStore mediaStore;
 
     @Mock
+    private PointService pointService;
+
+    @Mock
     private UserService userService;
 
     private CheckInService service;
@@ -92,7 +99,14 @@ class CheckInServiceTest {
     void setUp() {
         Clock clock = Clock.fixed(TODAY.atStartOfDay().toInstant(ZoneOffset.UTC), ZoneId.of("UTC"));
         service = new CheckInService(
-                checkInRepository, challengeMemberRepository, guard, policy, mediaStore, userService, clock);
+                checkInRepository,
+                challengeMemberRepository,
+                guard,
+                policy,
+                mediaStore,
+                pointService,
+                userService,
+                clock);
         lenient().when(userService.findNicknames(anyList())).thenReturn(Map.of(USER_ID, "인증러"));
     }
 
@@ -118,13 +132,14 @@ class CheckInServiceTest {
     class Submit {
 
         @Test
-        @DisplayName("성공 — roundNo 는 그날 기존 인증 수 + 1, 포인트는 0")
+        @DisplayName("성공 — roundNo 는 그날 기존 인증 수 + 1, 포인트 적립")
         void succeeds() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 3);
             givenActiveMemberAndValidDay(challenge);
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(1);
             when(mediaStore.reserve(any())).thenReturn("check-ins/2026/09/uuid.png");
+            when(policy.checkInReward()).thenReturn(10);
             when(checkInRepository.saveAndFlush(any(CheckIn.class))).thenAnswer(inv -> {
                 CheckIn c = inv.getArgument(0);
                 ReflectionTestUtils.setField(c, "id", 100L);
@@ -136,13 +151,14 @@ class CheckInServiceTest {
             assertThat(result.currentCount()).isEqualTo(2);
             assertThat(result.targetCount()).isEqualTo(3);
             assertThat(result.dailyCompleted()).isFalse();
-            assertThat(result.earnedUserPoints()).isZero();
+            assertThat(result.earnedUserPoints()).isEqualTo(10);
             assertThat(result.checkIn().roundNo()).isEqualTo(2);
             assertThat(result.checkIn().mediaType()).isEqualTo(MediaType.IMAGE);
 
-            // 미디어 바이트는 row 저장(flush) 이후에만 쓴다.
-            var order = inOrder(checkInRepository, mediaStore);
+            // 순서: row 저장(flush) → 포인트 적립 → 미디어 바이트 쓰기.
+            var order = inOrder(checkInRepository, pointService, mediaStore);
             order.verify(checkInRepository).saveAndFlush(any(CheckIn.class));
+            order.verify(pointService).reward(USER_ID, CHALLENGE_ID, 10, UserPointReason.CHECK_IN, "인증");
             order.verify(mediaStore).write(any(), eq("check-ins/2026/09/uuid.png"));
         }
 
@@ -268,6 +284,7 @@ class CheckInServiceTest {
 
             // insert 가 실패하면 파일을 쓰지 않는다 — orphan 없음.
             verify(mediaStore, never()).write(any(), any());
+            verify(pointService, never()).reward(anyLong(), anyLong(), anyInt(), any(), any());
         }
     }
 

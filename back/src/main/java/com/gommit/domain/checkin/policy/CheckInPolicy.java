@@ -14,6 +14,15 @@ import org.springframework.stereotype.Component;
 @Component
 public class CheckInPolicy {
 
+    // 인증 성공 1건당 지급 포인트. [임시값] — 기획 확정 필요.
+    // 여러 도메인의 포인트 금액을 한 곳에서 관리하려면 중앙 PointPolicy / @ConfigurationProperties 도입 검토.
+    private static final int POINT_PER_CHECK_IN = 10;
+
+    // 인증 1건에 지급할 포인트. challenge 별/스트릭별로 가변이 되면 여기에 파라미터를 추가한다.
+    public int checkInReward() {
+        return POINT_PER_CHECK_IN;
+    }
+
     // date 가 challenge 의 인증 대상일인가.
     public boolean isCheckInDay(Challenge challenge, LocalDate date) {
         if (date.isBefore(challenge.getStartDate()) || date.isAfter(challenge.getEndDate())) {
