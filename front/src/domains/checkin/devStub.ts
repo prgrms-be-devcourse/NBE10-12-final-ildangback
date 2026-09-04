@@ -1,9 +1,13 @@
-import type { GalleryQuery } from "./api";
+import type { GalleryQuery, MyCheckInQuery } from "./api";
 import type {
   ChallengeMember,
   CheckIn,
   CheckInCursorResponse,
   CheckInResultResponse,
+  CursorPageMeta,
+  MyChallengeSummary,
+  MyCheckIn,
+  MyCheckInCursorResponse,
   TodayCheckInStatus,
 } from "./types";
 
@@ -84,9 +88,23 @@ const STUB_GALLERY: CheckIn[] = Array.from({ length: 45 }, (_, i) => {
   };
 });
 
-export function stubGallery(query: GalleryQuery): CheckInCursorResponse {
-  const size = query.size ?? 20;
+/** id 내림차순으로 정렬된 rows 를 커서로 자른다. */
+function stubCursorPage<T extends { id: number }>(
+  rows: T[],
+  cursor: number | undefined,
+  size: number,
+): { content: T[]; meta: CursorPageMeta } {
+  const startIdx = cursor == null ? 0 : rows.findIndex((r) => r.id < cursor);
+  const content = startIdx < 0 ? [] : rows.slice(startIdx, startIdx + size);
+  const last = content.at(-1);
+  const hasNext = last != null && rows.some((r) => r.id < last.id);
+  return {
+    content,
+    meta: { nextCursor: hasNext ? last!.id : null, hasNext, size },
+  };
+}
 
+export function stubGallery(query: GalleryQuery): CheckInCursorResponse {
   let rows = STUB_GALLERY;
   if (query.month) {
     rows = rows.filter((c) => c.businessDate.startsWith(query.month!));
@@ -94,17 +112,62 @@ export function stubGallery(query: GalleryQuery): CheckInCursorResponse {
   if (query.userId != null) {
     rows = rows.filter((c) => c.userId === query.userId);
   }
+  return stubCursorPage(rows, query.cursor, query.size ?? 20);
+}
 
-  const startIdx =
-    query.cursor == null ? 0 : rows.findIndex((c) => c.id < query.cursor!);
-  const page = startIdx < 0 ? [] : rows.slice(startIdx, startIdx + size);
-  const last = page.at(-1);
-  const hasNext = last != null && rows.some((c) => c.id < last.id);
+// ── 프로필 모아보기 스텁 ────────────────────────────────────────────────────
 
+const STUB_MY_CHALLENGES: MyChallengeSummary[] = [
+  { challengeId: 1, name: "오운완" },
+  { challengeId: 2, name: "매일 독서 30분" },
+  { challengeId: 3, name: "아침 6시 기상" },
+];
+
+export function stubMyChallenges(): MyChallengeSummary[] {
+  return STUB_MY_CHALLENGES;
+}
+
+// 내 인증 60건 — 2026-09 / 2026-08, 챌린지 3개에 분산, 일부 memo.
+const STUB_MY_CHECKINS: MyCheckIn[] = Array.from({ length: 60 }, (_, i) => {
+  const id = 60 - i;
+  const inSeptember = id >= 25;
+  const day = ((id * 5) % 27) + 1;
+  const month = inSeptember ? "09" : "08";
+  const businessDate = `2026-${month}-${String(day).padStart(2, "0")}`;
   return {
-    content: page,
-    meta: { nextCursor: hasNext ? last!.id : null, hasNext, size },
+    id,
+    userId: 1,
+    nickname: "나",
+    businessDate,
+    roundNo: 1,
+    checkInType: "PHOTO",
+    mediaUrl: `https://placehold.co/600x600/8058c4/fff?text=${month}-${String(day).padStart(2, "0")}`,
+    mediaType: "IMAGE",
+    memo: id % 4 === 0 ? STUB_MEMOS[id % STUB_MEMOS.length] : null,
+    createdAt: `${businessDate}T0${id % 6}:${String((id * 7) % 60).padStart(2, "0")}:00`,
+    challengeId: (id % 3) + 1,
   };
+});
+
+export function stubMyCheckIns(query: MyCheckInQuery): MyCheckInCursorResponse {
+  let rows = STUB_MY_CHECKINS;
+  if (query.challengeId != null) {
+    rows = rows.filter((c) => c.challengeId === query.challengeId);
+  }
+  if (query.checkInType) {
+    rows = rows.filter((c) => c.checkInType === query.checkInType);
+  }
+  // totalCount 는 month 를 무시한다(헤더 수치 고정).
+  const totalCount = rows.length;
+  if (query.month) {
+    rows = rows.filter((c) => c.businessDate.startsWith(query.month!));
+  }
+  const { content, meta } = stubCursorPage(
+    rows,
+    query.cursor,
+    query.size ?? 20,
+  );
+  return { content, meta: { ...meta, totalCount } };
 }
 
 export function stubSubmitResult(input: {

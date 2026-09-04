@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { Button } from "../../../shared/ui/Button";
-import { useCheckInGallery } from "../lib/useCheckInGallery";
-import { useChallengeMembers } from "../lib/useChallengeMembers";
 import { currentMonth } from "../lib/month";
+import { useChallengeMembers } from "../lib/useChallengeMembers";
+import { useCheckInGallery } from "../lib/useCheckInGallery";
 import type { CheckIn } from "../types";
-import { Chip } from "./Chip";
-import { CheckInGrid, CheckInGridSkeleton } from "./CheckInGrid";
+import { CheckInGridSection } from "./CheckInGridSection";
 import { CheckInLightbox } from "./CheckInLightbox";
+import { Chip } from "./Chip";
 import { MonthNav } from "./MonthNav";
 
 /**
@@ -21,8 +20,7 @@ export function CheckInGalleryTab({ challengeId }: { challengeId: number }) {
   const [selected, setSelected] = useState<CheckIn | null>(null);
 
   const members = useChallengeMembers(challengeId);
-  const { items, loading, loadingMore, error, hasNext, loadMore, reload } =
-    useCheckInGallery(challengeId, { month, userId });
+  const result = useCheckInGallery(challengeId, { month, userId });
 
   return (
     <div className="px-4 pt-4 pb-10">
@@ -44,31 +42,16 @@ export function CheckInGalleryTab({ challengeId }: { challengeId: number }) {
       </div>
 
       <div className="mt-4">
-        {loading ? (
-          <CheckInGridSkeleton />
-        ) : error ? (
-          <div className="py-16 text-center">
-            <p className="text-[14px] text-gray-500">불러오지 못했어요</p>
-            <Button variant="secondary" className="mt-4" onClick={reload}>
-              다시 시도
-            </Button>
-          </div>
-        ) : items.length === 0 ? (
-          <p className="py-16 text-center text-[14px] text-gray-400">
-            {userId === null
+        <CheckInGridSection
+          result={result}
+          emptyMessage={
+            userId === null
               ? "이번 달 인증이 없어요"
-              : "조건에 맞는 인증이 없어요"}
-          </p>
-        ) : (
-          <CheckInGrid
-            items={items}
-            showAuthor
-            onSelect={setSelected}
-            hasNext={hasNext}
-            loadingMore={loadingMore}
-            onLoadMore={loadMore}
-          />
-        )}
+              : "조건에 맞는 인증이 없어요"
+          }
+          onSelect={setSelected}
+          showAuthor
+        />
       </div>
 
       <CheckInLightbox

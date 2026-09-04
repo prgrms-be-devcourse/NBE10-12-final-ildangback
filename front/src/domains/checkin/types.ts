@@ -1,6 +1,6 @@
 /**
  * front/docs/checkin-api-spec.yml 의 스키마를 옮긴 것이다. 그쪽이 정본이며,
- * 제출 플로우 + 갤러리 탭에 필요한 것만 담는다 — 프로필 모아보기 · 일일로그는 제외.
+ * 제출 플로우 · 갤러리 탭 · 프로필 모아보기 · 일일 로그에 필요한 것을 담는다.
  */
 
 /** 현재 PHOTO 만 지원. VIDEO 는 스펙 enum 에 아직 없음. */
@@ -76,4 +76,36 @@ export interface ChallengeMember {
   nickname: string;
   /** 오늘 인증 횟수. 현황 탭용 — 갤러리 칩에선 안 쓴다. */
   todayCheckInCount: number;
+}
+
+// ── 프로필 > 내 인증 모아보기 (GET /users/me/check-ins) ──────────────────────
+
+/** `CheckIn` + 상세 경로 조립용 `challengeId`. 여러 챌린지가 섞여 온다. */
+export interface MyCheckIn extends CheckIn {
+  challengeId: number;
+}
+
+export interface MyCheckInPageMeta extends CursorPageMeta {
+  /**
+   * 본인 인증 총 횟수. `challengeId`·`checkInType` 필터는 반영하되 `month` 는 무시 —
+   * 월을 바꿔도 헤더 수치가 안 흔들린다.
+   */
+  totalCount: number;
+}
+
+export interface MyCheckInCursorResponse {
+  content: MyCheckIn[];
+  meta: MyCheckInPageMeta;
+}
+
+/**
+ * 내가 참여한(했던) 챌린지 한 건. "전체 인증" 화면의 챌린지 드롭다운용.
+ *
+ * ⚠️ challenge/group 도메인 몫(`GET /groups/me` 등). 아직 프론트에 그 도메인이 없어
+ * 임시로 둔다. (front/docs/checkin-gallery-backend-asks.md)
+ */
+export interface MyChallengeSummary {
+  challengeId: number;
+  /** 그룹명 (챌린지 자체엔 이름이 없음) */
+  name: string;
 }

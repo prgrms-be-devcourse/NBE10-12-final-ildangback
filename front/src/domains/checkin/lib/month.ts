@@ -19,3 +19,9 @@ export function monthLabel(month: string): string {
   const [y, m] = month.split("-");
   return `${y}년 ${Number(m)}월`;
 }
+
+/** 최근 `count` 개월을 최신순으로. 월 드롭다운 옵션용. */
+export function recentMonths(count = 12): string[] {
+  const now = currentMonth();
+  return Array.from({ length: count }, (_, i) => shiftMonth(now, -i));
+}

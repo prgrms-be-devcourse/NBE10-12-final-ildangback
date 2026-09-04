@@ -5,6 +5,7 @@ import { TabLayout } from "./app/TabLayout";
 import { LoginPage } from "./domains/auth/pages/LoginPage";
 import { SignUpPage } from "./domains/auth/pages/SignUpPage";
 import { CheckInPage } from "./domains/checkin/pages/CheckInPage";
+import { MyCheckInsPage } from "./domains/checkin/pages/MyCheckInsPage";
 import { AccountPage } from "./domains/user/pages/AccountPage";
 import { ChangePasswordPage } from "./domains/user/pages/ChangePasswordPage";
 import { DeleteAccountPage } from "./domains/user/pages/DeleteAccountPage";
@@ -32,6 +33,11 @@ export function App() {
         <Route index element={<HomePage />} />
         <Route path="challenges" element={<ChallengeTabPlaceholder />} />
         <Route path="profile" element={<ProfilePage />} />
+
+        {/* 프로필 하위지만 하단바가 유지되는 화면(시안). 로그인 필수. */}
+        <Route element={<RequireAuth />}>
+          <Route path="profile/check-ins" element={<MyCheckInsPage />} />
+        </Route>
       </Route>
 
       <Route element={<PlainLayout />}>

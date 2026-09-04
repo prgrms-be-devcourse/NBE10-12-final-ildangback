@@ -3,6 +3,8 @@ import {
   isCheckInStubEnabled,
   stubChallengeMembers,
   stubGallery,
+  stubMyChallenges,
+  stubMyCheckIns,
   stubSubmitResult,
   stubTodayStatus,
 } from "./devStub";
@@ -11,8 +13,22 @@ import type {
   CheckInCursorResponse,
   CheckInResultResponse,
   CheckInType,
+  MyChallengeSummary,
+  MyCheckInCursorResponse,
   TodayCheckInStatus,
 } from "./types";
+
+/** 정의된 값만 쿼리스트링으로. `?a=1&b=2` 또는 빈 문자열. */
+function buildQuery(
+  params: Record<string, string | number | undefined>,
+): string {
+  const usp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v != null) usp.set(k, String(v));
+  }
+  const qs = usp.toString();
+  return qs ? `?${qs}` : "";
+}
 
 /** GET /challenges/{challengeId}/check-ins/today */
 export function getTodayCheckInStatus(
@@ -77,16 +93,13 @@ export function getChallengeGallery(
     );
   }
 
-  const params = new URLSearchParams();
-  if (query.month) params.set("month", query.month);
-  if (query.userId != null) params.set("userId", String(query.userId));
-  if (query.cursor != null) params.set("cursor", String(query.cursor));
-  if (query.size != null) params.set("size", String(query.size));
-
-  const qs = params.toString();
-  return apiFetch(
-    `/api/challenges/${challengeId}/check-ins${qs ? `?${qs}` : ""}`,
-  );
+  const qs = buildQuery({
+    month: query.month,
+    userId: query.userId,
+    cursor: query.cursor,
+    size: query.size,
+  });
+  return apiFetch(`/api/challenges/${challengeId}/check-ins${qs}`);
 }
 
 /**
@@ -103,4 +116,44 @@ export function getChallengeMembers(
 ): Promise<ChallengeMember[]> {
   if (isCheckInStubEnabled()) return Promise.resolve(stubChallengeMembers());
   return apiFetch(`/api/challenges/${challengeId}/members`);
+}
+
+export interface MyCheckInQuery {
+  /** 지정 시 해당 챌린지의 본인 인증만 (그룹 앨범). 생략 시 전체 챌린지. */
+  challengeId?: number;
+  checkInType?: CheckInType;
+  /** yyyy-MM */
+  month?: string;
+  cursor?: number;
+  size?: number;
+}
+
+/** GET /users/me/check-ins (프로필 전체 인증 / 그룹 앨범 - 무한스크롤) */
+export function getMyCheckIns(
+  query: MyCheckInQuery = {},
+): Promise<MyCheckInCursorResponse> {
+  if (isCheckInStubEnabled()) {
+    return new Promise((resolve) =>
+      setTimeout(() => resolve(stubMyCheckIns(query)), 300),
+    );
+  }
+  const qs = buildQuery({
+    challengeId: query.challengeId,
+    checkInType: query.checkInType,
+    month: query.month,
+    cursor: query.cursor,
+    size: query.size,
+  });
+  return apiFetch(`/api/users/me/check-ins${qs}`);
+}
+
+/**
+ * 내가 참여한(했던) 챌린지 목록. "전체 인증" 화면 챌린지 드롭다운용.
+ *
+ * ⚠️ challenge/group 도메인 몫(`GET /groups/me` 등). 프론트에 그 도메인이 아직 없어
+ * dev 스텁만. (front/docs/checkin-gallery-backend-asks.md)
+ */
+export function getMyChallenges(): Promise<MyChallengeSummary[]> {
+  if (isCheckInStubEnabled()) return Promise.resolve(stubMyChallenges());
+  return apiFetch(`/api/groups/me`);
 }

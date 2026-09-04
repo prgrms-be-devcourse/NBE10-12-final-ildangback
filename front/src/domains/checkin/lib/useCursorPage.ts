@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CursorPageMeta } from "../types";
 
-interface Page<T> {
+interface Page<T, M> {
   /** 이 페이지가 어느 요청(deps)의 것인지. deps 가 바뀌면 옛 응답을 버리는 데 쓴다. */
   key: string;
   items: T[];
-  meta: CursorPageMeta;
+  meta: M;
 }
 
-export interface CursorPageResult<T> {
+export interface CursorPageResult<T, M> {
   items: T[];
+  /** 현재 deps 에 해당하는 페이지의 meta. 헤더 집계(totalCount 등)에 쓴다. */
+  meta: M | null;
   loading: boolean;
   loadingMore: boolean;
   error: boolean;
@@ -26,14 +28,12 @@ export interface CursorPageResult<T> {
  * 자연히 무시된다. `fetchPage` 는 매 렌더 새로 만들어도 된다(ref 로 최신값 유지) —
  * 재요청 트리거는 오직 `deps` 다.
  */
-export function useCursorPage<T>(
-  fetchPage: (
-    cursor: number | undefined,
-  ) => Promise<{ content: T[]; meta: CursorPageMeta }>,
+export function useCursorPage<T, M extends CursorPageMeta = CursorPageMeta>(
+  fetchPage: (cursor: number | undefined) => Promise<{ content: T[]; meta: M }>,
   deps: readonly unknown[],
-): CursorPageResult<T> {
+): CursorPageResult<T, M> {
   const [reloadKey, setReloadKey] = useState(0);
-  const [page, setPage] = useState<Page<T> | null>(null);
+  const [page, setPage] = useState<Page<T, M> | null>(null);
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
 
@@ -97,6 +97,7 @@ export function useCursorPage<T>(
 
   return {
     items: fresh?.items ?? [],
+    meta: fresh?.meta ?? null,
     loading,
     loadingMore,
     error,
