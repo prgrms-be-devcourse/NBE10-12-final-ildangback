@@ -28,4 +28,14 @@ public class Item extends BaseEntity {
 
     @Column(nullable = false)
     private int price;
+
+    public static Item of(ItemSlot slot, String name, String imageUrl, int price) {
+        Item item = new Item();
+        item.slot = slot;
+        item.name = name;
+        item.imageUrl = imageUrl;
+        item.price = price;
+
+        return item;
+    }
 }
