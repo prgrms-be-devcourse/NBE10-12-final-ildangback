@@ -250,8 +250,8 @@ class GroupServiceTest {
 
             // then
             assertThat(response.content()).isEmpty();
-            assertThat(response.meta().hasNext()).isFalse();
-            assertThat(response.meta().nextCursor()).isNull();
+            assertThat(response.hasNext()).isFalse();
+            assertThat(response.nextCursor()).isNull();
         }
 
         @Test
@@ -295,8 +295,8 @@ class GroupServiceTest {
             assertThat(response.content()).hasSize(1);
             assertThat(response.content().get(0).id()).isEqualTo(12L);
             assertThat(response.content().get(0).currentMembers()).isEqualTo(4);
-            assertThat(response.meta().hasNext()).isTrue();
-            assertThat(response.meta().nextCursor()).isEqualTo(12L);
+            assertThat(response.hasNext()).isTrue();
+            assertThat(response.nextCursor()).isEqualTo(12L);
         }
     }
 
@@ -523,7 +523,7 @@ class GroupServiceTest {
             ChallengeMember member = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
             when(challengeMemberRepository.findAllByUserIdAndStatus(2L, ChallengeMemberStatus.ACTIVE))
                     .thenReturn(List.of(member));
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeGroupRepository.findAllById(List.of(12L))).thenReturn(List.of(group));
             when(challengeMemberRepository.countByChallengeIdAndStatus(50L, ChallengeMemberStatus.ACTIVE))
                     .thenReturn(3L);
             when(challengeProgressCalculator.calculateCurrentDay(eq(challenge), any(LocalDate.class)))
@@ -537,7 +537,7 @@ class GroupServiceTest {
             assertThat(response.content()).hasSize(1);
             assertThat(response.content().get(0).groupId()).isEqualTo(12L);
             assertThat(response.content().get(0).participantCount()).isEqualTo(3);
-            assertThat(response.meta().hasNext()).isFalse();
+            assertThat(response.hasNext()).isFalse();
         }
 
         @Test
@@ -548,7 +548,7 @@ class GroupServiceTest {
             ChallengeMember member = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
             when(challengeMemberRepository.findAllByUserIdAndStatus(2L, ChallengeMemberStatus.ACTIVE))
                     .thenReturn(List.of(member));
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.empty());
+            when(challengeGroupRepository.findAllById(List.of(12L))).thenReturn(List.of());
 
             // when & then
             assertBusinessException(() -> groupService.getMyGroups(2L, null, null, 20), ErrorCode.GROUP_NOT_FOUND);

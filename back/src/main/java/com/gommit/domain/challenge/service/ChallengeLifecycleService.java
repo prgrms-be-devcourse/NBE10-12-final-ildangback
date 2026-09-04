@@ -53,7 +53,7 @@ public class ChallengeLifecycleService {
             // 연장 시즌이면 새 시즌 OWNER를 Group OWNER로 동기화
             ChallengeMember owner = challengeMemberRepository
                     .findByChallengeIdAndRole(challenge.getId(), ChallengeMemberRole.OWNER)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_CHALLENGE_OWNER));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_OWNER));
 
             group.changeOwner(owner.getUserId());
         }

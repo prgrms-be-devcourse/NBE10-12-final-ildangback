@@ -45,11 +45,11 @@ public class ChallengeExtensionService {
         // 해당 챌린지의 내 참여 정보 조회
         ChallengeMember challengeMember = challengeMemberRepository
                 .findByChallengeIdAndUserId(challengeId, userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER));
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER));
 
         // 현재 참여 중인 멤버만 연장 의사 선택 가능
         if (challengeMember.getStatus() != ChallengeMemberStatus.ACTIVE) {
-            throw new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER);
+            throw new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER);
         }
 
         // 연장 투표 마감 여부 확인
@@ -113,8 +113,9 @@ public class ChallengeExtensionService {
 
     private void validateExtensionChoicePeriod(Challenge challenge) {
         LocalDate deadline = challenge.getEndDate().minusDays(2);
+        LocalDate today = LocalDate.now(KST);
 
-        if (LocalDate.now().isAfter(deadline)) {
+        if (today.isAfter(deadline)) {
             throw new BusinessException(ErrorCode.EXTENSION_CHOICE_CLOSED);
         }
     }
@@ -141,7 +142,7 @@ public class ChallengeExtensionService {
         // 현 시즌 OWNER 조회
         ChallengeMember currentOwner = challengeMemberRepository
                 .findByChallengeIdAndRole(challengeId, ChallengeMemberRole.OWNER)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_CHALLENGE_OWNER));
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_OWNER));
 
         // 기존 OWNER가 연장을 선택했다면 그대로 OWNER
         if (currentOwner.getExtensionChoice() == ExtensionChoice.EXTEND) {

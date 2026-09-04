@@ -37,6 +37,7 @@ public class ChallengeService {
     private final ChallengeProgressCalculator challengeProgressCalculator;
 
     // 그룹 생성 시 첫 챌린지 생성
+    @Transactional
     public Challenge createInitialChallenge(Long groupId, Long userId, InitialChallengeSettingRequest setting) {
 
         // 유효성 체크
@@ -88,12 +89,12 @@ public class ChallengeService {
         // 시즌 멤버 확인
         challengeMemberRepository
                 .findByChallengeIdAndUserId(challengeId, userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER));
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER));
 
         // OWNER 체크
         ChallengeMember owner = challengeMemberRepository
                 .findByChallengeIdAndRole(challengeId, ChallengeMemberRole.OWNER)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_CHALLENGE_OWNER));
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_OWNER));
 
         long participantCount =
                 challengeMemberRepository.countByChallengeIdAndStatus(challengeId, ChallengeMemberStatus.ACTIVE);
@@ -144,7 +145,7 @@ public class ChallengeService {
         // 요청자가 해당 시즌 멤버인지 확인
         challengeMemberRepository
                 .findByChallengeIdAndUserId(challengeId, userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER));
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER));
 
         // 현재 참여 중인 시즌 멤버 조회
         List<ChallengeMember> members =
@@ -187,10 +188,10 @@ public class ChallengeService {
 
         ChallengeMember challengeMember = challengeMemberRepository
                 .findByChallengeIdAndUserId(challengeId, userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER));
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER));
 
         if (challengeMember.getRole() != ChallengeMemberRole.OWNER) {
-            throw new BusinessException(ErrorCode.NOT_CHALLENGE_OWNER);
+            throw new BusinessException(ErrorCode.CHALLENGE_NOT_OWNER);
         }
 
         if (challenge.getStatus() != ChallengeStatus.READY) {
@@ -315,11 +316,11 @@ public class ChallengeService {
 
         ChallengeMember currentMember = challengeMemberRepository
                 .findByChallengeIdAndUserId(challengeId, userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER));
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER));
 
         // OWNER인지 확인
         if (currentMember.getRole() != ChallengeMemberRole.OWNER) {
-            throw new BusinessException(ErrorCode.NOT_CHALLENGE_OWNER);
+            throw new BusinessException(ErrorCode.CHALLENGE_NOT_OWNER);
         }
 
         if (userId.equals(request.targetUserId())) {
@@ -329,10 +330,10 @@ public class ChallengeService {
         // 위임 대상 멤버 조회
         ChallengeMember targetMember = challengeMemberRepository
                 .findByChallengeIdAndUserId(challengeId, request.targetUserId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER));
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER));
 
         if (targetMember.getStatus() != ChallengeMemberStatus.ACTIVE) {
-            throw new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER);
+            throw new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER);
         }
 
         currentMember.changeRole(ChallengeMemberRole.MEMBER);

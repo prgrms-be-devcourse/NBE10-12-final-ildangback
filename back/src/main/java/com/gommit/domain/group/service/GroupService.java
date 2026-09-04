@@ -17,12 +17,14 @@ import com.gommit.domain.group.repository.GroupMemberCount;
 import com.gommit.domain.group.repository.GroupMemberRepository;
 import com.gommit.domain.user.entity.User;
 import com.gommit.domain.user.repository.UserRepository;
+import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -108,7 +110,7 @@ public class GroupService {
     }
 
     @Transactional(readOnly = true)
-    public GroupSummaryCursorResponse getPublicGroups(
+    public SliceResponse<GroupSummaryResponse> getPublicGroups(
             String keyword, GroupCategory category, GroupSort sort, Long cursor, int size) {
 
         // 공개 + 모집 중인 그룹 조회
@@ -133,7 +135,7 @@ public class GroupService {
 
         // 조회 결과가 없을경우 빈 응답
         if (groups.isEmpty()) {
-            return new GroupSummaryCursorResponse(List.of(), new CursorMetaResponse(null, false, 0));
+            return new SliceResponse<>(List.of(), false, null);
         }
 
         // 그룹 ID 목록 추출
@@ -179,22 +181,7 @@ public class GroupService {
                     summaries.stream().filter(summary -> summary.id() < cursor).toList();
         }
 
-        // size + 1 방식으로 다음 페이지 존재 여부 확인
-        boolean hasNext = summaries.size() > size;
-
-        List<GroupSummaryResponse> content = summaries.stream().limit(size).toList();
-
-        // 다음 cursor 계산
-        Long nextCursor = null;
-
-        if (hasNext && !content.isEmpty()) {
-            nextCursor = content.get(content.size() - 1).id();
-        }
-
-        // cursor meta 생성
-        CursorMetaResponse meta = new CursorMetaResponse(nextCursor, hasNext, content.size());
-
-        return new GroupSummaryCursorResponse(content, meta);
+        return SliceResponse.ofCursor(summaries, size, GroupSummaryResponse::id);
     }
 
     private List<GroupSummaryResponse> sortGroupSummaries(List<GroupSummaryResponse> summaries, GroupSort sort) {
@@ -359,7 +346,7 @@ public class GroupService {
 
     // 내 그룹 목록 조회
     @Transactional(readOnly = true)
-    public MyGroupCursorResponse getMyGroups(Long userId, GroupStatus status, Long cursor, int size) {
+    public SliceResponse<MyGroupSummaryResponse> getMyGroups(Long userId, GroupStatus status, Long cursor, int size) {
         // 내가 현재 참여 중이거나 정상 종료한 챌린지 멤버 조회
         List<ChallengeMember> challengeMembers =
                 challengeMemberRepository.findAllByUserIdAndStatus(userId, ChallengeMemberStatus.ACTIVE);
@@ -393,16 +380,25 @@ public class GroupService {
                 })
                 .toList();
 
+        List<Long> groupIds = displayMembers.stream()
+                .map(member -> member.getChallenge().getGroupId())
+                .distinct()
+                .toList();
+
+        Map<Long, ChallengeGroup> groupMap = challengeGroupRepository.findAllById(groupIds).stream()
+                .collect(Collectors.toMap(ChallengeGroup::getId, Function.identity()));
+
         // 그룹 필터링
         if (status != null) {
             displayMembers = displayMembers.stream()
                     .filter(member -> {
                         Long groupId = member.getChallenge().getGroupId();
 
-                        ChallengeGroup group = challengeGroupRepository
-                                .findById(groupId)
-                                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+                        ChallengeGroup group = groupMap.get(groupId);
 
+                        if (group == null) {
+                            throw new BusinessException(ErrorCode.GROUP_NOT_FOUND);
+                        }
                         return group.getStatus() == status;
                     })
                     .toList();
@@ -432,7 +428,15 @@ public class GroupService {
         }
 
         List<MyGroupSummaryResponse> content = pageMembers.stream()
-                .map(member -> toMyGroupSummaryResponse(member, userId))
+                .map(member -> {
+                    Long groupId = member.getChallenge().getGroupId();
+                    ChallengeGroup group = groupMap.get(groupId);
+
+                    if (group == null) {
+                        throw new BusinessException(ErrorCode.GROUP_NOT_FOUND);
+                    }
+                    return toMyGroupSummaryResponse(member, userId, group);
+                })
                 .toList();
 
         // 다음 커서 생성
@@ -441,18 +445,11 @@ public class GroupService {
             nextCursor = pageMembers.get(pageMembers.size() - 1).getId();
         }
 
-        // meta 생성
-        CursorMetaResponse meta = new CursorMetaResponse(nextCursor, hasNext, content.size());
-
-        return new MyGroupCursorResponse(content, meta);
+        return new SliceResponse<>(content, hasNext, nextCursor);
     }
 
-    private MyGroupSummaryResponse toMyGroupSummaryResponse(ChallengeMember member, Long userId) {
+    private MyGroupSummaryResponse toMyGroupSummaryResponse(ChallengeMember member, Long userId, ChallengeGroup group) {
         Challenge challenge = member.getChallenge();
-
-        ChallengeGroup group = challengeGroupRepository
-                .findById(challenge.getGroupId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
 
         // 현재 시즌 참여 인원
         int participantCount = (int)

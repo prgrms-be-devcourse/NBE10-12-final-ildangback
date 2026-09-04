@@ -270,7 +270,7 @@ class ChallengeServiceTest {
         }
 
         @Test
-        @DisplayName("요청자가 시즌 멤버가 아니면 NOT_CHALLENGE_MEMBER")
+        @DisplayName("요청자가 시즌 멤버가 아니면 CHALLENGE_NOT_MEMBER")
         void throwsWhenUserIsNotChallengeMember() {
             // given
             Challenge challenge = challenge(50L, ChallengeStatus.ACTIVE);
@@ -278,7 +278,7 @@ class ChallengeServiceTest {
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.empty());
 
             // when & then
-            assertBusinessException(() -> challengeService.getChallengeStatus(50L, 2L), ErrorCode.NOT_CHALLENGE_MEMBER);
+            assertBusinessException(() -> challengeService.getChallengeStatus(50L, 2L), ErrorCode.CHALLENGE_NOT_MEMBER);
         }
     }
 
@@ -337,7 +337,7 @@ class ChallengeServiceTest {
         }
 
         @Test
-        @DisplayName("OWNER가 아니면 NOT_CHALLENGE_OWNER")
+        @DisplayName("OWNER가 아니면 CHALLENGE_NOT_OWNER")
         void throwsWhenUserIsNotOwner() {
             // given
             Challenge challenge = challenge(50L, ChallengeStatus.READY);
@@ -347,7 +347,7 @@ class ChallengeServiceTest {
 
             // when & then
             assertBusinessException(
-                    () -> challengeService.updateChallenge(50L, 2L, updateRequest()), ErrorCode.NOT_CHALLENGE_OWNER);
+                    () -> challengeService.updateChallenge(50L, 2L, updateRequest()), ErrorCode.CHALLENGE_NOT_OWNER);
         }
 
         @Test
@@ -447,7 +447,7 @@ class ChallengeServiceTest {
         }
 
         @Test
-        @DisplayName("위임 대상이 ACTIVE 멤버가 아니면 NOT_CHALLENGE_MEMBER")
+        @DisplayName("위임 대상이 ACTIVE 멤버가 아니면 CHALLENGE_NOT_MEMBER")
         void throwsWhenTargetMemberIsNotActive() {
             // given
             Challenge challenge = challenge(50L, ChallengeStatus.READY);
@@ -461,7 +461,7 @@ class ChallengeServiceTest {
             // when & then
             assertBusinessException(
                     () -> challengeService.delegateOwner(50L, 1L, new OwnerDelegationRequest(2L)),
-                    ErrorCode.NOT_CHALLENGE_MEMBER);
+                    ErrorCode.CHALLENGE_NOT_MEMBER);
             assertThat(currentOwner.getRole()).isEqualTo(ChallengeMemberRole.OWNER);
         }
     }

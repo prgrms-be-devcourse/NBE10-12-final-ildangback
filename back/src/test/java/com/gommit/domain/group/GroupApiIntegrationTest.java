@@ -151,8 +151,8 @@ class GroupApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content.length()").value(1))
                     .andExpect(jsonPath("$.content[0].name").value("저녁 오운완"))
-                    .andExpect(jsonPath("$.meta.hasNext").value(true))
-                    .andExpect(jsonPath("$.meta.nextCursor").exists());
+                    .andExpect(jsonPath("$.hasNext").value(true))
+                    .andExpect(jsonPath("$.nextCursor").exists());
         }
     }
 
@@ -279,7 +279,7 @@ class GroupApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content.length()").value(1))
                     .andExpect(jsonPath("$.content[0].name").value("오운완 모임"))
-                    .andExpect(jsonPath("$.meta.hasNext").value(false));
+                    .andExpect(jsonPath("$.hasNext").value(false));
         }
     }
 }

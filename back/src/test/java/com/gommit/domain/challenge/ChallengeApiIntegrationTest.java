@@ -151,7 +151,7 @@ class ChallengeApiIntegrationTest extends IntegrationTestSupport {
 
             getChallengeStatus(otherTokens.accessToken(), challengeId)
                     .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("NOT_CHALLENGE_MEMBER"));
+                    .andExpect(jsonPath("$.code").value("CHALLENGE_NOT_MEMBER"));
         }
     }
 
@@ -210,7 +210,7 @@ class ChallengeApiIntegrationTest extends IntegrationTestSupport {
 
             updateChallenge(memberTokens.accessToken(), challengeId, updateBody())
                     .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("NOT_CHALLENGE_OWNER"));
+                    .andExpect(jsonPath("$.code").value("CHALLENGE_NOT_OWNER"));
         }
 
         @Test
