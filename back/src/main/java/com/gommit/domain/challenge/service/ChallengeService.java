@@ -157,7 +157,9 @@ public class ChallengeService {
             User user = userMap.get(member.getUserId());
 
             // 오늘 인증 횟수 조회
-            long todayCheckInCount = checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challengeId, member.getUserId(), today);
+            // TODO: CheckInRepository 연동 후 실제 값으로 변경
+            long todayCheckInCount = 0;
+//            long todayCheckInCount = checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challengeId, member.getUserId(), today);
 
             return new MemberTodayStatusResponse(member.getUserId(), user.getNickname(), (int) todayCheckInCount);
         }).toList();
