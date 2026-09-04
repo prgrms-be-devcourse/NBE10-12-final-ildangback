@@ -351,13 +351,14 @@ class PointServiceTest {
                     null,
                     20);
 
-            // then: to는 그날 하루까지 포함해야 하므로 다음날 00:00이 배타적 상한이다
+            // then: 하루 경계가 04:00이라 시작은 8/1 04:00, to는 그날 하루까지 포함해야
+            // 하므로 다음날(9/1) 04:00이 배타적 상한이다
             ArgumentCaptor<LocalDateTime> from = ArgumentCaptor.forClass(LocalDateTime.class);
             ArgumentCaptor<LocalDateTime> to = ArgumentCaptor.forClass(LocalDateTime.class);
             verify(userPointHistoryRepository)
                     .findHistories(any(), any(), from.capture(), to.capture(), any(), any(), any());
-            assertThat(from.getValue()).isEqualTo(LocalDateTime.of(2026, 8, 1, 0, 0));
-            assertThat(to.getValue()).isEqualTo(LocalDateTime.of(2026, 9, 1, 0, 0));
+            assertThat(from.getValue()).isEqualTo(LocalDateTime.of(2026, 8, 1, 4, 0));
+            assertThat(to.getValue()).isEqualTo(LocalDateTime.of(2026, 9, 1, 4, 0));
         }
     }
 

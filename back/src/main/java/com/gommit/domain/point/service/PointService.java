@@ -184,12 +184,11 @@ public class PointService {
         return type == PointChangeType.EARN;
     }
 
-    // from/to(직접설정)가 오면 period는 무시하고 그 범위를 그대로 쓴다.
-    // to는 그날 하루를 포함하도록 다음날 00:00을 배타적 상한으로 삼는다.
+    // from/to(직접설정)가 오면 period 대신 04:00 기준으로 그 범위를 쓴다.
     private static LocalDateTime[] toDateRange(PeriodFilter period, LocalDate from, LocalDate to) {
         if (from != null || to != null) {
-            LocalDateTime start = from != null ? from.atStartOfDay() : null;
-            LocalDateTime end = to != null ? to.plusDays(1).atStartOfDay() : null;
+            LocalDateTime start = from != null ? from.atTime(BUSINESS_DAY_CUTOFF_HOUR, 0) : null;
+            LocalDateTime end = to != null ? to.plusDays(1).atTime(BUSINESS_DAY_CUTOFF_HOUR, 0) : null;
             return new LocalDateTime[] {start, end};
         }
 
