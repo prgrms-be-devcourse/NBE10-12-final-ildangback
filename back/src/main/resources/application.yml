@@ -23,10 +23,30 @@ spring:
         default-page-size: 20
         max-page-size: 100
 
+  # 업로드 상한. nginx client_max_body_size(20m) 보다 작아야 Spring 이 에러 응답을 준다.
+  # (미디어 도메인 병합 시 정책과 재정렬 — infra/docs/infra-design.md Q25)
+  servlet:
+    multipart:
+      max-file-size: 15MB
+      max-request-size: 20MB
+
 springdoc:
   swagger-ui:
     tags-sorter: alpha
     operations-sorter: method
+
+# 컨테이너/nginx 헬스체크용. health 만 노출, 상세는 인증 없이 안 보이게.
+# 모니터링 스택 도입 시 prometheus 추가 + 인증 (infra/docs/infra-design.md Q26).
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
 
 auth-token:
   access-token:

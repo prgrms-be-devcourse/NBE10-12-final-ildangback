@@ -1,0 +1,14 @@
+# hadolint 규칙 조정.
+ignored:
+  # DL3008: apt 패키지 버전 미고정.
+  #   ffmpeg 는 OS 보안 패치를 그대로 따라가는 게 낫다(미디어 설계 메모의 결정).
+  #   버전을 박으면 CVE 패치가 늦어진다.
+  - DL3008
+  # DL3059: 연속 RUN 병합 권고 — 레이어 캐시 목적상 의도적으로 분리했다.
+  - DL3059
+  # SC2012: `ls` 로 파일 목록 파싱.
+  #   bootJar 산출물은 back/build/libs 에 1개(-plain 제외)뿐이라 통제된 상황이다.
+  - SC2012
+
+trustedRegistries:
+  - docker.io
