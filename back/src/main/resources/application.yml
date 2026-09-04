@@ -34,6 +34,17 @@ springdoc:
     tags-sorter: alpha
     operations-sorter: method
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
 auth-token:
   access-token:
     expiration: 15m

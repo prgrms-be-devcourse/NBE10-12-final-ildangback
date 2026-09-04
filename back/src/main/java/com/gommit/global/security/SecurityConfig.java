@@ -32,6 +32,11 @@ public class SecurityConfig {
         "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**",
     };
 
+    // 컨테이너/nginx 헬스체크. 상세 정보는 노출하지 않음(application.yml: exposure.include=health).
+    private static final String[] MONITORING_ENDPOINTS = {
+        "/actuator/health", "/actuator/health/**",
+    };
+
     private static final String H2_CONSOLE = "/h2-console/**";
 
     // PUBLIC 미디어 정적 서빙 (media.storage.local.base-url 의 path). GET 만 공개, 인증 불필요.
@@ -69,6 +74,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, MEDIA_PUBLIC)
                         .permitAll()
                         .requestMatchers(DOCS_ENDPOINTS)
+                        .permitAll()
+                        .requestMatchers(MONITORING_ENDPOINTS)
                         .permitAll()
                         .anyRequest()
                         .authenticated())
