@@ -1,0 +1,12 @@
+# cp terraform.tfvars.example terraform.tfvars 후 채운다. terraform.tfvars 는 커밋 금지.
+
+cloudflare_zone_id   = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+cloudflare_api_token = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# 구매 후 실제 도메인으로 교체 (기본값 go-mmit.site 는 임시)
+# domain = "go-mmit.site"
+
+# github_repo = "prgrms-be-devcourse/NBE10-12-final-ildangback"
+
+# small 이상은 결재 필요
+# instance_type = "t4g.small"
