@@ -39,6 +39,9 @@ class RefreshTokenServiceTest {
     private RefreshTokenRepository refreshTokenRepository;
 
     @Mock
+    private RefreshTokenReuseRevoker refreshTokenReuseRevoker;
+
+    @Mock
     private UserRepository userRepository;
 
     @Spy
@@ -158,24 +161,27 @@ class RefreshTokenServiceTest {
             given(userRepository.findByIdAndDeletedAtIsNull(42L)).willReturn(Optional.of(user));
 
             assertThat(refreshTokenService.rotate(raw).user()).isEqualTo(user);
+            verify(refreshTokenReuseRevoker, never()).revokeAll(anyLong(), any());
         }
 
         @Test
-        @DisplayName("유예를 넘긴 로테이션 RT 는 401 이고, 탐지 비활성 상태에서는 전체 폐기를 하지 않는다")
+        @DisplayName("유예를 넘긴 로테이션 RT 는 401 이고 전체 폐기로 이어진다")
         void rotateRejectsRotatedTokenPastGrace() {
             String raw =
                     givenRotatedToken(UserFixture.user(), LocalDateTime.now().minusSeconds(GRACE.toSeconds() + 5));
 
             assertRefreshTokenInvalid(raw);
-            verify(refreshTokenRepository, never()).revokeAllByUserId(anyLong(), any());
+            verify(refreshTokenReuseRevoker).revokeAll(eq(42L), any());
         }
 
+        // 로그아웃한 RT 로 들어온 것은 재사용이 아니다. 다른 기기까지 끊으면 안 된다
         @Test
-        @DisplayName("세션이 끊긴 RT 는 방금 끊겼어도 401. 유예는 로테이션에만 준다")
+        @DisplayName("세션이 끊긴 RT 는 방금 끊겼어도 401 이고 전체 폐기를 하지 않는다")
         void rotateRejectsRevokedTokenWithoutGrace() {
             String raw = givenRevokedToken(UserFixture.user(), LocalDateTime.now());
 
             assertRefreshTokenInvalid(raw);
+            verify(refreshTokenReuseRevoker, never()).revokeAll(anyLong(), any());
         }
 
         @Test

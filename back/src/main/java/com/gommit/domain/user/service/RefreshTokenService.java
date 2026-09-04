@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RefreshTokenService {
 
     private final RefreshTokenRepository refreshTokenRepository;
+    private final RefreshTokenReuseRevoker refreshTokenReuseRevoker;
     private final UserRepository userRepository;
     private final SecureTokenProvider secureTokenProvider;
     private final AuthTokenProperties authTokenProperties;
@@ -68,7 +69,7 @@ public class RefreshTokenService {
             return getActiveUser(userId);
         }
 
-        throw reuseException(userId);
+        throw reuseException(userId, now);
     }
 
     // RT 1건 폐기
@@ -95,9 +96,10 @@ public class RefreshTokenService {
         return deleted;
     }
 
-    // 재사용으로 보고 거부
-    private BusinessException reuseException(Long userId) {
+    // 재사용으로 보고 전체 폐기 후 거부
+    private BusinessException reuseException(Long userId, LocalDateTime now) {
         log.warn("RT 재사용 판정: userId={}", userId);
+        refreshTokenReuseRevoker.revokeAll(userId, now);
         return new BusinessException(ErrorCode.REFRESH_TOKEN_INVALID);
     }
 

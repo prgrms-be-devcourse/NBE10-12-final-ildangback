@@ -182,6 +182,41 @@ class AuthApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_INVALID"));
         }
 
+        // 훔친 RT 가 쓰인 것으로 본다. 그 요청만 막으면 최신 RT 를 가진 쪽이 계속 산다
+        @Test
+        @DisplayName("재사용이 탐지되면 그 사용자의 RT 가 전부 폐기된다")
+        void revokesAllOnReuseDetected() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+            String otherDevice = fieldOf(bodyOf(login(EMAIL, DEFAULT_PASSWORD)), "refreshToken");
+            String rotated = fieldOf(bodyOf(refresh(tokens.refreshToken())), "refreshToken");
+            backdateRotatedAt(LocalDateTime.now().minusMinutes(1));
+
+            refresh(tokens.refreshToken()).andExpect(status().isUnauthorized());
+
+            assertThat(jdbcTemplate.queryForObject(
+                            "SELECT COUNT(*) FROM refresh_tokens WHERE revoked_at IS NULL", Integer.class))
+                    .as("살아 있는 RT 가 남으면 폐기가 롤백된 것이다")
+                    .isZero();
+            refresh(rotated)
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_INVALID"));
+            refresh(otherDevice).andExpect(status().isUnauthorized());
+        }
+
+        // 로그아웃은 재사용이 아니다. 다른 기기까지 끊으면 안 된다
+        @Test
+        @DisplayName("세션이 끊긴 RT 로 들어와도 다른 기기는 살아 있다")
+        void keepsOtherSessionsOnRevokedToken() throws Exception {
+            var first = loginAs(EMAIL, NICKNAME);
+            var second = login(EMAIL, DEFAULT_PASSWORD);
+            String otherDevice = fieldOf(bodyOf(second), "refreshToken");
+            logout(first.accessToken(), first.refreshToken()).andExpect(status().isNoContent());
+
+            refresh(first.refreshToken()).andExpect(status().isUnauthorized());
+
+            refresh(otherDevice).andExpect(status().isOk());
+        }
+
         @Test
         @DisplayName("없는 RT 는 401")
         void rejectsUnknownToken() throws Exception {
