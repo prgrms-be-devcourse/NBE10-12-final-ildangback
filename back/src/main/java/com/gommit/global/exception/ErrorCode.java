@@ -16,10 +16,33 @@ public enum ErrorCode {
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
 
     // ===== challenge =====
+    INVALID_START_DATE(HttpStatus.BAD_REQUEST, "챌린지 시작일은 내일 이후여야 합니다."),
+    INVALID_PERIOD(HttpStatus.BAD_REQUEST, "챌린지 종료일은 시작일보다 빠를 수 없습니다."),
+    INVALID_FREQUENCY(HttpStatus.BAD_REQUEST, "인증 주기 설정이 올바르지 않습니다."),
+    NO_CHECK_IN_METHOD(HttpStatus.BAD_REQUEST, "인증 방식은 최소 1개 이상 선택해야 합니다."),
+    INVALID_CATEGORY_MAP_TYPE(HttpStatus.BAD_REQUEST, "카테고리와 맵 타입의 조합이 올바르지 않습니다."),
+    CHALLENGE_NOT_OWNER(HttpStatus.FORBIDDEN, "챌린지 OWNER 권한이 없습니다."),
+    CHALLENGE_NOT_MEMBER(HttpStatus.FORBIDDEN, "챌린지에 참여 중인 멤버가 아닙니다."),
+    CHALLENGE_NOT_EDITABLE(HttpStatus.FORBIDDEN, "READY 상태의 챌린지만 설정을 수정할 수 있습니다."),
+    INVALID_EXTENSION_START_DATE(HttpStatus.BAD_REQUEST, "연장 시즌의 시작일은 이전 시즌 종료일 이후여야 합니다."),
+    INVALID_DAILY_COUNT(HttpStatus.BAD_REQUEST, "하루 인증 횟수가 허용 범위를 벗어났습니다."),
+    CANNOT_DELEGATE_TO_SELF(HttpStatus.BAD_REQUEST, "자기 자신에게 OWNER를 위임할 수 없습니다."),
+    EXTENSION_CHOICE_CLOSED(HttpStatus.CONFLICT, "연장 참여 의사 선택 기간이 마감되었습니다."),
+    INVALID_EXTENSION_CHOICE(HttpStatus.BAD_REQUEST, "연장 참여 의사는 EXTEND 또는 DECLINE만 선택할 수 있습니다."),
+    EXTENSION_CHOICE_NOT_AVAILABLE(HttpStatus.CONFLICT, "현재 연장 참여 의사를 선택할 수 없는 챌린지입니다."),
+    EXTENSION_START_DATE_NOT_EDITABLE(HttpStatus.BAD_REQUEST, "연장 시즌의 시작일은 변경할 수 없습니다."),
 
     // ===== checkin =====
 
     // ===== group =====
+    GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "그룹을 찾을 수 없습니다."),
+    NOT_GROUP_MEMBER(HttpStatus.FORBIDDEN, "해당 그룹의 멤버가 아닙니다."),
+    CHALLENGE_NOT_FOUND(HttpStatus.NOT_FOUND, "챌린지를 찾을 수 없습니다."),
+    GROUP_NOT_JOINABLE(HttpStatus.CONFLICT, "현재 참여할 수 없는 그룹입니다."),
+    INVITE_CODE_REQUIRED(HttpStatus.FORBIDDEN, "초대코드가 필요한 그룹입니다."),
+    ALREADY_JOINED(HttpStatus.CONFLICT, "이미 참여한 그룹입니다."),
+    GROUP_FULL(HttpStatus.CONFLICT, "그룹 정원이 가득 찼습니다."),
+    GROUP_OWNER_CANNOT_LEAVE(HttpStatus.CONFLICT, "그룹 OWNER는 위임 후 퇴장할 수 있습니다."),
 
     // ===== item =====
 

@@ -11,6 +11,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -46,4 +47,29 @@ public class ChallengeMember extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ExtensionChoice extensionChoice;
+
+    @Builder
+    public ChallengeMember(Challenge challenge, Long userId, ChallengeMemberRole role) {
+        this.challenge = challenge;
+        this.userId = userId;
+        this.role = role;
+        this.status = ChallengeMemberStatus.ACTIVE;
+        this.currentStreak = 0;
+        this.bestStreak = 0;
+        this.leftAt = null;
+        this.extensionChoice = ExtensionChoice.PENDING;
+    }
+
+    public void changeRole(ChallengeMemberRole role) {
+        this.role = role;
+    }
+
+    public void changeExtensionChoice(ExtensionChoice choice) {
+        this.extensionChoice = choice;
+    }
+
+    public void leave() {
+        this.status = ChallengeMemberStatus.LEFT;
+        this.leftAt = LocalDateTime.now();
+    }
 }

@@ -7,6 +7,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -43,4 +44,35 @@ public class ChallengeGroup extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private GroupStatus status;
+
+    @Builder
+    private ChallengeGroup(
+            String name,
+            String description,
+            GroupCategory category,
+            MapType mapType,
+            Visibility visibility,
+            int maxMembers,
+            Long ownerId) {
+        this.name = name;
+        this.description = description;
+        this.category = category;
+        this.mapType = mapType;
+        this.visibility = visibility;
+        this.maxMembers = maxMembers;
+        this.ownerId = ownerId;
+        this.status = GroupStatus.READY; // 첫 생성 READY
+    }
+
+    public void changeOwner(Long ownerId) {
+        this.ownerId = ownerId;
+    }
+
+    public void activate() {
+        this.status = GroupStatus.ACTIVE;
+    }
+
+    public void end() {
+        this.status = GroupStatus.ENDED;
+    }
 }
