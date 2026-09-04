@@ -1,28 +1,30 @@
 package com.gommit.domain.group.controller;
 
 import com.gommit.domain.group.dto.request.GroupCreateRequest;
-import com.gommit.domain.group.dto.response.GroupDetailResponse;
-import com.gommit.domain.group.dto.response.GroupJoinResponse;
-import com.gommit.domain.group.dto.response.GroupSummaryCursorResponse;
-import com.gommit.domain.group.dto.response.MyGroupCursorResponse;
+import com.gommit.domain.group.dto.response.*;
 import com.gommit.domain.group.entity.GroupCategory;
 import com.gommit.domain.group.entity.GroupSort;
 import com.gommit.domain.group.entity.GroupStatus;
 import com.gommit.domain.group.service.GroupService;
+import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.security.CurrentUser;
 import com.gommit.global.security.SecurityUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "group - 그룹")
 @RestController
 @RequestMapping("/api/groups")
 @RequiredArgsConstructor
+@Validated
 public class GroupController {
     private final GroupService groupService;
 
@@ -37,25 +39,26 @@ public class GroupController {
 
     @Operation(summary = "공개 그룹 목록 조회", description = "현재 참여 가능한 공개 그룹 목록을 조회")
     @GetMapping
-    public ResponseEntity<GroupSummaryCursorResponse> getPublicGroups(
+    public ResponseEntity<SliceResponse<GroupSummaryResponse>> getPublicGroups(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) GroupCategory category,
             @RequestParam(defaultValue = "LATEST") GroupSort sort,
             @RequestParam(required = false) Long cursor,
-            @RequestParam(defaultValue = "20") int size) {
-        GroupSummaryCursorResponse response = groupService.getPublicGroups(keyword, category, sort, cursor, size);
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        SliceResponse<GroupSummaryResponse> response =
+                groupService.getPublicGroups(keyword, category, sort, cursor, size);
 
         return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "내 그룹 목록 조회", description = "현재 로그인한 사용자가 참여 중이거나 정상 종료한 그룹 목록을 조회")
     @GetMapping("/me")
-    public ResponseEntity<MyGroupCursorResponse> getMyGroups(
+    public ResponseEntity<SliceResponse<MyGroupSummaryResponse>> getMyGroups(
             @CurrentUser SecurityUser actor,
             @RequestParam(required = false) GroupStatus status,
             @RequestParam(required = false) Long cursor,
-            @RequestParam(defaultValue = "20") int size) {
-        MyGroupCursorResponse response = groupService.getMyGroups(actor.getId(), status, cursor, size);
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+        SliceResponse<MyGroupSummaryResponse> response = groupService.getMyGroups(actor.getId(), status, cursor, size);
 
         return ResponseEntity.ok(response);
     }
