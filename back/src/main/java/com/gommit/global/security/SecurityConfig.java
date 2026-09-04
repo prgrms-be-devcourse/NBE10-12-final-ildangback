@@ -42,6 +42,9 @@ public class SecurityConfig {
 
     private static final String H2_CONSOLE = "/h2-console/**";
 
+    // PUBLIC 미디어 정적 서빙 (media.storage.local.base-url 의 path). GET 만 공개, 인증 불필요.
+    private static final String MEDIA_PUBLIC = "/media/**";
+
     private final JwtFilter jwtFilter;
     private final CustomAuthenticationEntryPoint authenticationEntryPoint;
     private final CustomAccessDeniedHandler accessDeniedHandler;
@@ -70,6 +73,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth.requestMatchers(HttpMethod.OPTIONS, "/**")
                         .permitAll()
                         .requestMatchers(PUBLIC_ENDPOINTS)
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, MEDIA_PUBLIC)
                         .permitAll()
                         .requestMatchers(DOCS_ENDPOINTS)
                         .permitAll()

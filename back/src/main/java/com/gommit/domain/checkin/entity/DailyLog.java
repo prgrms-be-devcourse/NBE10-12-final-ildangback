@@ -21,6 +21,6 @@ public class DailyLog extends BaseEntity {
     @Column(nullable = false)
     private LocalDate logDate;
 
-    @Column(length = 500)
-    private String videoUrl;
+    @Column(length = 255)
+    private String videoKey;
 }
