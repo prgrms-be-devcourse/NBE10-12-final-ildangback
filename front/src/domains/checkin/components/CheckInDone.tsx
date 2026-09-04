@@ -1,6 +1,7 @@
 import { CheckIcon } from "@phosphor-icons/react";
 import { Button } from "../../../shared/ui/Button";
 import type { CheckInResultResponse } from "../types";
+import { CheckInHeader } from "./CheckInHeader";
 
 interface Props {
   result: CheckInResultResponse;
@@ -27,7 +28,9 @@ export function CheckInDone({ result, onGoToGroup }: Props) {
 
   return (
     <div className="flex flex-1 flex-col items-center px-6 pt-6 pb-10">
-      <span className="flex size-16 items-center justify-center rounded-2xl bg-purple-500 text-white">
+      <CheckInHeader />
+
+      <span className="mt-10 flex size-16 items-center justify-center rounded-2xl bg-purple-500 text-white">
         <CheckIcon size={32} weight="bold" />
       </span>
 

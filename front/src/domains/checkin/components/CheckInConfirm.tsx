@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Button } from "../../../shared/ui/Button";
-import { Logo } from "../../../shared/ui/Logo";
 import { TextField } from "../../../shared/ui/TextField";
 import type { CapturedPhoto } from "../types";
+import { CheckInHeader } from "./CheckInHeader";
 
 const MEMO_MAX = 100;
 
@@ -32,7 +32,7 @@ export function CheckInConfirm({
 
   return (
     <div className="flex flex-1 flex-col px-6 pt-4 pb-8">
-      <Logo className="mx-auto h-9" />
+      <CheckInHeader />
 
       <img
         src={photo.previewUrl}

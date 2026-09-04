@@ -1,7 +1,7 @@
 import { CameraIcon, ClockIcon, ShareNetworkIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { Button } from "../../../shared/ui/Button";
-import { Logo } from "../../../shared/ui/Logo";
+import { CheckInHeader } from "./CheckInHeader";
 
 interface Props {
   onStart: () => void;
@@ -11,7 +11,7 @@ interface Props {
 export function CheckInIntro({ onStart }: Props) {
   return (
     <div className="flex flex-1 flex-col items-center px-8 pt-6 pb-8 text-center">
-      <Logo className="h-10" />
+      <CheckInHeader />
 
       <CameraIcon size={72} weight="fill" className="mt-10 text-purple-400" />
 
