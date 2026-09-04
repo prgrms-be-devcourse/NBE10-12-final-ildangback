@@ -42,4 +42,35 @@ public class CheckIn extends BaseEntity {
 
     @Column(nullable = false)
     private LocalDate businessDate;
+
+    private CheckIn(
+            Long challengeId,
+            Long userId,
+            int roundNo,
+            CheckInType checkInType,
+            String mediaKey,
+            MediaType mediaType,
+            String memo,
+            LocalDate businessDate) {
+        this.challengeId = challengeId;
+        this.userId = userId;
+        this.roundNo = roundNo;
+        this.checkInType = checkInType;
+        this.mediaKey = mediaKey;
+        this.mediaType = mediaType;
+        this.memo = memo;
+        this.businessDate = businessDate;
+    }
+
+    public static CheckIn create(
+            Long challengeId,
+            Long userId,
+            int roundNo,
+            CheckInType checkInType,
+            String mediaKey,
+            MediaType mediaType,
+            String memo,
+            LocalDate businessDate) {
+        return new CheckIn(challengeId, userId, roundNo, checkInType, mediaKey, mediaType, memo, businessDate);
+    }
 }

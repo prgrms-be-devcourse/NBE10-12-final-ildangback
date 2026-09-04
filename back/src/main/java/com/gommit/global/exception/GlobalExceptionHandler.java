@@ -14,6 +14,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 @Slf4j
@@ -35,6 +36,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(AuthenticationException.class)
     public void rethrowAuthentication(AuthenticationException e) throws AuthenticationException {
         throw e;
+    }
+
+    // 서블릿 multipart 한도 초과를 앱단 검증(FILE_TOO_LARGE)과 같은 코드로 응답. 없으면 PAYLOAD_TOO_LARGE 로 응답됨.
+    @Override
+    protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
+            MaxUploadSizeExceededException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        log.warn("Upload exceeds multipart limit: {}", ex.getMessage());
+        return ResponseEntity.status(ErrorCode.FILE_TOO_LARGE.getHttpStatus())
+                .body(ErrorResponse.of(ErrorCode.FILE_TOO_LARGE));
     }
 
     @ExceptionHandler(Exception.class)
