@@ -2,12 +2,31 @@ import { readFileSync } from "node:fs";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { VitePWA } from "vite-plugin-pwa";
 
 const { version } = JSON.parse(readFileSync("./package.json", "utf-8"));
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    // PWA: manifest.json 은 public/ 에 직접 두므로(manifest: false) service worker 만 생성한다.
+    // manifest 만으로는 설치가 안 되고 fetch 핸들러가 있는 SW 가 있어야 한다 (infra/docs/infra-design.md Q8).
+    VitePWA({
+      registerType: "autoUpdate",
+      injectRegister: "auto",
+      manifest: false,
+      workbox: {
+        // 앱 셸 precache + SPA 라우팅 fallback. /api 응답은 캐시하지 않는다(습관 데이터는 최신이 중요).
+        globPatterns: ["**/*.{js,css,html,woff2}"],
+        navigateFallback: "/index.html",
+        navigateFallbackDenylist: [/^\/api/],
+        cleanupOutdatedCaches: true,
+      },
+      devOptions: { enabled: false },
+    }),
+  ],
   server: {
     proxy: {
       "/api": {
