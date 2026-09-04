@@ -34,3 +34,9 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### 로컬 시크릿 (Cloudinary 통합 테스트 등) ###
+# 실제 값이 담긴 .env 는 커밋 금지. 템플릿은 .env.example 로 관리.
+.env
+.env.*
+!*.example

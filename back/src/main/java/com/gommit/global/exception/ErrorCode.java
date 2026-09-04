@@ -31,6 +31,13 @@ public enum ErrorCode {
     NOT_ITEM_OWNER(HttpStatus.FORBIDDEN, "본인이 보유한 아이템만 착용할 수 있습니다."),
     ITEM_IN_USE(HttpStatus.CONFLICT, "이미 보유중인 사용자가 있어 삭제할 수 없습니다."),
 
+    // ===== media =====
+    EMPTY_FILE(HttpStatus.BAD_REQUEST, "파일이 비어 있습니다."),
+    FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "허용된 파일 크기를 초과했습니다."),
+    UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 파일 형식입니다."),
+    MEDIA_NOT_FOUND(HttpStatus.NOT_FOUND, "미디어를 찾을 수 없습니다."),
+    MEDIA_STORAGE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장에 실패했습니다."),
+
     // ===== point =====
     POINT_INSUFFICIENT(HttpStatus.CONFLICT, "포인트가 부족합니다."),
     POINT_HISTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 포인트 이력입니다."),
