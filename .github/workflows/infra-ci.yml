@@ -1,0 +1,92 @@
+name: Infra CI
+
+# infra/ 를 건드린 PR 에서 도는 검증. AWS 자격증명 불필요(전부 로컬 분석 or plan-only).
+# 관례: backend/frontend CI 와 동일하게 "빌드/검증"은 머지를 막고 "린트"는 리포트만.
+on:
+  push:
+    branches: ["main", "dev"]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/infra-ci.yml'
+  pull_request:
+    branches: ["main", "dev"]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---- 머지를 막는 검증 -----------------------------------------------------
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.5"
+
+      # 막는 것: 포맷 안 맞은 .tf 가 머지돼 diff 노이즈 + 리뷰 피로.
+      - name: fmt
+        run: terraform fmt -check -recursive -diff
+
+      - name: init (no backend)
+        run: terraform init -backend=false
+
+      # 막는 것: 존재하지 않는 속성/타입 오류/참조 오타가 apply 때 처음 터지는 것.
+      - name: validate
+        run: terraform validate -no-color
+
+      # 막는 것: 설계 불변식이 조용히 깨지는 것 —
+      #   SG 에 22/0.0.0.0/0 개방, 인스턴스 타입 변경, IMDSv2 해제, 루트 볼륨 미암호화,
+      #   user_data_replace_on_change=true, 자동기동 크론/타임존 어긋남, DLM 비활성, DNS proxied 해제.
+      #   (tests/infra.tftest.hcl, mock_provider 라 자격증명·비용 없음)
+      - name: test
+        run: terraform test -no-color
+
+  # ---- 리포트만 (continue-on-error) — 빌드 안 막음 -----------------------
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 막는 것(권고): 안 쓰는 선언, 죽은 코드, 잘못된 인스턴스 타입 문자열, deprecated 문법 등.
+      - uses: terraform-linters/setup-tflint@v4
+        continue-on-error: true
+      - name: tflint run
+        continue-on-error: true
+        working-directory: infra/terraform
+        run: |
+          tflint --init
+          tflint -f compact --recursive
+
+      # 막는 것(권고): 루트 유저 컨테이너, 캐시 안 지우는 apt, 미고정 base 태그, RUN 안의 쉘 실수.
+      - name: hadolint
+        continue-on-error: true
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: infra/docker/Dockerfile
+          config: infra/docker/.hadolint.yaml
+
+      # 막는 것(권고): 따옴표 안 씌운 변수, set -e 없이 실패 무시, 존재하지 않는 분기 등 쉘 함정.
+      - name: shellcheck
+        continue-on-error: true
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          shellcheck infra/bootstrap/user-data.sh infra/compose/deploy.sh infra/compose/backup.sh
+
+  # ---- 워크플로 자체 문법 (가벼워서 항상) --------------------------------
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # 막는 것: deploy.yml/infra-ci.yml 의 잘못된 표현식·존재하지 않는 컨텍스트·YAML 구조 오류.
+      - uses: reviewdog/action-actionlint@v1
+        with:
+          fail_level: none
