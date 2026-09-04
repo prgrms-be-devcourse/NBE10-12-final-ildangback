@@ -360,6 +360,49 @@ class PointServiceTest {
             assertThat(from.getValue()).isEqualTo(LocalDateTime.of(2026, 8, 1, 4, 0));
             assertThat(to.getValue()).isEqualTo(LocalDateTime.of(2026, 9, 1, 4, 0));
         }
+
+        @Test
+        @DisplayName("from만 있으면 INVALID_INPUT_VALUE 예외가 발생한다")
+        void customRangeFromOnly() {
+            assertThatThrownBy(() -> pointService.getMyHistories(
+                            1L, null, PointChangeType.ALL, null, LocalDate.of(2026, 8, 1), null, null, 20))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+            verify(userPointHistoryRepository, never()).findHistories(any(), any(), any(), any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("to만 있으면 INVALID_INPUT_VALUE 예외가 발생한다")
+        void customRangeToOnly() {
+            assertThatThrownBy(() -> pointService.getMyHistories(
+                            1L, null, PointChangeType.ALL, null, null, LocalDate.of(2026, 8, 31), null, 20))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+            verify(userPointHistoryRepository, never()).findHistories(any(), any(), any(), any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("from이 to보다 미래면 INVALID_INPUT_VALUE 예외가 발생한다")
+        void throwsWhenFromIsAfterTo() {
+            assertThatThrownBy(() -> pointService.getMyHistories(
+                            1L,
+                            null,
+                            PointChangeType.ALL,
+                            null,
+                            LocalDate.of(2026, 8, 31),
+                            LocalDate.of(2026, 8, 1),
+                            null,
+                            20))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+            verify(userPointHistoryRepository, never()).findHistories(any(), any(), any(), any(), any(), any(), any());
+        }
     }
 
     @Nested

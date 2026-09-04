@@ -184,11 +184,18 @@ public class PointService {
         return type == PointChangeType.EARN;
     }
 
-    // from/to(직접설정)가 오면 period 대신 04:00 기준으로 그 범위를 쓴다.
+    // from/to(직접설정)가 오면 period 대신 04:00 기준으로 그 범위를 쓴다. 둘 다 있거나
+    // 둘 다 없어야 한다 - 하나만 주면 "무제한"인지 "빠뜨린 것"인지 구분이 안 된다.
     private static LocalDateTime[] toDateRange(PeriodFilter period, LocalDate from, LocalDate to) {
-        if (from != null || to != null) {
-            LocalDateTime start = from != null ? from.atTime(BUSINESS_DAY_CUTOFF_HOUR, 0) : null;
-            LocalDateTime end = to != null ? to.plusDays(1).atTime(BUSINESS_DAY_CUTOFF_HOUR, 0) : null;
+        if ((from == null) != (to == null)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        if (from != null && to.isBefore(from)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        if (from != null) {
+            LocalDateTime start = from.atTime(BUSINESS_DAY_CUTOFF_HOUR, 0);
+            LocalDateTime end = to.plusDays(1).atTime(BUSINESS_DAY_CUTOFF_HOUR, 0);
             return new LocalDateTime[] {start, end};
         }
 
