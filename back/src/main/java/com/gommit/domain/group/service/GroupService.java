@@ -465,7 +465,8 @@ public class GroupService {
         int todayCheckInCount = 0;
 
         if(challenge.getStatus() == ChallengeStatus.ACTIVE) {
-            todayCheckInCount = (int) checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challenge.getId(), userId, today);
+            // TODO: CheckInRepository 연동 후 실제 값으로 변경
+//            todayCheckInCount = (int) checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challenge.getId(), userId, today);
         }
 
         // 오늘 인증 완료 여부
