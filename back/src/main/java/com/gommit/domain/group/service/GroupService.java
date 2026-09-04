@@ -9,6 +9,7 @@ import com.gommit.domain.challenge.service.ChallengeService;
 import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.group.dto.request.GroupCreateRequest;
 import com.gommit.domain.challenge.dto.request.InitialChallengeSettingRequest;
+import com.gommit.domain.challenge.service.ChallengeProgressCalculator;
 import com.gommit.domain.group.dto.response.*;
 import com.gommit.domain.group.entity.*;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
@@ -23,8 +24,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +40,7 @@ public class GroupService {
     private final ChallengeMemberRepository challengeMemberRepository;
     private final CheckInRepository checkInRepository;
     private final ChallengeMemberService challengeMemberService;
+    private final ChallengeProgressCalculator challengeProgressCalculator;
 
     @Transactional
     public GroupDetailResponse createGroup(Long userId, GroupCreateRequest request) {
@@ -452,18 +452,20 @@ public class GroupService {
         // 현재 시즌 참여 인원
         int participantCount = (int) challengeMemberRepository.countByChallengeIdAndStatus(challenge.getId(), ChallengeMemberStatus.ACTIVE);
 
+        LocalDate today = LocalDate.now();
+
         // day 계산
-        int currentDay = calculateCurrentDay(challenge, LocalDate.now());
+        int currentDay = challengeProgressCalculator.calculateCurrentDay(challenge, today);
 
         int totalDays = challenge.getRequiredDayCount();
         // 진행률 계산
-        double periodProgressRate = calculatePeriodProgressRate(currentDay, totalDays);
+        double periodProgressRate = challengeProgressCalculator.calculatePeriodProgressRate(currentDay, totalDays);
 
         // 오늘 인증 횟수
         int todayCheckInCount = 0;
 
         if(challenge.getStatus() == ChallengeStatus.ACTIVE) {
-            todayCheckInCount = (int) checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challenge.getId(), userId, LocalDate.now());
+            todayCheckInCount = (int) checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challenge.getId(), userId, today);
         }
 
         // 오늘 인증 완료 여부
@@ -484,82 +486,5 @@ public class GroupService {
             challenge.getDailyCheckInCount(),
             todayCompleted
         );
-    }
-
-    private int calculateCurrentDay(Challenge challenge, LocalDate today) {
-        // 시작 전이면 아직 Day 0
-        if(today.isBefore(challenge.getStartDate())) {
-            return 0;
-        }
-
-        // 종료 이후라면 전체 예정 인증일 수 반환
-        if(today.isAfter(challenge.getEndDate())) {
-            return challenge.getRequiredDayCount();
-        }
-
-        return switch (challenge.getFrequencyType()) {
-            case DAILY -> calculateDailyCurrentDay(challenge, today);
-            case DAYS_OF_WEEK -> calculateDaysOfWeekCurrentDay(challenge, today);
-            case EVERY_N_DAYS -> calculateEveryNDaysCurrentDay(challenge, today);
-        };
-    }
-
-    private double calculatePeriodProgressRate(int currentDay, int totalDays) {
-        if (totalDays == 0) {
-            return 0.0;
-        }
-        return Math.round(
-            ((double) currentDay / totalDays) * 1000
-        ) / 10.0;
-    }
-
-    private int calculateDailyCurrentDay(Challenge challenge, LocalDate today) {
-
-        return (int) ChronoUnit.DAYS.between(
-            challenge.getStartDate(),
-            today
-        ) + 1;
-    }
-
-    private int calculateDaysOfWeekCurrentDay(Challenge challenge, LocalDate today) {
-
-        List<DaysOfWeek> scheduledDays =
-            Arrays.stream(challenge.getDaysOfWeek().split(","))
-                .map(DaysOfWeek::valueOf)
-                .toList();
-
-        int count = 0;
-
-        for (
-            LocalDate date = challenge.getStartDate();
-            !date.isAfter(today);
-            date = date.plusDays(1)
-        ) {
-
-            DaysOfWeek currentDay =
-                DaysOfWeek.getDaysOfWeek(
-                    date.getDayOfWeek()
-                );
-
-            if (scheduledDays.contains(currentDay)) {
-                count++;
-            }
-        }
-
-        return count;
-    }
-
-    private int calculateEveryNDaysCurrentDay(
-        Challenge challenge,
-        LocalDate today
-    ) {
-
-        long days =
-            ChronoUnit.DAYS.between(
-                challenge.getStartDate(),
-                today
-            );
-
-        return (int) (days / challenge.getFrequencyValue()) + 1;
     }
 }
