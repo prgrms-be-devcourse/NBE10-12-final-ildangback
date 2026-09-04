@@ -5,6 +5,7 @@ import com.gommit.domain.user.dto.request.DeleteAccountRequest;
 import com.gommit.domain.user.dto.request.UpdateProfileRequest;
 import com.gommit.domain.user.dto.response.UserProfileResponse;
 import com.gommit.domain.user.entity.User;
+import com.gommit.domain.user.repository.AuthIdentityRepository;
 import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final AuthIdentityRepository authIdentityRepository;
     private final RefreshTokenService refreshTokenService;
     private final PasswordEncoder passwordEncoder;
 
@@ -71,11 +73,14 @@ public class UserService {
     @Transactional
     public void deleteAccount(Long userId, DeleteAccountRequest request) {
         User user = findNotDeleted(userId);
-        verifyPassword(user, request.password());
+        if (user.getPassword() != null) {
+            verifyPassword(user, request.password());
+        }
 
         // TODO: 챌린지의 멤버 상태 변경 필요
 
         user.deleteAccount();
+        authIdentityRepository.deleteByUserId(userId);
         refreshTokenService.revokeAll(userId);
     }
 
@@ -98,7 +103,9 @@ public class UserService {
 
     // 비밀번호 확인
     private void verifyPassword(User user, String rawPassword) {
-        if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
+        if (rawPassword == null
+                || user.getPassword() == null
+                || !passwordEncoder.matches(rawPassword, user.getPassword())) {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
     }

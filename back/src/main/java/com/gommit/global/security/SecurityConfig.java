@@ -32,7 +32,8 @@ public class SecurityConfig {
         "/api/auth/check-nickname",
         "/api/auth/verify-email",
         "/api/auth/password-reset",
-        "/api/auth/password-reset/confirm"
+        "/api/auth/password-reset/confirm",
+        "/api/auth/oauth/*"
     };
 
     private static final String[] DOCS_ENDPOINTS = {

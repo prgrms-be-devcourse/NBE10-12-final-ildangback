@@ -37,8 +37,8 @@ media:
       root-folder: ${MEDIA_CLOUDINARY_ROOT_FOLDER:go-mmit}
 
 app:
-  frontend-base-url: ${FRONTEND_BASE_URL}
-  api-base-url: ${API_BASE_URL}
+  frontend-base-url: ${FRONTEND_BASE_URL:https://go-mmit.site}
+  api-base-url: ${API_BASE_URL:https://api.go-mmit.site}
   mail-from: ${MAIL_FROM}
 
 auth-token:
@@ -47,6 +47,11 @@ auth-token:
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS}
 
-app:
-  frontend-base-url: https://go-mmit.site
-  api-base-url: https://api.go-mmit.site
+oauth:
+  allowed-redirect-uris: ${OAUTH_ALLOWED_REDIRECT_URIS}
+  google:
+    client-id: ${GOOGLE_CLIENT_ID}
+    client-secret: ${GOOGLE_CLIENT_SECRET}
+  naver:
+    client-id: ${NAVER_CLIENT_ID}
+    client-secret: ${NAVER_CLIENT_SECRET}

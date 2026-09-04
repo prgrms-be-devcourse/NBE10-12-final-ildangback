@@ -21,7 +21,7 @@ public class User extends BaseEntity {
     @Column(nullable = false, length = 255)
     private String email;
 
-    @Column(nullable = false, length = 255)
+    @Column(length = 255)
     private String password;
 
     @Column(nullable = false, length = 50)
@@ -48,8 +48,12 @@ public class User extends BaseEntity {
     private LocalDateTime deletedAt;
 
     public User(String email, String encodedPassword, String nickname) {
-        this.email = email;
+        this(email, nickname);
         this.password = encodedPassword;
+    }
+
+    public User(String email, String nickname) {
+        this.email = email;
         this.nickname = nickname;
         this.role = UserRole.USER;
         this.personalStreak = 0;
