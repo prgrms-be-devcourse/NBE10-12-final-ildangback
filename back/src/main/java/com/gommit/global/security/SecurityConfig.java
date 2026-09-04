@@ -32,6 +32,11 @@ public class SecurityConfig {
         "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**",
     };
 
+    // 컨테이너/nginx 헬스체크. 상세 정보는 노출하지 않음(application.yml: exposure.include=health).
+    private static final String[] MONITORING_ENDPOINTS = {
+        "/actuator/health", "/actuator/health/**",
+    };
+
     private static final String H2_CONSOLE = "/h2-console/**";
 
     private final JwtFilter jwtFilter;
@@ -64,6 +69,8 @@ public class SecurityConfig {
                         .requestMatchers(PUBLIC_ENDPOINTS)
                         .permitAll()
                         .requestMatchers(DOCS_ENDPOINTS)
+                        .permitAll()
+                        .requestMatchers(MONITORING_ENDPOINTS)
                         .permitAll()
                         .anyRequest()
                         .authenticated())
