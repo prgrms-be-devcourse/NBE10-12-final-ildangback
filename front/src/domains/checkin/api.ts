@@ -1,6 +1,7 @@
 import { apiFetch } from "../../shared/api/client";
 import {
   isCheckInStubEnabled,
+  stubChallengeAlbumSummary,
   stubChallengeMembers,
   stubGallery,
   stubMyChallenges,
@@ -9,6 +10,7 @@ import {
   stubTodayStatus,
 } from "./devStub";
 import type {
+  ChallengeAlbumSummary,
   ChallengeMember,
   CheckInCursorResponse,
   CheckInResultResponse,
@@ -156,4 +158,20 @@ export function getMyCheckIns(
 export function getMyChallenges(): Promise<MyChallengeSummary[]> {
   if (isCheckInStubEnabled()) return Promise.resolve(stubMyChallenges());
   return apiFetch(`/api/groups/me`);
+}
+
+/**
+ * 그룹 앨범 헤더용 챌린지 요약.
+ *
+ * ⚠️ 실제로는 `GET /challenges/{id}` + `GET /groups/{groupId}` 두 호출을 합쳐야 한다
+ * (#31). 프론트에 challenge/group 도메인이 없어 dev 스텁만.
+ * (front/docs/checkin-gallery-backend-asks.md)
+ */
+export function getChallengeAlbumSummary(
+  challengeId: number,
+): Promise<ChallengeAlbumSummary> {
+  if (isCheckInStubEnabled()) {
+    return Promise.resolve(stubChallengeAlbumSummary(challengeId));
+  }
+  return apiFetch(`/api/challenges/${challengeId}`);
 }

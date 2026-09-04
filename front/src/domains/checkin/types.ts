@@ -109,3 +109,20 @@ export interface MyChallengeSummary {
   /** 그룹명 (챌린지 자체엔 이름이 없음) */
   name: string;
 }
+
+/**
+ * 그룹 앨범 화면 상단 헤더용. 실제로는 `GET /challenges/{id}`(#31, 기간·상태) +
+ * `GET /groups/{groupId}`(#31, 이름·카테고리) 두 응답을 합쳐야 나온다.
+ * (front/docs/checkin-gallery-backend-asks.md)
+ */
+export interface ChallengeAlbumSummary {
+  challengeId: number;
+  /** 그룹명 */
+  name: string;
+  /** 그룹 카테고리 ("운동" 등) */
+  category: string;
+  /** 진행 중이면 true (ChallengeStatus === IN_PROGRESS) */
+  active: boolean;
+  startDate: string;
+  endDate: string;
+}

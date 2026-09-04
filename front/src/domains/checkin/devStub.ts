@@ -1,5 +1,6 @@
 import type { GalleryQuery, MyCheckInQuery } from "./api";
 import type {
+  ChallengeAlbumSummary,
   ChallengeMember,
   CheckIn,
   CheckInCursorResponse,
@@ -125,6 +126,22 @@ const STUB_MY_CHALLENGES: MyChallengeSummary[] = [
 
 export function stubMyChallenges(): MyChallengeSummary[] {
   return STUB_MY_CHALLENGES;
+}
+
+const STUB_ALBUM_CATEGORIES = ["운동", "독서", "생활습관"];
+
+export function stubChallengeAlbumSummary(
+  challengeId: number,
+): ChallengeAlbumSummary {
+  const found = STUB_MY_CHALLENGES.find((c) => c.challengeId === challengeId);
+  return {
+    challengeId,
+    name: found?.name ?? "오운완",
+    category: STUB_ALBUM_CATEGORIES[(challengeId - 1) % 3],
+    active: true,
+    startDate: "2026-08-20",
+    endDate: "2027-02-15",
+  };
 }
 
 // 내 인증 60건 — 2026-09 / 2026-08, 챌린지 3개에 분산, 일부 memo.

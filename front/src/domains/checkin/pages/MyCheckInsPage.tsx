@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router";
 import { TopBar } from "../../../shared/ui/TopBar";
 import { CheckInGridSection } from "../components/CheckInGridSection";
 import { CheckInLightbox } from "../components/CheckInLightbox";
@@ -57,6 +58,17 @@ export function MyCheckInsPage() {
             총 <span className="font-bold text-purple-500">{total}</span>개의
             기록
           </p>
+        )}
+
+        {/* TODO(임시): "참여했던 챌린지" 목록 화면이 생기면 그쪽에서 앨범으로 진입한다.
+            지금은 챌린지를 고르면 그 앨범으로 가는 링크를 띄운다. */}
+        {challengeId != null && (
+          <Link
+            to={`/profile/challenges/${challengeId}/album`}
+            className="mt-2 block text-[13px] font-semibold text-purple-500"
+          >
+            이 챌린지 앨범 보기 →
+          </Link>
         )}
 
         <div className="mt-2">

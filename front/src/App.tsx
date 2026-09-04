@@ -5,6 +5,7 @@ import { TabLayout } from "./app/TabLayout";
 import { LoginPage } from "./domains/auth/pages/LoginPage";
 import { SignUpPage } from "./domains/auth/pages/SignUpPage";
 import { CheckInPage } from "./domains/checkin/pages/CheckInPage";
+import { MyChallengeAlbumPage } from "./domains/checkin/pages/MyChallengeAlbumPage";
 import { MyCheckInsPage } from "./domains/checkin/pages/MyCheckInsPage";
 import { AccountPage } from "./domains/user/pages/AccountPage";
 import { ChangePasswordPage } from "./domains/user/pages/ChangePasswordPage";
@@ -37,6 +38,10 @@ export function App() {
         {/* 프로필 하위지만 하단바가 유지되는 화면(시안). 로그인 필수. */}
         <Route element={<RequireAuth />}>
           <Route path="profile/check-ins" element={<MyCheckInsPage />} />
+          <Route
+            path="profile/challenges/:challengeId/album"
+            element={<MyChallengeAlbumPage />}
+          />
         </Route>
       </Route>
 
