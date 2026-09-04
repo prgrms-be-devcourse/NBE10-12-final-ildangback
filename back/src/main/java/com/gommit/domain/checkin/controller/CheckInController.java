@@ -14,9 +14,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import java.time.LocalDate;
+import jakarta.validation.constraints.Pattern;
+import java.time.YearMonth;
 import lombok.RequiredArgsConstructor;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -65,14 +65,17 @@ public class CheckInController {
     public ResponseEntity<CheckInCursorResponse> getGallery(
             @CurrentUser SecurityUser actor,
             @PathVariable Long challengeId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false)
+                    @Pattern(regexp = "^\\d{4}-(0[1-9]|1[0-2])$", message = "yyyy-MM 형식이어야 합니다.")
+                    String month,
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) CheckInType checkInType,
             @RequestParam(required = false) Long cursor,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
 
+        YearMonth yearMonth = (month == null) ? null : YearMonth.parse(month);
         return ResponseEntity.ok(
-                checkInService.getGallery(actor.getId(), challengeId, date, userId, checkInType, cursor, size));
+                checkInService.getGallery(actor.getId(), challengeId, yearMonth, userId, checkInType, cursor, size));
     }
 
     @Operation(summary = "최근 인증 로그 한줄보기")

@@ -409,6 +409,34 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
         }
 
         @Test
+        @DisplayName("갤러리 — month 필터 (해당 월만) / 형식 오류 400")
+        void galleryMonthFilter() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+            long challengeId = setUpChallenge(EMAIL, 3);
+            submit(challengeId, tokens.accessToken());
+            submit(challengeId, tokens.accessToken());
+            List<Long> ids = jdbcTemplate.queryForList("select id from check_ins order by id asc", Long.class);
+            // 한 건은 지난달로 옮긴다.
+            jdbcTemplate.update(
+                    "update check_ins set business_date = ? where id = ?",
+                    LocalDate.now().minusMonths(1).withDayOfMonth(10),
+                    ids.get(0));
+
+            String thisMonth = java.time.YearMonth.now().toString();
+            mockMvc.perform(withToken(
+                            get("/api/challenges/{id}/check-ins", challengeId).param("month", thisMonth),
+                            tokens.accessToken()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content.length()").value(1))
+                    .andExpect(jsonPath("$.content[0].id").value(ids.get(1)));
+
+            mockMvc.perform(withToken(
+                            get("/api/challenges/{id}/check-ins", challengeId).param("month", "2026/09"),
+                            tokens.accessToken()))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
         @DisplayName("갤러리 — userId 필터")
         void galleryFiltersByUser() throws Exception {
             var owner = loginAs(EMAIL, NICKNAME);

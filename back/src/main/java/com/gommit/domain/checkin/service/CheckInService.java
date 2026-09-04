@@ -135,16 +135,20 @@ public class CheckInService {
     public CheckInCursorResponse getGallery(
             Long userId,
             Long challengeId,
-            LocalDate date,
+            YearMonth month,
             Long filterUserId,
             CheckInType checkInType,
             Long cursor,
             int size) {
         ReadAccess access = guard.resolveReadAccess(challengeId, userId);
 
+        LocalDate from = (month == null) ? null : month.atDay(1);
+        LocalDate to = (month == null) ? null : month.atEndOfMonth();
+
         List<CheckIn> rows = checkInRepository.findGallery(
                 challengeId,
-                date,
+                from,
+                to,
                 filterUserId,
                 checkInType,
                 access.maxBusinessDate(),

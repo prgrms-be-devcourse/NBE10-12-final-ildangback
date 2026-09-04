@@ -324,7 +324,7 @@ class CheckInServiceTest {
         void galleryActiveNoDateLimit() {
             when(guard.resolveReadAccess(CHALLENGE_ID, USER_ID)).thenReturn(new ReadAccess(challenge, null));
             when(checkInRepository.findGallery(
-                            eq(CHALLENGE_ID), any(), any(), any(), eq(null), any(), any(Pageable.class)))
+                            eq(CHALLENGE_ID), any(), any(), any(), any(), eq(null), any(), any(Pageable.class)))
                     .thenReturn(List.of());
 
             service.getGallery(USER_ID, CHALLENGE_ID, null, null, null, null, 20);
@@ -336,10 +336,28 @@ class CheckInServiceTest {
             LocalDate leftOn = TODAY.minusDays(3);
             when(guard.resolveReadAccess(CHALLENGE_ID, USER_ID)).thenReturn(new ReadAccess(challenge, leftOn));
             when(checkInRepository.findGallery(
-                            eq(CHALLENGE_ID), any(), any(), any(), eq(leftOn), any(), any(Pageable.class)))
+                            eq(CHALLENGE_ID), any(), any(), any(), any(), eq(leftOn), any(), any(Pageable.class)))
                     .thenReturn(List.of());
 
             service.getGallery(USER_ID, CHALLENGE_ID, null, null, null, null, 20);
+        }
+
+        @Test
+        @DisplayName("갤러리 — month 는 그 달의 첫날~마지막날 범위로 조회한다")
+        void galleryMonthFilter() {
+            when(guard.resolveReadAccess(CHALLENGE_ID, USER_ID)).thenReturn(new ReadAccess(challenge, null));
+            when(checkInRepository.findGallery(
+                            eq(CHALLENGE_ID),
+                            eq(LocalDate.of(2026, 9, 1)),
+                            eq(LocalDate.of(2026, 9, 30)),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(Pageable.class)))
+                    .thenReturn(List.of());
+
+            service.getGallery(USER_ID, CHALLENGE_ID, YearMonth.of(2026, 9), null, null, null, 20);
         }
 
         @Test

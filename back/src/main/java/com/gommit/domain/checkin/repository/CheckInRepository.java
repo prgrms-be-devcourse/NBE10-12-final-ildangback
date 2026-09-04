@@ -14,12 +14,13 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
 
     int countByChallengeIdAndUserIdAndBusinessDate(Long challengeId, Long userId, LocalDate businessDate);
 
-    // 갤러리 — 그룹원 전체. date / userId / checkInType 필터, id 커서(내림차순).
+    // 갤러리 — 그룹원 전체. from~to(월 범위) / userId / checkInType 필터, id 커서(내림차순).
     // maxBusinessDate: businessDate 상한 (null = 제한 없음). 이탈 멤버에게 이탈일 이하 기록만 보이게 할 때 쓴다.
     @Query("""
             select c from CheckIn c
             where c.challengeId = :challengeId
-              and (:date is null or c.businessDate = :date)
+              and (:from is null or c.businessDate >= :from)
+              and (:to is null or c.businessDate <= :to)
               and (:userId is null or c.userId = :userId)
               and (:checkInType is null or c.checkInType = :checkInType)
               and (:maxBusinessDate is null or c.businessDate <= :maxBusinessDate)
@@ -28,7 +29,8 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
             """)
     List<CheckIn> findGallery(
             @Param("challengeId") Long challengeId,
-            @Param("date") LocalDate date,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to,
             @Param("userId") Long userId,
             @Param("checkInType") CheckInType checkInType,
             @Param("maxBusinessDate") LocalDate maxBusinessDate,
