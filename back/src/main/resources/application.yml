@@ -5,6 +5,12 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
+  servlet:
+    multipart:
+      # 사용자 업로드 경로(CHECKIN/ITEM, 이미지)만 커버. DAILYLOG 는 서버 생성이라 무관.
+      max-file-size: 12MB
+      max-request-size: 15MB
+
   jpa:
     open-in-view: false
     hibernate:
@@ -34,3 +40,18 @@ auth-token:
   refresh-token:
     expiration: 30d
     reuse-grace-period: 30s
+
+media:
+  storage:
+    provider: ${MEDIA_STORAGE_PROVIDER:local}   # local | cloudinary
+    local:
+      base-dir: ${MEDIA_LOCAL_BASE_DIR:./data/media}
+      base-url: ${MEDIA_LOCAL_BASE_URL:http://localhost:8080/media}   # PUBLIC 정적 서빙 접두사.
+    cloudinary:                                 # provider=cloudinary 일 때만 사용
+      cloud-name: ${CLOUDINARY_CLOUD_NAME:}
+      api-key: ${CLOUDINARY_API_KEY:}
+      api-secret: ${CLOUDINARY_API_SECRET:}
+    policies:
+      CHECKIN:  { folder: check-ins,       max-size: 5MB,  visibility: PRIVATE, allowed-content-types: [image/png, image/jpeg, image/webp] }
+      DAILYLOG: { folder: daily-check-ins, max-size: 40MB, visibility: PRIVATE, allowed-content-types: [video/mp4] }
+      ITEM:     { folder: character-store, max-size: 5MB,  visibility: PUBLIC,  allowed-content-types: [image/png, image/jpeg, image/webp] }
