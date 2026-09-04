@@ -17,7 +17,11 @@ import { useToast } from "../../../shared/lib/useToast";
 const MENU: { icon: string; label: string; to?: string }[] = [
   { icon: pixelIcons.personalStats, label: "개인 통계" },
   { icon: pixelIcons.monthlyMergeArchive, label: "월간 머지 아카이브" },
-  { icon: pixelIcons.pointHistory, label: "포인트 내역" },
+  {
+    icon: pixelIcons.pointHistory,
+    label: "포인트 내역",
+    to: "/profile/points",
+  },
   { icon: pixelIcons.badgeAchievement, label: "참여했던 챌린지" },
   { icon: pixelIcons.settingsGear, label: "설정", to: "/profile/settings" },
 ];

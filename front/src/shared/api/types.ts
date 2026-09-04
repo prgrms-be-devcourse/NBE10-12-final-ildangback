@@ -44,3 +44,39 @@ export interface LoginResponse extends TokenResponse {
 export interface AvailabilityResponse {
   available: boolean;
 }
+
+/** 백엔드 커서 페이지 공통 모양. meta 래핑 없음, size 없음. */
+export interface SliceResponse<T> {
+  content: T[];
+  hasNext: boolean;
+  nextCursor: number | null;
+}
+
+/** CUSTOM은 서버엔 없는 프론트 전용 값 — 선택되면 period 대신 from/to를 보낸다. */
+export type PeriodFilter = "THIS_MONTH" | "LAST_MONTH" | "ALL" | "CUSTOM";
+export type PointChangeType = "EARN" | "DEDUCT" | "ALL";
+
+export type UserPointReason =
+  | "CHECK_IN"
+  | "CHALLENGE_BONUS"
+  | "MONTHLY_MERGE_BONUS"
+  | "ITEM_PURCHASE"
+  | "WITHDRAWAL_PENALTY";
+
+export interface PointBalanceResponse {
+  balance: number;
+  monthlyEarned: number;
+  monthlySpent: number;
+  totalEarned: number;
+}
+
+export interface UserPointHistoryResponse {
+  id: number;
+  userId: number;
+  sourceName: string;
+  amount: number;
+  reason: UserPointReason;
+  balanceAfter: number;
+  /** LocalDateTime 문자열. date.ts 의 규칙과 동일하게 파싱 없이 슬라이스해서 쓴다. */
+  createdAt: string;
+}

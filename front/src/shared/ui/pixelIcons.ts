@@ -15,6 +15,7 @@ import appInformation from "../../assets/icons/app-information.webp";
 import appVersion from "../../assets/icons/app-version-cube.webp";
 import chatNotification from "../../assets/icons/chat-notification-bubble.webp";
 import badgeAchievement from "../../assets/icons/badge-achievement.webp";
+import characterWink from "../../assets/icons/character-wink.webp";
 import logout from "../../assets/icons/logout.webp";
 import monthlyMergeArchive from "../../assets/icons/monthly-merge-archive.webp";
 import monthlyMergeNotification from "../../assets/icons/monthly-merge-notification-calendar.webp";
@@ -36,6 +37,7 @@ export const pixelIcons = {
   appVersion,
   chatNotification,
   badgeAchievement,
+  characterWink,
   logout,
   monthlyMergeArchive,
   monthlyMergeNotification,

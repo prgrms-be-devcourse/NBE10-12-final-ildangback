@@ -7,3 +7,25 @@ export function formatDate(isoLocalDateTime: string): string {
   const [year, month, day] = isoLocalDateTime.slice(0, 10).split("-");
   return `${year}년 ${Number(month)}월 ${Number(day)}일`;
 }
+
+/** 연도 없는 날짜. 포인트 내역처럼 최근 기록을 날짜별로 묶는 헤더에 쓴다. */
+export function formatMonthDay(isoLocalDateTime: string): string {
+  const [, month, day] = isoLocalDateTime.slice(0, 10).split("-");
+  return `${Number(month)}월 ${Number(day)}일`;
+}
+
+/** "09:12" 형태의 시:분만. */
+export function formatTime(isoLocalDateTime: string): string {
+  return isoLocalDateTime.slice(11, 16);
+}
+
+/** "2026.08.25 09:12" 형태. 포인트 상세처럼 처리 일시를 정확히 보여줄 때 쓴다. */
+export function formatDateTimeDot(isoLocalDateTime: string): string {
+  const datePart = isoLocalDateTime.slice(0, 10).replaceAll("-", ".");
+  return `${datePart} ${formatTime(isoLocalDateTime)}`;
+}
+
+/** 날짜만 비교할 때 쓰는 키(YYYY-MM-DD). 목록을 날짜별로 묶을 때 그룹 키로 쓴다. */
+export function dateKey(isoLocalDateTime: string): string {
+  return isoLocalDateTime.slice(0, 10);
+}

@@ -8,6 +8,8 @@ import { AccountPage } from "./domains/user/pages/AccountPage";
 import { ChangePasswordPage } from "./domains/user/pages/ChangePasswordPage";
 import { DeleteAccountPage } from "./domains/user/pages/DeleteAccountPage";
 import { EditProfilePage } from "./domains/user/pages/EditProfilePage";
+import { PointHistoryDetailPage } from "./domains/point/pages/PointHistoryDetailPage";
+import { PointHistoryPage } from "./domains/point/pages/PointHistoryPage";
 import { ProfilePage } from "./domains/user/pages/ProfilePage";
 import { SettingsPage } from "./domains/user/pages/SettingsPage";
 import { ChallengeTabPlaceholder } from "./pages/ChallengeTabPlaceholder";
@@ -43,6 +45,11 @@ export function App() {
           <Route path="profile/edit" element={<EditProfilePage />} />
           <Route path="profile/password" element={<ChangePasswordPage />} />
           <Route path="profile/delete" element={<DeleteAccountPage />} />
+          <Route path="profile/points" element={<PointHistoryPage />} />
+          <Route
+            path="profile/points/:historyId"
+            element={<PointHistoryDetailPage />}
+          />
         </Route>
       </Route>
 
