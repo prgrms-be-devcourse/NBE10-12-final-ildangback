@@ -55,8 +55,6 @@ export function stubChallengeMembers(): ChallengeMember[] {
   return STUB_MEMBERS;
 }
 
-// 갤러리 스텁 데이터 — id 내림차순(최신순). 2026-09 33건 / 2026-08 12건, 멤버 5명,
-// 일부만 memo. 9월은 size=20 이면 1페이지 20 + 2페이지 13 이라 무한스크롤이 실제로 돈다.
 const STUB_MEMOS: (string | null)[] = [
   "오늘도 완료 💪",
   null,
@@ -70,12 +68,45 @@ const STUB_MEMOS: (string | null)[] = [
   "친구랑 같이 운동",
 ];
 
-const STUB_GALLERY: CheckIn[] = Array.from({ length: 45 }, (_, i) => {
-  const id = 45 - i;
-  const inSeptember = id >= 13;
-  const day = ((id * 7) % 27) + 1;
-  const month = inSeptember ? "09" : "08";
-  const businessDate = `2026-${month}-${String(day).padStart(2, "0")}`;
+function pad(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/**
+ * 최신 날짜부터 하루에 `perDay(id)` 건씩, `count` 건이 될 때까지 `{id, businessDate}` 를
+ * 만든다. id 는 큰 게 최신이라 커서(id 내림차순)·날짜 그룹핑이 둘 다 자연스럽다.
+ */
+function datedIds(
+  start: [number, number, number],
+  count: number,
+  perDay: (id: number) => number,
+): { id: number; businessDate: string }[] {
+  const out: { id: number; businessDate: string }[] = [];
+  const d = new Date(start[0], start[1] - 1, start[2], 12);
+  let id = count;
+  while (out.length < count) {
+    const ymd = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const n = Math.max(1, perDay(id));
+    for (let k = 0; k < n && out.length < count; k++) {
+      out.push({ id: id--, businessDate: ymd });
+    }
+    d.setDate(d.getDate() - 1);
+  }
+  return out;
+}
+
+/** 실제 사진처럼 보이게 dev 에서만 쓰는 임의 이미지. */
+function stubPhoto(seed: string | number): string {
+  return `https://picsum.photos/seed/gommit-${seed}/500`;
+}
+
+// 갤러리 스텁 — 최신순, 2026-09 ~ 2026-08 걸침(9월 > 20건이라 무한스크롤이 실제로 돈다),
+// 멤버 5명, 일부만 memo.
+const STUB_GALLERY: CheckIn[] = datedIds(
+  [2026, 9, 25],
+  50,
+  (id) => (id % 2) + 1,
+).map(({ id, businessDate }) => {
   const member = STUB_MEMBERS[id % STUB_MEMBERS.length];
   return {
     id,
@@ -83,11 +114,11 @@ const STUB_GALLERY: CheckIn[] = Array.from({ length: 45 }, (_, i) => {
     nickname: member.nickname,
     businessDate,
     roundNo: 1,
-    checkInType: "PHOTO",
-    mediaUrl: `https://placehold.co/600x600/8058c4/fff?text=${month}-${String(day).padStart(2, "0")}`,
-    mediaType: "IMAGE",
+    checkInType: "PHOTO" as const,
+    mediaUrl: stubPhoto(id),
+    mediaType: "IMAGE" as const,
     memo: STUB_MEMOS[id % STUB_MEMOS.length],
-    createdAt: `${businessDate}T09:0${id % 6}:00`,
+    createdAt: `${businessDate}T${pad(9 + (id % 8))}:${pad((id * 7) % 60)}:00`,
   };
 });
 
@@ -146,27 +177,24 @@ export function stubChallengeAlbumSummary(
   };
 }
 
-// 내 인증 60건 — 2026-09 / 2026-08, 챌린지 3개에 분산, 일부 memo.
-const STUB_MY_CHECKINS: MyCheckIn[] = Array.from({ length: 60 }, (_, i) => {
-  const id = 60 - i;
-  const inSeptember = id >= 25;
-  const day = ((id * 5) % 27) + 1;
-  const month = inSeptember ? "09" : "08";
-  const businessDate = `2026-${month}-${String(day).padStart(2, "0")}`;
-  return {
-    id,
-    userId: 1,
-    nickname: "나",
-    businessDate,
-    roundNo: 1,
-    checkInType: "PHOTO",
-    mediaUrl: `https://placehold.co/600x600/8058c4/fff?text=${month}-${String(day).padStart(2, "0")}`,
-    mediaType: "IMAGE",
-    memo: id % 4 === 0 ? STUB_MEMOS[id % STUB_MEMOS.length] : null,
-    createdAt: `${businessDate}T0${id % 6}:${String((id * 7) % 60).padStart(2, "0")}:00`,
-    challengeId: (id % 3) + 1,
-  };
-});
+// 내 인증 60건 — 최신순, 2026-09 ~ 2026-08 걸침, 하루 1~3건, 챌린지 3개 분산, 일부 memo.
+const STUB_MY_CHECKINS: MyCheckIn[] = datedIds(
+  [2026, 9, 26],
+  60,
+  (id) => (id % 3) + 1,
+).map(({ id, businessDate }) => ({
+  id,
+  userId: 1,
+  nickname: "나",
+  businessDate,
+  roundNo: 1,
+  checkInType: "PHOTO" as const,
+  mediaUrl: stubPhoto(`me-${id}`),
+  mediaType: "IMAGE" as const,
+  memo: id % 4 === 0 ? STUB_MEMOS[id % STUB_MEMOS.length] : null,
+  createdAt: `${businessDate}T${pad(8 + (id % 10))}:${pad((id * 7) % 60)}:00`,
+  challengeId: (id % 3) + 1,
+}));
 
 export function stubMyCheckIns(query: MyCheckInQuery): MyCheckInCursorResponse {
   let rows = STUB_MY_CHECKINS;
