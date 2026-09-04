@@ -14,7 +14,9 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,17 +41,27 @@ public class PersonalPointController {
         return pointService.getMyBalance(user.getId());
     }
 
-    @Operation(summary = "개인 포인트 이력 조회", description = "최근 발생한 순서로 이력을 커서 기반 무한스크롤로 반환한다.")
+    @Operation(
+            summary = "개인 포인트 이력 조회",
+            description = "최근 발생한 순서로 이력을 커서 기반 무한스크롤로 반환한다. " + "from/to를 주면 period 대신 그 범위(직접설정)를 쓴다.")
     @GetMapping("/histories")
     public SliceResponse<UserPointHistoryResponse> getMyPointHistories(
             @CurrentUser SecurityUser user,
             @Parameter(description = "조회 기간 프리셋") @RequestParam(required = false) PeriodFilter period,
             @Parameter(description = "적립/차감 구분 필터") @RequestParam(required = false) PointChangeType type,
             @Parameter(description = "조회할 변동 사유") @RequestParam(required = false) UserPointReason reason,
+            @Parameter(description = "직접설정 시작일(포함). 있으면 period 대신 사용")
+                    @RequestParam(required = false)
+                    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+                    LocalDate from,
+            @Parameter(description = "직접설정 종료일(포함). 있으면 period 대신 사용")
+                    @RequestParam(required = false)
+                    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+                    LocalDate to,
             @Parameter(description = "이전 응답의 nextCursor 값. 첫 페이지는 생략") @RequestParam(required = false) Long cursor,
             @Parameter(description = "한 번에 가져올 개수") @RequestParam(defaultValue = "" + DEFAULT_SIZE) @Min(1) @Max(100)
                     int size) {
-        return pointService.getMyHistories(user.getId(), period, type, reason, cursor, size);
+        return pointService.getMyHistories(user.getId(), period, type, reason, from, to, cursor, size);
     }
 
     @Operation(summary = "개인 포인트 이력 상세 조회", description = "이력 목록에서 항목을 눌렀을 때 보여주는 상세 화면용 API.")

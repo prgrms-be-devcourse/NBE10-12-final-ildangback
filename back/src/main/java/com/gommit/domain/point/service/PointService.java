@@ -94,8 +94,15 @@ public class PointService {
     }
 
     public SliceResponse<UserPointHistoryResponse> getMyHistories(
-            Long userId, PeriodFilter period, PointChangeType type, UserPointReason reason, Long cursor, int size) {
-        LocalDateTime[] range = toDateRange(period);
+            Long userId,
+            PeriodFilter period,
+            PointChangeType type,
+            UserPointReason reason,
+            LocalDate from,
+            LocalDate to,
+            Long cursor,
+            int size) {
+        LocalDateTime[] range = toDateRange(period, from, to);
         var rows = userPointHistoryRepository.findHistories(
                 userId, cursor, range[0], range[1], reason, toEarnFlag(type), PageRequest.of(0, size + 1));
         var content = rows.stream().map(UserPointHistoryResponse::from).toList();
@@ -124,8 +131,15 @@ public class PointService {
     }
 
     public SliceResponse<GroupPointHistoryResponse> getGroupHistories(
-            Long groupId, PeriodFilter period, PointChangeType type, GroupPointReason reason, Long cursor, int size) {
-        LocalDateTime[] range = toDateRange(period);
+            Long groupId,
+            PeriodFilter period,
+            PointChangeType type,
+            GroupPointReason reason,
+            LocalDate from,
+            LocalDate to,
+            Long cursor,
+            int size) {
+        LocalDateTime[] range = toDateRange(period, from, to);
         var rows = groupPointHistoryRepository.findHistories(
                 groupId, cursor, range[0], range[1], reason, toEarnFlag(type), PageRequest.of(0, size + 1));
         var content = rows.stream().map(GroupPointHistoryResponse::from).toList();
@@ -170,7 +184,21 @@ public class PointService {
         return type == PointChangeType.EARN;
     }
 
-    private static LocalDateTime[] toDateRange(PeriodFilter period) {
+    // from/to(직접설정)가 오면 period 대신 04:00 기준으로 그 범위를 쓴다. 둘 다 있거나
+    // 둘 다 없어야 한다 - 하나만 주면 "무제한"인지 "빠뜨린 것"인지 구분이 안 된다.
+    private static LocalDateTime[] toDateRange(PeriodFilter period, LocalDate from, LocalDate to) {
+        if ((from == null) != (to == null)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        if (from != null && to.isBefore(from)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        if (from != null) {
+            LocalDateTime start = from.atTime(BUSINESS_DAY_CUTOFF_HOUR, 0);
+            LocalDateTime end = to.plusDays(1).atTime(BUSINESS_DAY_CUTOFF_HOUR, 0);
+            return new LocalDateTime[] {start, end};
+        }
+
         if (period == null || period == PeriodFilter.ALL) {
             return new LocalDateTime[] {null, null};
         }

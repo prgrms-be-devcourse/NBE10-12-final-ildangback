@@ -266,7 +266,7 @@ class PointServiceTest {
 
             // when
             SliceResponse<?> result =
-                    pointService.getMyHistories(1L, PeriodFilter.ALL, PointChangeType.ALL, null, null, 2);
+                    pointService.getMyHistories(1L, PeriodFilter.ALL, PointChangeType.ALL, null, null, null, null, 2);
 
             // then
             assertThat(result.content()).hasSize(2);
@@ -284,7 +284,7 @@ class PointServiceTest {
 
             // when
             SliceResponse<?> result =
-                    pointService.getMyHistories(1L, PeriodFilter.ALL, PointChangeType.ALL, null, null, 20);
+                    pointService.getMyHistories(1L, PeriodFilter.ALL, PointChangeType.ALL, null, null, null, null, 20);
 
             // then
             assertThat(result.content()).hasSize(1);
@@ -300,7 +300,7 @@ class PointServiceTest {
                     .thenReturn(List.of());
 
             // when
-            pointService.getMyHistories(1L, PeriodFilter.THIS_MONTH, PointChangeType.ALL, null, null, 20);
+            pointService.getMyHistories(1L, PeriodFilter.THIS_MONTH, PointChangeType.ALL, null, null, null, null, 20);
 
             // then
             ArgumentCaptor<LocalDateTime> from = ArgumentCaptor.forClass(LocalDateTime.class);
@@ -320,7 +320,7 @@ class PointServiceTest {
                     .thenReturn(List.of());
 
             // when
-            pointService.getMyHistories(1L, PeriodFilter.LAST_MONTH, PointChangeType.ALL, null, null, 20);
+            pointService.getMyHistories(1L, PeriodFilter.LAST_MONTH, PointChangeType.ALL, null, null, null, null, 20);
 
             // then
             ArgumentCaptor<LocalDateTime> from = ArgumentCaptor.forClass(LocalDateTime.class);
@@ -331,6 +331,77 @@ class PointServiceTest {
             assertThat(from.getValue())
                     .isEqualTo(thisMonthFirstDay.minusMonths(1).atTime(4, 0));
             assertThat(to.getValue()).isEqualTo(thisMonthFirstDay.atTime(4, 0));
+        }
+
+        @Test
+        @DisplayName("from/to(직접설정)가 있으면 period는 무시하고 그 범위를 쓴다")
+        void customRangeOverridesPeriod() {
+            // given
+            when(userPointHistoryRepository.findHistories(any(), any(), any(), any(), any(), any(), any()))
+                    .thenReturn(List.of());
+
+            // when: period가 THIS_MONTH여도 from/to가 있으면 그쪽을 따른다
+            pointService.getMyHistories(
+                    1L,
+                    PeriodFilter.THIS_MONTH,
+                    PointChangeType.ALL,
+                    null,
+                    LocalDate.of(2026, 8, 1),
+                    LocalDate.of(2026, 8, 31),
+                    null,
+                    20);
+
+            // then: 하루 경계가 04:00이라 시작은 8/1 04:00, to는 그날 하루까지 포함해야
+            // 하므로 다음날(9/1) 04:00이 배타적 상한이다
+            ArgumentCaptor<LocalDateTime> from = ArgumentCaptor.forClass(LocalDateTime.class);
+            ArgumentCaptor<LocalDateTime> to = ArgumentCaptor.forClass(LocalDateTime.class);
+            verify(userPointHistoryRepository)
+                    .findHistories(any(), any(), from.capture(), to.capture(), any(), any(), any());
+            assertThat(from.getValue()).isEqualTo(LocalDateTime.of(2026, 8, 1, 4, 0));
+            assertThat(to.getValue()).isEqualTo(LocalDateTime.of(2026, 9, 1, 4, 0));
+        }
+
+        @Test
+        @DisplayName("from만 있으면 INVALID_INPUT_VALUE 예외가 발생한다")
+        void customRangeFromOnly() {
+            assertThatThrownBy(() -> pointService.getMyHistories(
+                            1L, null, PointChangeType.ALL, null, LocalDate.of(2026, 8, 1), null, null, 20))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+            verify(userPointHistoryRepository, never()).findHistories(any(), any(), any(), any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("to만 있으면 INVALID_INPUT_VALUE 예외가 발생한다")
+        void customRangeToOnly() {
+            assertThatThrownBy(() -> pointService.getMyHistories(
+                            1L, null, PointChangeType.ALL, null, null, LocalDate.of(2026, 8, 31), null, 20))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+            verify(userPointHistoryRepository, never()).findHistories(any(), any(), any(), any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("from이 to보다 미래면 INVALID_INPUT_VALUE 예외가 발생한다")
+        void throwsWhenFromIsAfterTo() {
+            assertThatThrownBy(() -> pointService.getMyHistories(
+                            1L,
+                            null,
+                            PointChangeType.ALL,
+                            null,
+                            LocalDate.of(2026, 8, 31),
+                            LocalDate.of(2026, 8, 1),
+                            null,
+                            20))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+            verify(userPointHistoryRepository, never()).findHistories(any(), any(), any(), any(), any(), any(), any());
         }
     }
 

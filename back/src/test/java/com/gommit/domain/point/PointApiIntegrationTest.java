@@ -167,6 +167,40 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(jsonPath("$.content.length()").value(1))
                     .andExpect(jsonPath("$.content[0].reason").value("ITEM_PURCHASE"));
         }
+
+        // from만/to만 있을 때 실제 DB(MySQL)에서 null 파라미터가 예외 없이 처리되는지 확인한다.
+        // 유닛 테스트는 리포지토리를 mock으로 대체해서 JPQL이 실제로 null-safe한지는 증명 못 한다.
+        @Test
+        @DisplayName("from만 있으면 400")
+        void rejectsFromOnly() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+
+            getMyHistories(tokens.accessToken(), "?from=2020-01-01")
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"));
+        }
+
+        @Test
+        @DisplayName("to만 있으면 400")
+        void rejectsToOnly() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+
+            getMyHistories(tokens.accessToken(), "?to=2099-12-31")
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"));
+        }
+
+        @Test
+        @DisplayName("from/to를 함께 주면 그 범위만 조회된다")
+        void filtersByFromAndTo() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+            Long userId = userIdOf(EMAIL);
+            pointService.reward(userId, null, 40, UserPointReason.CHECK_IN, "오운완");
+
+            getMyHistories(tokens.accessToken(), "?from=2020-01-01&to=2099-12-31")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content.length()").value(1));
+        }
     }
 
     @Nested
