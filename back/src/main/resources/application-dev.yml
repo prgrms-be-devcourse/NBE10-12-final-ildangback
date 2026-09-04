@@ -24,3 +24,14 @@ auth-token:
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+
+oauth:
+  allowed-redirect-uris:
+    - http://localhost:5173/oauth/google/callback
+    - http://localhost:5173/oauth/naver/callback
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
+    client-secret: ${GOOGLE_CLIENT_SECRET:}
+  naver:
+    client-id: ${NAVER_CLIENT_ID:}
+    client-secret: ${NAVER_CLIENT_SECRET:}

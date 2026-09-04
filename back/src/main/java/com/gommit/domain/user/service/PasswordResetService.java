@@ -59,6 +59,10 @@ public class PasswordResetService {
             return;
         }
 
+        if (user.getPassword() == null) {
+            return;
+        }
+
         // 미인증이면 재설정 대신 인증 메일을 보낸다
         if (!user.isEmailVerified()) {
             emailVerificationService.sendIfDue(user, VERIFY_FIRST_SUBJECT, VERIFY_FIRST_BODY_FORMAT);

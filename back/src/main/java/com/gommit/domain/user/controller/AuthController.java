@@ -1,6 +1,7 @@
 package com.gommit.domain.user.controller;
 
 import com.gommit.domain.user.dto.request.LoginRequest;
+import com.gommit.domain.user.dto.request.OAuthLoginRequest;
 import com.gommit.domain.user.dto.request.PasswordResetConfirmRequest;
 import com.gommit.domain.user.dto.request.PasswordResetRequest;
 import com.gommit.domain.user.dto.request.RefreshRequest;
@@ -10,9 +11,11 @@ import com.gommit.domain.user.dto.response.LoginResponse;
 import com.gommit.domain.user.dto.response.PasswordResetTargetResponse;
 import com.gommit.domain.user.dto.response.TokenResponse;
 import com.gommit.domain.user.dto.response.UserSummaryResponse;
+import com.gommit.domain.user.entity.OAuthProvider;
 import com.gommit.domain.user.service.AuthService;
 import com.gommit.domain.user.service.EmailVerificationService;
 import com.gommit.domain.user.service.PasswordResetService;
+import com.gommit.domain.user.service.SocialAuthService;
 import com.gommit.domain.user.service.UserService;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.security.CurrentUser;
@@ -41,6 +44,7 @@ public class AuthController {
     private final UserService userService;
     private final EmailVerificationService emailVerificationService;
     private final PasswordResetService passwordResetService;
+    private final SocialAuthService socialAuthService;
 
     @Operation(summary = "회원가입")
     @PostMapping("/signup")
@@ -52,6 +56,13 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    @Operation(summary = "소셜 로그인")
+    @PostMapping("/oauth/{provider}")
+    public ResponseEntity<LoginResponse> oauthLogin(
+            @PathVariable String provider, @Valid @RequestBody OAuthLoginRequest request) {
+        return ResponseEntity.ok(socialAuthService.login(OAuthProvider.from(provider), request));
     }
 
     @Operation(summary = "토큰 재발급")

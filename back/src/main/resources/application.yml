@@ -17,6 +17,11 @@ spring:
   flyway:
     enabled: true
 
+  http:
+    clients:
+      connect-timeout: 5s
+      read-timeout: 5s
+
   mail:
     properties:
       mail:

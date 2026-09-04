@@ -40,3 +40,12 @@ auth-token:
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS}
+
+oauth:
+  allowed-redirect-uris: ${OAUTH_ALLOWED_REDIRECT_URIS}
+  google:
+    client-id: ${GOOGLE_CLIENT_ID}
+    client-secret: ${GOOGLE_CLIENT_SECRET}
+  naver:
+    client-id: ${NAVER_CLIENT_ID}
+    client-secret: ${NAVER_CLIENT_SECRET}

@@ -59,12 +59,12 @@ public class AuthService {
                 .findByEmailAndDeletedAtIsNull(request.email())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS));
 
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+        if (user.getPassword() == null || !passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
 
         TokenResponse tokens = new TokenResponse(issueAccessToken(user), refreshTokenService.issue(user));
-        return new LoginResponse(tokens, new UserProfileResponse(user));
+        return new LoginResponse(tokens, new UserProfileResponse(user), false);
     }
 
     // 토큰 재발급
