@@ -1,0 +1,73 @@
+# EC2 /opt/team1-app 에 배치. CD 가 .env 의 IMAGE_TAG 를 갱신하고 `docker compose up -d`.
+name: gommit
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certs:/etc/nginx/certs:ro   # origin.pem / origin.key (Cloudflare Origin CA)
+    depends_on:
+      back:
+        condition: service_healthy
+    mem_limit: 64m
+
+  back:
+    image: ghcr.io/${GHCR_REPO}/back:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # 2GB 박스 프리셋 (Q24). Dockerfile 기본값을 덮어씀.
+      JAVA_OPTS: "-Xms256m -Xmx768m -XX:+ExitOnOutOfMemoryError -Duser.timezone=Asia/Seoul"
+      SPRING_PROFILES_ACTIVE: prod
+    expose:
+      - "8080"                        # nginx 만 접근. 호스트 포트 매핑 안 함.
+    volumes:
+      - media-tmp:/app/media-tmp      # ffmpeg 임시파일
+    depends_on:
+      mysql:
+        condition: service_healthy
+    mem_limit: 1200m
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 5
+      start_period: 90s
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    command:
+      - --innodb-buffer-pool-size=384M
+      - --max-connections=50
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    environment:
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: Asia/Seoul
+    volumes:
+      - mysql-data:/var/lib/mysql
+    expose:
+      - "3306"
+    mem_limit: 500m
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+# 야간 mysqldump 는 호스트 cron 이 backup.sh 를 돌린다 (user-data.sh 에서 03:50 등록).
+
+volumes:
+  mysql-data:
+  media-tmp:
