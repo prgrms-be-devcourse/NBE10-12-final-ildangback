@@ -24,7 +24,3 @@ auth-token:
 
 cors:
   allowed-origins: http://localhost:5173
-
-checkin:
-  media:
-    base-dir: build/test-media # 통합 테스트가 실제 파일을 쓰는 위치. build/ 는 gitignore 대상.

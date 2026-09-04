@@ -45,7 +45,8 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
     private static final byte[] PNG_1X1 = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D
     };
 
-    private static final Path MEDIA_DIR = Path.of("build/test-media");
+    // media(#8) LocalStorageService 테스트 저장 루트 — application-test.yml 의 media.storage.local.base-dir 와 동일.
+    private static final Path MEDIA_DIR = Path.of(System.getProperty("java.io.tmpdir"), "gommit-media-test");
 
     @Autowired
     private CheckInService checkInService;

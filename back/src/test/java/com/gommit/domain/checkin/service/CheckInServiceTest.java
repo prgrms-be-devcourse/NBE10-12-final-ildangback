@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
@@ -138,7 +139,7 @@ class CheckInServiceTest {
             givenActiveMemberAndValidDay(challenge);
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(1);
-            when(mediaStore.reserve(any())).thenReturn("check-ins/2026/09/uuid.png");
+            when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
             when(policy.checkInReward()).thenReturn(10);
             when(checkInRepository.saveAndFlush(any(CheckIn.class))).thenAnswer(inv -> {
                 CheckIn c = inv.getArgument(0);
@@ -155,11 +156,11 @@ class CheckInServiceTest {
             assertThat(result.checkIn().roundNo()).isEqualTo(2);
             assertThat(result.checkIn().mediaType()).isEqualTo(MediaType.IMAGE);
 
-            // 순서: row 저장(flush) → 포인트 적립 → 미디어 바이트 쓰기.
-            var order = inOrder(checkInRepository, pointService, mediaStore);
+            // 순서: 미디어 저장 → row 저장(flush) → 포인트 적립.
+            var order = inOrder(mediaStore, checkInRepository, pointService);
+            order.verify(mediaStore).store(any());
             order.verify(checkInRepository).saveAndFlush(any(CheckIn.class));
             order.verify(pointService).reward(USER_ID, CHALLENGE_ID, 10, UserPointReason.CHECK_IN, "인증");
-            order.verify(mediaStore).write(any(), eq("check-ins/2026/09/uuid.png"));
         }
 
         @Test
@@ -169,7 +170,7 @@ class CheckInServiceTest {
             givenActiveMemberAndValidDay(challenge);
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(0);
-            when(mediaStore.reserve(any())).thenReturn("check-ins/2026/09/uuid.png");
+            when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
             when(checkInRepository.saveAndFlush(any(CheckIn.class))).thenAnswer(inv -> inv.getArgument(0));
 
             assertThat(service.submit(USER_ID, CHALLENGE_ID, form(null), media())
@@ -275,15 +276,15 @@ class CheckInServiceTest {
             givenActiveMemberAndValidDay(challenge);
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(0);
-            when(mediaStore.reserve(any())).thenReturn("check-ins/2026/09/uuid.png");
+            when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
             when(checkInRepository.saveAndFlush(any(CheckIn.class)))
                     .thenThrow(new DataIntegrityViolationException("uk_check_ins"));
 
             assertBusiness(
                     () -> service.submit(USER_ID, CHALLENGE_ID, form(null), media()), ErrorCode.DAILY_LIMIT_EXCEEDED);
 
-            // insert 가 실패하면 파일을 쓰지 않는다 — orphan 없음.
-            verify(mediaStore, never()).write(any(), any());
+            // insert 가 실패하면 방금 쓴 파일을 정리한다 — orphan 방지.
+            verify(mediaStore).delete(anyString());
             verify(pointService, never()).reward(anyLong(), anyLong(), anyInt(), any(), any());
         }
     }

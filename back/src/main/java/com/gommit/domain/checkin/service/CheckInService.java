@@ -35,6 +35,7 @@ import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
@@ -43,6 +44,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -106,7 +108,7 @@ public class CheckInService {
             throw new BusinessException(ErrorCode.DAILY_LIMIT_EXCEEDED);
         }
 
-        String mediaKey = mediaStore.reserve(media); // 검증 + 키 확보, 바이트는 아직 안 씀
+        String mediaKey = mediaStore.store(media); // 검증 + 저장 (media#8 StorageService 경유)
         int roundNo = already + 1;
 
         CheckIn checkIn = CheckIn.create(
@@ -114,7 +116,9 @@ public class CheckInService {
         try {
             checkInRepository.saveAndFlush(checkIn);
         } catch (DataIntegrityViolationException e) {
-            // uk_check_ins 위반 = 같은 회차를 이미 다른 요청이 선점 → 한도 초과와 동일 취급. 파일은 아직 안 썼다.
+            // uk_check_ins 위반 = 같은 회차를 이미 다른 요청이 선점 → 한도 초과와 동일 취급.
+            // 방금 쓴 파일은 고아가 되므로 best-effort 로 정리한다.
+            deleteQuietly(mediaKey);
             throw new BusinessException(ErrorCode.DAILY_LIMIT_EXCEEDED);
         }
 
@@ -125,7 +129,6 @@ public class CheckInService {
         pointService.reward(userId, challengeId, earnedUserPoints, UserPointReason.CHECK_IN, "인증");
 
         String nickname = nicknameOf(userId);
-        mediaStore.write(media, mediaKey); // row·적립 확정 후에만 기록. 실패 시 트랜잭션 롤백으로 함께 사라진다.
 
         boolean dailyCompleted = roundNo >= target;
         return new CheckInResultResponse(
@@ -238,6 +241,14 @@ public class CheckInService {
             throw new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER);
         }
         return checkIn;
+    }
+
+    private void deleteQuietly(String storageKey) {
+        try {
+            mediaStore.delete(storageKey);
+        } catch (RuntimeException ex) {
+            log.warn("orphan 미디어 정리 실패: {}", storageKey, ex);
+        }
     }
 
     private String nicknameOf(Long userId) {
