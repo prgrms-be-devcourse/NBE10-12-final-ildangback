@@ -1,7 +1,7 @@
 package com.gommit.domain.challenge.scheduler;
+
 import com.gommit.domain.challenge.service.ChallengeExtensionService;
 import com.gommit.domain.challenge.service.ChallengeLifecycleService;
-import com.gommit.domain.challenge.service.ChallengeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;

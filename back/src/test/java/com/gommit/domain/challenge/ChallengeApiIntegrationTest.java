@@ -71,8 +71,7 @@ class ChallengeApiIntegrationTest extends IntegrationTestSupport {
                     "allowedTypes": ["PHOTO"]
                   }
                 }
-                """
-                .formatted(name, LocalDate.now().plusDays(1), LocalDate.now().plusDays(7));
+                """.formatted(name, LocalDate.now().plusDays(1), LocalDate.now().plusDays(7));
     }
 
     private String updateBody() {
@@ -86,8 +85,7 @@ class ChallengeApiIntegrationTest extends IntegrationTestSupport {
                   "dailyCheckInCount": 3,
                   "allowedTypes": ["PHOTO"]
                 }
-                """
-                .formatted(LocalDate.now().plusDays(2), LocalDate.now().plusDays(10));
+                """.formatted(LocalDate.now().plusDays(2), LocalDate.now().plusDays(10));
     }
 
     private Long userIdOf(String email) {

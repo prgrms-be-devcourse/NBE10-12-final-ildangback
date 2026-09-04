@@ -10,14 +10,13 @@ import com.gommit.domain.group.entity.GroupMemberStatus;
 import com.gommit.domain.group.repository.GroupMemberRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -31,20 +30,25 @@ public class ChallengeExtensionService {
 
     // 다음 시즌 연장 참여 의사 검사
     @Transactional
-    public ExtensionChoiceResponse updateExtensionChoice(Long challengeId, Long userId, ExtensionChoiceRequest request) {
+    public ExtensionChoiceResponse updateExtensionChoice(
+            Long challengeId, Long userId, ExtensionChoiceRequest request) {
         // 챌린지 조회
-        Challenge challenge = challengeRepository.findById(challengeId).orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
+        Challenge challenge = challengeRepository
+                .findById(challengeId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
 
         // 진해 중인 시즌에서만 연장 의사 선택 가능
-        if(challenge.getStatus() != ChallengeStatus.ACTIVE) {
+        if (challenge.getStatus() != ChallengeStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.EXTENSION_CHOICE_NOT_AVAILABLE);
         }
 
         // 해당 챌린지의 내 참여 정보 조회
-        ChallengeMember challengeMember = challengeMemberRepository.findByChallengeIdAndUserId(challengeId, userId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER));
+        ChallengeMember challengeMember = challengeMemberRepository
+                .findByChallengeIdAndUserId(challengeId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER));
 
         // 현재 참여 중인 멤버만 연장 의사 선택 가능
-        if(challengeMember.getStatus() != ChallengeMemberStatus.ACTIVE) {
+        if (challengeMember.getStatus() != ChallengeMemberStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER);
         }
 
@@ -58,24 +62,23 @@ public class ChallengeExtensionService {
         challengeMember.changeExtensionChoice(request.choice());
 
         // 현재 ACTIVE 멤버들의 선택 현황 집계
-        int pendingCount = (int) challengeMemberRepository.countByChallengeIdAndStatusAndExtensionChoice(challengeId, ChallengeMemberStatus.ACTIVE, ExtensionChoice.PENDING);
-        int extendCount = (int) challengeMemberRepository.countByChallengeIdAndStatusAndExtensionChoice(challengeId, ChallengeMemberStatus.ACTIVE, ExtensionChoice.EXTEND);
-        int declineCount = (int) challengeMemberRepository.countByChallengeIdAndStatusAndExtensionChoice(challengeId, ChallengeMemberStatus.ACTIVE, ExtensionChoice.DECLINE);
+        int pendingCount = (int) challengeMemberRepository.countByChallengeIdAndStatusAndExtensionChoice(
+                challengeId, ChallengeMemberStatus.ACTIVE, ExtensionChoice.PENDING);
+        int extendCount = (int) challengeMemberRepository.countByChallengeIdAndStatusAndExtensionChoice(
+                challengeId, ChallengeMemberStatus.ACTIVE, ExtensionChoice.EXTEND);
+        int declineCount = (int) challengeMemberRepository.countByChallengeIdAndStatusAndExtensionChoice(
+                challengeId, ChallengeMemberStatus.ACTIVE, ExtensionChoice.DECLINE);
 
         return new ExtensionChoiceResponse(
-            challengeId,
-            userId,
-            challengeMember.getExtensionChoice(),
-            pendingCount,
-            extendCount,
-            declineCount
-        );
+                challengeId, userId, challengeMember.getExtensionChoice(), pendingCount, extendCount, declineCount);
     }
 
     @Transactional
     public void finalizeExtension(Long challengeId) {
         // 현재 시즌 조회
-        Challenge currentChallenge = challengeRepository.findById(challengeId).orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
+        Challenge currentChallenge = challengeRepository
+                .findById(challengeId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
 
         // 마감 시 PENDING -> DECLINE 처리
         closeExtensionChoice(challengeId);
@@ -84,7 +87,7 @@ public class ChallengeExtensionService {
         List<ChallengeMember> extendMembers = getExtendMembers(challengeId);
 
         // EXTEND 아무도 없으면 다음 시즌 생성하지 않음
-        if(extendMembers.isEmpty()) {
+        if (extendMembers.isEmpty()) {
             leaveDeclineMembers(currentChallenge.getGroupId(), challengeId);
             return;
         }
@@ -102,10 +105,8 @@ public class ChallengeExtensionService {
         leaveDeclineMembers(currentChallenge.getGroupId(), challengeId);
     }
 
-
-
     private void validateExtensionChoice(ExtensionChoice choice) {
-        if(choice != ExtensionChoice.EXTEND && choice != ExtensionChoice.DECLINE) {
+        if (choice != ExtensionChoice.EXTEND && choice != ExtensionChoice.DECLINE) {
             throw new BusinessException(ErrorCode.INVALID_EXTENSION_CHOICE);
         }
     }
@@ -113,32 +114,37 @@ public class ChallengeExtensionService {
     private void validateExtensionChoicePeriod(Challenge challenge) {
         LocalDate deadline = challenge.getEndDate().minusDays(2);
 
-        if(LocalDate.now().isAfter(deadline)) {
+        if (LocalDate.now().isAfter(deadline)) {
             throw new BusinessException(ErrorCode.EXTENSION_CHOICE_CLOSED);
         }
     }
 
     private void closeExtensionChoice(Long challengeId) {
         // 아직 연장 의사를 선택하지 않은 현재 참여 멤버 조회
-        List<ChallengeMember> pendingMembers = challengeMemberRepository.findAllByChallengeIdAndStatusAndExtensionChoice(challengeId, ChallengeMemberStatus.ACTIVE, ExtensionChoice.PENDING);
+        List<ChallengeMember> pendingMembers =
+                challengeMemberRepository.findAllByChallengeIdAndStatusAndExtensionChoice(
+                        challengeId, ChallengeMemberStatus.ACTIVE, ExtensionChoice.PENDING);
 
         // 마감 시 미응답자는 연장 거절로 처리
-        for(ChallengeMember challengeMember : pendingMembers) {
+        for (ChallengeMember challengeMember : pendingMembers) {
             challengeMember.changeExtensionChoice(ExtensionChoice.DECLINE);
         }
     }
 
     // EXTEND 멤버 조회
     private List<ChallengeMember> getExtendMembers(Long challengeId) {
-        return challengeMemberRepository.findAllByChallengeIdAndStatusAndExtensionChoice(challengeId, ChallengeMemberStatus.ACTIVE, ExtensionChoice.EXTEND);
+        return challengeMemberRepository.findAllByChallengeIdAndStatusAndExtensionChoice(
+                challengeId, ChallengeMemberStatus.ACTIVE, ExtensionChoice.EXTEND);
     }
 
     private ChallengeMember selectNextOwner(Long challengeId, List<ChallengeMember> extendMembers) {
         // 현 시즌 OWNER 조회
-        ChallengeMember currentOwner = challengeMemberRepository.findByChallengeIdAndRole(challengeId, ChallengeMemberRole.OWNER).orElseThrow(() -> new BusinessException(ErrorCode.NOT_CHALLENGE_OWNER));
+        ChallengeMember currentOwner = challengeMemberRepository
+                .findByChallengeIdAndRole(challengeId, ChallengeMemberRole.OWNER)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_CHALLENGE_OWNER));
 
         // 기존 OWNER가 연장을 선택했다면 그대로 OWNER
-        if(currentOwner.getExtensionChoice() == ExtensionChoice.EXTEND) {
+        if (currentOwner.getExtensionChoice() == ExtensionChoice.EXTEND) {
             return currentOwner;
         }
 
@@ -157,28 +163,31 @@ public class ChallengeExtensionService {
         LocalDate nextEndDate = nextStartDate.plusDays(periodDays);
 
         Challenge nextChallenge = Challenge.builder()
-            .groupId(currentChallenge.getGroupId())
-            .seqNo(currentChallenge.getSeqNo() + 1)
-            .startDate(nextStartDate)
-            .endDate(nextEndDate)
-            // 이전 시즌 설정을 기본값으로 복사
-            .frequencyType(currentChallenge.getFrequencyType())
-            .frequencyValue(currentChallenge.getFrequencyValue())
-            .daysOfWeek(currentChallenge.getDaysOfWeek())
-            .dailyCheckInCount(currentChallenge.getDailyCheckInCount())
-            .requiredDayCount(currentChallenge.getRequiredDayCount())
-            .allowPhoto(currentChallenge.isAllowPhoto())
-            // 새 시즌이므로 streak 초기화
-            .groupCurrentStreak(0)
-            .groupBestStreak(0)
-            .build();
+                .groupId(currentChallenge.getGroupId())
+                .seqNo(currentChallenge.getSeqNo() + 1)
+                .startDate(nextStartDate)
+                .endDate(nextEndDate)
+                // 이전 시즌 설정을 기본값으로 복사
+                .frequencyType(currentChallenge.getFrequencyType())
+                .frequencyValue(currentChallenge.getFrequencyValue())
+                .daysOfWeek(currentChallenge.getDaysOfWeek())
+                .dailyCheckInCount(currentChallenge.getDailyCheckInCount())
+                .requiredDayCount(currentChallenge.getRequiredDayCount())
+                .allowPhoto(currentChallenge.isAllowPhoto())
+                // 새 시즌이므로 streak 초기화
+                .groupCurrentStreak(0)
+                .groupBestStreak(0)
+                .build();
 
         return challengeRepository.save(nextChallenge);
     }
 
-    private void createNextChallengeMembers(Challenge nextChallenge, List<ChallengeMember> extendMembers, ChallengeMember nextOwner) {
-        for(ChallengeMember member : extendMembers) {
-            ChallengeMemberRole role = member.getUserId().equals(nextOwner.getUserId()) ? ChallengeMemberRole.OWNER : ChallengeMemberRole.MEMBER;
+    private void createNextChallengeMembers(
+            Challenge nextChallenge, List<ChallengeMember> extendMembers, ChallengeMember nextOwner) {
+        for (ChallengeMember member : extendMembers) {
+            ChallengeMemberRole role = member.getUserId().equals(nextOwner.getUserId())
+                    ? ChallengeMemberRole.OWNER
+                    : ChallengeMemberRole.MEMBER;
 
             challengeMemberService.createChallengeMember(nextChallenge, member.getUserId(), role);
         }
@@ -186,12 +195,15 @@ public class ChallengeExtensionService {
 
     private void leaveDeclineMembers(Long groupId, Long challengeId) {
         // 연장하지 않는 멤버 조회
-        List<ChallengeMember> declinedMembers = challengeMemberRepository.findAllByChallengeIdAndStatusAndExtensionChoice(challengeId, ChallengeMemberStatus.ACTIVE, ExtensionChoice.DECLINE);
+        List<ChallengeMember> declinedMembers =
+                challengeMemberRepository.findAllByChallengeIdAndStatusAndExtensionChoice(
+                        challengeId, ChallengeMemberStatus.ACTIVE, ExtensionChoice.DECLINE);
 
-        for(ChallengeMember member : declinedMembers) {
-            groupMemberRepository.findByGroupIdAndUserId(groupId, member.getUserId())
-                .filter(groupMember -> groupMember.getStatus() == GroupMemberStatus.ACTIVE)
-                .ifPresent(GroupMember::leave);
+        for (ChallengeMember member : declinedMembers) {
+            groupMemberRepository
+                    .findByGroupIdAndUserId(groupId, member.getUserId())
+                    .filter(groupMember -> groupMember.getStatus() == GroupMemberStatus.ACTIVE)
+                    .ifPresent(GroupMember::leave);
         }
     }
 

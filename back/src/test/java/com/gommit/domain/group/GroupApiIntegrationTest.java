@@ -62,8 +62,7 @@ class GroupApiIntegrationTest extends IntegrationTestSupport {
                     "allowedTypes": ["PHOTO"]
                   }
                 }
-                """
-                .formatted(
+                """.formatted(
                         name,
                         category,
                         mapType,
@@ -87,7 +86,8 @@ class GroupApiIntegrationTest extends IntegrationTestSupport {
     }
 
     private Long createGroupAndReturnId(String accessToken, Long ownerId, String name) throws Exception {
-        createGroup(accessToken, groupCreateBody(name, "EXERCISE", "GYM", "PUBLIC")).andExpect(status().isCreated());
+        createGroup(accessToken, groupCreateBody(name, "EXERCISE", "GYM", "PUBLIC"))
+                .andExpect(status().isCreated());
         return latestGroupIdOf(ownerId);
     }
 

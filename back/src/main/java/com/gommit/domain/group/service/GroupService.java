@@ -1,15 +1,15 @@
 package com.gommit.domain.group.service;
 
+import com.gommit.domain.challenge.dto.request.InitialChallengeSettingRequest;
 import com.gommit.domain.challenge.dto.response.ChallengeSummaryResponse;
 import com.gommit.domain.challenge.entity.*;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.challenge.service.ChallengeMemberService;
+import com.gommit.domain.challenge.service.ChallengeProgressCalculator;
 import com.gommit.domain.challenge.service.ChallengeService;
 import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.group.dto.request.GroupCreateRequest;
-import com.gommit.domain.challenge.dto.request.InitialChallengeSettingRequest;
-import com.gommit.domain.challenge.service.ChallengeProgressCalculator;
 import com.gommit.domain.group.dto.response.*;
 import com.gommit.domain.group.entity.*;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
@@ -19,15 +19,14 @@ import com.gommit.domain.user.entity.User;
 import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -63,120 +62,121 @@ public class GroupService {
         User user = userRepository.findById(userId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         return new GroupDetailResponse(
-            new GroupResponse(group, 1),
-            challengeResponse,
-            new GroupMemberResponse(groupMember, user)
-        );
+                new GroupResponse(group, 1), challengeResponse, new GroupMemberResponse(groupMember, user));
     }
 
     // 그룹 생성
     private ChallengeGroup createGroupEntity(Long userId, GroupCreateRequest request) {
         // 그룹 생성 시 그룹 상태는 READY로 설정
         ChallengeGroup group = ChallengeGroup.builder()
-            .name(request.name())
-            .description(request.description())
-            .category(request.category())
-            .mapType(request.mapType())
-            .visibility(request.visibility())
-            .maxMembers(request.maxMembers())
-            .ownerId(userId)
-            .build();
+                .name(request.name())
+                .description(request.description())
+                .category(request.category())
+                .mapType(request.mapType())
+                .visibility(request.visibility())
+                .maxMembers(request.maxMembers())
+                .ownerId(userId)
+                .build();
 
         return challengeGroupRepository.save(group);
     }
 
     // 그룹 생성자 첫 번째 그룹 멤버로 지정(초기 상태는 ACTIVE)
     private GroupMember createGroupMember(ChallengeGroup group, Long userId) {
-        GroupMember groupMember = GroupMember.builder()
-            .group(group)
-            .userId(userId)
-            .build();
+        GroupMember groupMember =
+                GroupMember.builder().group(group).userId(userId).build();
 
         return groupMemberRepository.save(groupMember);
     }
 
     private void validateCategoryMapType(GroupCreateRequest request) {
-        boolean valid = switch (request.category()) {
-            case DEV -> request.mapType() == MapType.STUDY_ROOM;
-            case READING -> request.mapType() == MapType.STUDY_ROOM;
-            case JOB -> request.mapType() == MapType.STUDY_ROOM;
-            case STUDY -> request.mapType() == MapType.STUDY_ROOM;
-            case EXERCISE -> request.mapType() == MapType.GYM;
-            case HEALTH -> request.mapType() == MapType.GYM;
-            case LIFE -> request.mapType() == MapType.STUDY_ROOM;
-            case ETC -> request.mapType() == MapType.STUDY_ROOM;
-        };
+        boolean valid =
+                switch (request.category()) {
+                    case DEV -> request.mapType() == MapType.STUDY_ROOM;
+                    case READING -> request.mapType() == MapType.STUDY_ROOM;
+                    case JOB -> request.mapType() == MapType.STUDY_ROOM;
+                    case STUDY -> request.mapType() == MapType.STUDY_ROOM;
+                    case EXERCISE -> request.mapType() == MapType.GYM;
+                    case HEALTH -> request.mapType() == MapType.GYM;
+                    case LIFE -> request.mapType() == MapType.STUDY_ROOM;
+                    case ETC -> request.mapType() == MapType.STUDY_ROOM;
+                };
 
         if (!valid) {
             throw new BusinessException(ErrorCode.INVALID_CATEGORY_MAP_TYPE);
         }
-
     }
 
     @Transactional(readOnly = true)
-    public GroupSummaryCursorResponse getPublicGroups(String keyword, GroupCategory category, GroupSort sort, Long cursor, int size) {
+    public GroupSummaryCursorResponse getPublicGroups(
+            String keyword, GroupCategory category, GroupSort sort, Long cursor, int size) {
 
         // 공개 + 모집 중인 그룹 조회
-        List<ChallengeGroup> groups = challengeGroupRepository.findAllByVisibilityAndStatus(Visibility.PUBLIC, GroupStatus.READY);
+        List<ChallengeGroup> groups =
+                challengeGroupRepository.findAllByVisibilityAndStatus(Visibility.PUBLIC, GroupStatus.READY);
 
         // 그룹명 검색
         if (keyword != null && !keyword.isBlank()) {
             String searchKeyword = keyword.trim().toLowerCase();
 
-            groups = groups.stream().filter(group -> group.getName().toLowerCase().contains(searchKeyword)).toList();
+            groups = groups.stream()
+                    .filter(group -> group.getName().toLowerCase().contains(searchKeyword))
+                    .toList();
         }
 
         // 카테고리 필터
-        if(category != null) {
-            groups = groups.stream().filter(group -> group.getCategory() == category).toList();
+        if (category != null) {
+            groups = groups.stream()
+                    .filter(group -> group.getCategory() == category)
+                    .toList();
         }
 
         // 조회 결과가 없을경우 빈 응답
-        if(groups.isEmpty()) {
-            return new GroupSummaryCursorResponse(
-                List.of(),
-                new CursorMetaResponse(null, false, 0)
-            );
+        if (groups.isEmpty()) {
+            return new GroupSummaryCursorResponse(List.of(), new CursorMetaResponse(null, false, 0));
         }
 
         // 그룹 ID 목록 추출
         List<Long> groupIds = groups.stream().map(ChallengeGroup::getId).toList();
 
         // 각 그룹의 READY Challenge 한번에 조회
-        List<Challenge> challenges = challengeRepository.findAllByGroupIdInAndStatus(
-            groupIds,
-            ChallengeStatus.READY
-        );
+        List<Challenge> challenges = challengeRepository.findAllByGroupIdInAndStatus(groupIds, ChallengeStatus.READY);
 
         // groupId -> Challenges
-        Map<Long, Challenge> challengeMap = challenges.stream().collect(Collectors.toMap(Challenge::getGroupId, challenge -> challenge));
-
+        Map<Long, Challenge> challengeMap =
+                challenges.stream().collect(Collectors.toMap(Challenge::getGroupId, challenge -> challenge));
 
         // 각 그룹의 ACTIVE 멤버 수를 한 번에 조회
-        List<GroupMemberCount> memberCounts = groupMemberRepository.countByGroupIdsAndStatus(groupIds, GroupMemberStatus.ACTIVE);
+        List<GroupMemberCount> memberCounts =
+                groupMemberRepository.countByGroupIdsAndStatus(groupIds, GroupMemberStatus.ACTIVE);
 
         // groupId -> currentMembers
-        Map<Long, Long> memberCountMap = memberCounts.stream().collect(Collectors.toMap(GroupMemberCount::getGroupId, GroupMemberCount::getCount));
+        Map<Long, Long> memberCountMap = memberCounts.stream()
+                .collect(Collectors.toMap(GroupMemberCount::getGroupId, GroupMemberCount::getCount));
 
         // GroupSummaryResponse로 변환
-        List<GroupSummaryResponse> summaries = groups.stream().map(group -> {
-            Challenge challenge = challengeMap.get(group.getId());
+        List<GroupSummaryResponse> summaries = groups.stream()
+                .map(group -> {
+                    Challenge challenge = challengeMap.get(group.getId());
 
-            if(challenge == null) {
-                throw new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND);
-            }
+                    if (challenge == null) {
+                        throw new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND);
+                    }
 
-            int currentMembers = memberCountMap.getOrDefault(group.getId(), 0L).intValue();
+                    int currentMembers =
+                            memberCountMap.getOrDefault(group.getId(), 0L).intValue();
 
-            return new GroupSummaryResponse(group, challenge, currentMembers);
-        }).toList();
+                    return new GroupSummaryResponse(group, challenge, currentMembers);
+                })
+                .toList();
 
         // 정렬하기
         summaries = sortGroupSummaries(summaries, sort);
 
         // cursor 적용
-        if(cursor != null) {
-            summaries = summaries.stream().filter(summary -> summary.id() < cursor).toList();
+        if (cursor != null) {
+            summaries =
+                    summaries.stream().filter(summary -> summary.id() < cursor).toList();
         }
 
         // size + 1 방식으로 다음 페이지 존재 여부 확인
@@ -187,166 +187,152 @@ public class GroupService {
         // 다음 cursor 계산
         Long nextCursor = null;
 
-        if(hasNext && !content.isEmpty()) {
+        if (hasNext && !content.isEmpty()) {
             nextCursor = content.get(content.size() - 1).id();
         }
 
         // cursor meta 생성
-        CursorMetaResponse meta = new CursorMetaResponse(
-            nextCursor,
-            hasNext,
-            content.size()
-        );
+        CursorMetaResponse meta = new CursorMetaResponse(nextCursor, hasNext, content.size());
 
         return new GroupSummaryCursorResponse(content, meta);
     }
 
-    private List<GroupSummaryResponse> sortGroupSummaries(
-        List<GroupSummaryResponse> summaries,
-        GroupSort sort
-    ) {
+    private List<GroupSummaryResponse> sortGroupSummaries(List<GroupSummaryResponse> summaries, GroupSort sort) {
 
         return switch (sort) {
 
             // 최신 생성 그룹
-            case LATEST -> summaries.stream()
-                .sorted(
-                    Comparator.comparing(GroupSummaryResponse::id)
-                        .reversed()
-                )
-                .toList();
+            case LATEST ->
+                summaries.stream()
+                        .sorted(Comparator.comparing(GroupSummaryResponse::id).reversed())
+                        .toList();
 
             // 현재 참여 인원이 많은 그룹
-            case POPULAR -> summaries.stream()
-                .sorted(
-                    Comparator.comparingInt(
-                            GroupSummaryResponse::currentMembers
-                        )
-                        .reversed()
-                        .thenComparing(
-                            GroupSummaryResponse::id,
-                            Comparator.reverseOrder()
-                        )
-                )
-                .toList();
+            case POPULAR ->
+                summaries.stream()
+                        .sorted(Comparator.comparingInt(GroupSummaryResponse::currentMembers)
+                                .reversed()
+                                .thenComparing(GroupSummaryResponse::id, Comparator.reverseOrder()))
+                        .toList();
 
             // 시작일이 가까운 그룹
-            case START_SOON -> summaries.stream()
-                .sorted(
-                    Comparator.comparing(
-                            GroupSummaryResponse::startDate
-                        )
-                        .thenComparing(
-                            GroupSummaryResponse::id,
-                            Comparator.reverseOrder()
-                        )
-                )
-                .toList();
+            case START_SOON ->
+                summaries.stream()
+                        .sorted(Comparator.comparing(GroupSummaryResponse::startDate)
+                                .thenComparing(GroupSummaryResponse::id, Comparator.reverseOrder()))
+                        .toList();
         };
     }
-
 
     @Transactional(readOnly = true)
     public GroupDetailResponse getGroupDetail(Long groupId) {
         // 그룹 조회
-        ChallengeGroup group = challengeGroupRepository.findById(groupId).orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+        ChallengeGroup group = challengeGroupRepository
+                .findById(groupId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
 
         // 현재 챌린지 조회
-        Challenge currentChallenge = challengeRepository.findFirstByGroupIdAndStatus(groupId, ChallengeStatus.ACTIVE).orElseGet(() -> challengeRepository.findFirstByGroupIdAndStatus(groupId, ChallengeStatus.READY).orElse(null));
+        Challenge currentChallenge = challengeRepository
+                .findFirstByGroupIdAndStatus(groupId, ChallengeStatus.ACTIVE)
+                .orElseGet(() -> challengeRepository
+                        .findFirstByGroupIdAndStatus(groupId, ChallengeStatus.READY)
+                        .orElse(null));
 
         // 현재 그룹 멤버 조회
         List<GroupMember> members = groupMemberRepository.findAllByGroupIdAndStatus(groupId, GroupMemberStatus.ACTIVE);
 
         List<Long> userIds = members.stream().map(GroupMember::getUserId).toList();
 
-        Map<Long, User> userMap = userRepository.findAllById(userIds).stream().collect(Collectors.toMap(User::getId, user -> user));
+        Map<Long, User> userMap =
+                userRepository.findAllById(userIds).stream().collect(Collectors.toMap(User::getId, user -> user));
 
         // 그룹정보랑 유저정보 -> 응답 DTO
-        List<GroupMemberResponse> memberResponses = members.stream().map(member -> {
-            User user = userMap.get(member.getUserId());
+        List<GroupMemberResponse> memberResponses = members.stream()
+                .map(member -> {
+                    User user = userMap.get(member.getUserId());
 
-            if(user == null) {
-                throw new BusinessException(ErrorCode.USER_NOT_FOUND);
-            }
+                    if (user == null) {
+                        throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+                    }
 
-            return new GroupMemberResponse(member, user);
-        }).toList();
+                    return new GroupMemberResponse(member, user);
+                })
+                .toList();
 
         return new GroupDetailResponse(
-            new GroupResponse(group, members.size()),
-            currentChallenge == null ? null : new ChallengeSummaryResponse(currentChallenge),
-            memberResponses
-        );
+                new GroupResponse(group, members.size()),
+                currentChallenge == null ? null : new ChallengeSummaryResponse(currentChallenge),
+                memberResponses);
     }
 
     // 공개 그룹 참여
     @Transactional
     public GroupJoinResponse joinGroup(Long groupId, Long userId) {
         // 그룹조회
-        ChallengeGroup group = challengeGroupRepository.findById(groupId).orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+        ChallengeGroup group = challengeGroupRepository
+                .findById(groupId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
 
         // 그룹 참여 가능한지 확인
-        if(group.getStatus() != GroupStatus.READY) {
+        if (group.getStatus() != GroupStatus.READY) {
             throw new BusinessException(ErrorCode.GROUP_NOT_JOINABLE);
         }
 
         // 공개그룹인지 확인
-        if(group.getVisibility() != Visibility.PUBLIC) {
+        if (group.getVisibility() != Visibility.PUBLIC) {
             throw new BusinessException(ErrorCode.INVITE_CODE_REQUIRED);
         }
 
         // READY 챌린지 조회
-        Challenge challenge = challengeRepository.findFirstByGroupIdAndStatus(groupId, ChallengeStatus.READY).orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_JOINABLE));
+        Challenge challenge = challengeRepository
+                .findFirstByGroupIdAndStatus(groupId, ChallengeStatus.READY)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_JOINABLE));
 
         // 기존 GroupMember 참여 이력 확인
-        if(groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
+        if (groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
             throw new BusinessException(ErrorCode.ALREADY_JOINED);
         }
 
         // 현재 ACTIVE 멤버 수 확인
         long currentMembers = groupMemberRepository.countByGroupIdAndStatus(groupId, GroupMemberStatus.ACTIVE);
 
-        if(currentMembers >= group.getMaxMembers()) {
+        if (currentMembers >= group.getMaxMembers()) {
             throw new BusinessException(ErrorCode.GROUP_FULL);
         }
 
         // 검증 후 GroupMember 생성
-        GroupMember groupMember = GroupMember.builder()
-            .group(group)
-            .userId(userId)
-            .build();
+        GroupMember groupMember =
+                GroupMember.builder().group(group).userId(userId).build();
 
         GroupMember savedGroupMember = groupMemberRepository.save(groupMember);
 
         // ChallengeMember 생성
-        ChallengeMember challengeMember = challengeMemberService.createChallengeMember(
-            challenge,
-            userId,
-            ChallengeMemberRole.MEMBER
-        );
+        ChallengeMember challengeMember =
+                challengeMemberService.createChallengeMember(challenge, userId, ChallengeMemberRole.MEMBER);
 
         User user = userRepository.findById(userId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         return new GroupJoinResponse(
-            new GroupMemberResponse(savedGroupMember, user),
-            challenge.getId(),
-            challengeMember.getId()
-        );
+                new GroupMemberResponse(savedGroupMember, user), challenge.getId(), challengeMember.getId());
     }
 
     // 그룹 퇴장
     @Transactional
     public void leaveGroup(Long groupId, Long userId) {
-        ChallengeGroup group = challengeGroupRepository.findById(groupId).orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+        ChallengeGroup group = challengeGroupRepository
+                .findById(groupId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
 
-        GroupMember groupMember = groupMemberRepository.findByGroupIdAndUserId(groupId, userId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_GROUP_MEMBER));
+        GroupMember groupMember = groupMemberRepository
+                .findByGroupIdAndUserId(groupId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_GROUP_MEMBER));
 
-        if(groupMember.getStatus() != GroupMemberStatus.ACTIVE) {
+        if (groupMember.getStatus() != GroupMemberStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.NOT_GROUP_MEMBER);
         }
 
         // 그룹 OWNER는 바로 퇴장 불가
-        if(group.getOwnerId().equals(userId)) {
+        if (group.getOwnerId().equals(userId)) {
             throw new BusinessException(ErrorCode.GROUP_OWNER_CANNOT_LEAVE);
         }
 
@@ -354,92 +340,109 @@ public class GroupService {
         groupMember.leave();
 
         // ACTIVE 시즌 멤버 퇴장
-        challengeRepository.findFirstByGroupIdAndStatus(groupId, ChallengeStatus.ACTIVE).ifPresent(challenge -> leaveChallengeMember(challenge.getId(), userId));
+        challengeRepository
+                .findFirstByGroupIdAndStatus(groupId, ChallengeStatus.ACTIVE)
+                .ifPresent(challenge -> leaveChallengeMember(challenge.getId(), userId));
 
         // READY 시즌 멤버 퇴장
-        challengeRepository.findFirstByGroupIdAndStatus(groupId, ChallengeStatus.READY).ifPresent(challenge -> leaveChallengeMember(challenge.getId(), userId));
+        challengeRepository
+                .findFirstByGroupIdAndStatus(groupId, ChallengeStatus.READY)
+                .ifPresent(challenge -> leaveChallengeMember(challenge.getId(), userId));
     }
 
     private void leaveChallengeMember(Long challengeId, Long userId) {
         challengeMemberRepository
-            .findByChallengeIdAndUserId(challengeId, userId)
-            .filter(member ->
-                member.getStatus() == ChallengeMemberStatus.ACTIVE
-            )
-            .ifPresent(ChallengeMember::leave);
+                .findByChallengeIdAndUserId(challengeId, userId)
+                .filter(member -> member.getStatus() == ChallengeMemberStatus.ACTIVE)
+                .ifPresent(ChallengeMember::leave);
     }
 
     // 내 그룹 목록 조회
     @Transactional(readOnly = true)
     public MyGroupCursorResponse getMyGroups(Long userId, GroupStatus status, Long cursor, int size) {
         // 내가 현재 참여 중이거나 정상 종료한 챌린지 멤버 조회
-        List<ChallengeMember> challengeMembers = challengeMemberRepository.findAllByUserIdAndStatus(userId, ChallengeMemberStatus.ACTIVE);
+        List<ChallengeMember> challengeMembers =
+                challengeMemberRepository.findAllByUserIdAndStatus(userId, ChallengeMemberStatus.ACTIVE);
 
         // 현재 참여 중인 그룹 Id 조회
-        List<Long> currentGroupIds = challengeMembers.stream().map(ChallengeMember::getChallenge).filter(challenge -> challenge.getStatus() == ChallengeStatus.READY || challenge.getStatus() == ChallengeStatus.ACTIVE)
-            .map(Challenge::getGroupId)
-            .distinct()
-            .toList();
+        List<Long> currentGroupIds = challengeMembers.stream()
+                .map(ChallengeMember::getChallenge)
+                .filter(challenge -> challenge.getStatus() == ChallengeStatus.READY
+                        || challenge.getStatus() == ChallengeStatus.ACTIVE)
+                .map(Challenge::getGroupId)
+                .distinct()
+                .toList();
 
         // 화면에 보여줄 챌린지 필터링
-        List<ChallengeMember> displayMembers = challengeMembers.stream().filter(member -> {
-            Challenge challenge = member.getChallenge();
+        List<ChallengeMember> displayMembers = challengeMembers.stream()
+                .filter(member -> {
+                    Challenge challenge = member.getChallenge();
 
-            // 현재 참여 중인 시즌
-            if(challenge.getStatus() == ChallengeStatus.READY || challenge.getStatus() == ChallengeStatus.ACTIVE) {
-                return true;
-            }
+                    // 현재 참여 중인 시즌
+                    if (challenge.getStatus() == ChallengeStatus.READY
+                            || challenge.getStatus() == ChallengeStatus.ACTIVE) {
+                        return true;
+                    }
 
-            // 정상 종료한 시즌
-            if(challenge.getStatus() == ChallengeStatus.ENDED) {
-                // 같은 그룹의 다음시즌에 현재 참여 중이라면 이전 챌린지 영역에 중복 표시하지 않음
-                return !currentGroupIds.contains(challenge.getGroupId());
-            }
-            return false;
-        }).toList();
+                    // 정상 종료한 시즌
+                    if (challenge.getStatus() == ChallengeStatus.ENDED) {
+                        // 같은 그룹의 다음시즌에 현재 참여 중이라면 이전 챌린지 영역에 중복 표시하지 않음
+                        return !currentGroupIds.contains(challenge.getGroupId());
+                    }
+                    return false;
+                })
+                .toList();
 
         // 그룹 필터링
-        if(status != null) {
-            displayMembers = displayMembers.stream().filter(member -> {
-                Long groupId = member.getChallenge().getGroupId();
+        if (status != null) {
+            displayMembers = displayMembers.stream()
+                    .filter(member -> {
+                        Long groupId = member.getChallenge().getGroupId();
 
-                ChallengeGroup group = challengeGroupRepository.findById(groupId).orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+                        ChallengeGroup group = challengeGroupRepository
+                                .findById(groupId)
+                                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
 
-                return group.getStatus() == status;
-            }).toList();
+                        return group.getStatus() == status;
+                    })
+                    .toList();
         }
 
         // 커서 기준 정렬
         displayMembers = displayMembers.stream()
-            .sorted(
-                Comparator.comparing(ChallengeMember::getId).reversed()
-            ).toList();
+                .sorted(Comparator.comparing(ChallengeMember::getId).reversed())
+                .toList();
 
         // cursor가 있으면 cursor보다 작은 Id만 남김
-        if(cursor != null) {
-            displayMembers = displayMembers.stream().filter(member -> member.getId() < cursor).toList();
+        if (cursor != null) {
+            displayMembers = displayMembers.stream()
+                    .filter(member -> member.getId() < cursor)
+                    .toList();
         }
 
         // hasNext 확인을 위해 size + 1 개 조회
-        List<ChallengeMember> pageMembers = displayMembers.stream().limit(size + 1L).toList();
+        List<ChallengeMember> pageMembers =
+                displayMembers.stream().limit(size + 1L).toList();
 
         boolean hasNext = pageMembers.size() > size;
 
         // 실제 응답에는 size개만 반환
-        if(hasNext) {
+        if (hasNext) {
             pageMembers = pageMembers.subList(0, size);
         }
 
-        List<MyGroupSummaryResponse> content = pageMembers.stream().map(member -> toMyGroupSummaryResponse(member, userId)).toList();
+        List<MyGroupSummaryResponse> content = pageMembers.stream()
+                .map(member -> toMyGroupSummaryResponse(member, userId))
+                .toList();
 
         // 다음 커서 생성
         Long nextCursor = null;
-        if(hasNext && !pageMembers.isEmpty()) {
+        if (hasNext && !pageMembers.isEmpty()) {
             nextCursor = pageMembers.get(pageMembers.size() - 1).getId();
         }
 
         // meta 생성
-        CursorMetaResponse meta =  new CursorMetaResponse(nextCursor, hasNext, content.size());
+        CursorMetaResponse meta = new CursorMetaResponse(nextCursor, hasNext, content.size());
 
         return new MyGroupCursorResponse(content, meta);
     }
@@ -447,10 +450,13 @@ public class GroupService {
     private MyGroupSummaryResponse toMyGroupSummaryResponse(ChallengeMember member, Long userId) {
         Challenge challenge = member.getChallenge();
 
-        ChallengeGroup group = challengeGroupRepository.findById(challenge.getGroupId()).orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+        ChallengeGroup group = challengeGroupRepository
+                .findById(challenge.getGroupId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
 
         // 현재 시즌 참여 인원
-        int participantCount = (int) challengeMemberRepository.countByChallengeIdAndStatus(challenge.getId(), ChallengeMemberStatus.ACTIVE);
+        int participantCount = (int)
+                challengeMemberRepository.countByChallengeIdAndStatus(challenge.getId(), ChallengeMemberStatus.ACTIVE);
 
         LocalDate today = LocalDate.now();
 
@@ -464,28 +470,29 @@ public class GroupService {
         // 오늘 인증 횟수
         int todayCheckInCount = 0;
 
-        if(challenge.getStatus() == ChallengeStatus.ACTIVE) {
+        if (challenge.getStatus() == ChallengeStatus.ACTIVE) {
             // TODO: CheckInRepository 연동 후 실제 값으로 변경
-//            todayCheckInCount = (int) checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challenge.getId(), userId, today);
+            //            todayCheckInCount = (int)
+            // checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challenge.getId(), userId, today);
         }
 
         // 오늘 인증 완료 여부
-        boolean todayCompleted = challenge.getStatus() == ChallengeStatus.ACTIVE && todayCheckInCount >= challenge.getDailyCheckInCount();
+        boolean todayCompleted = challenge.getStatus() == ChallengeStatus.ACTIVE
+                && todayCheckInCount >= challenge.getDailyCheckInCount();
 
         return new MyGroupSummaryResponse(
-            group.getId(),
-            challenge.getId(),
-            group.getName(),
-            group.getCategory(),
-            group.getStatus(),
-            challenge.getStatus(),
-            participantCount,
-            currentDay,
-            totalDays,
-            periodProgressRate,
-            todayCheckInCount,
-            challenge.getDailyCheckInCount(),
-            todayCompleted
-        );
+                group.getId(),
+                challenge.getId(),
+                group.getName(),
+                group.getCategory(),
+                group.getStatus(),
+                challenge.getStatus(),
+                participantCount,
+                currentDay,
+                totalDays,
+                periodProgressRate,
+                todayCheckInCount,
+                challenge.getDailyCheckInCount(),
+                todayCompleted);
     }
 }

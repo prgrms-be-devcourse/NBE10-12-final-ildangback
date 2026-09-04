@@ -8,30 +8,16 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 
 public record GroupCreateRequest(
+        @NotBlank @Size(min = 1, max = 100) String name,
 
-    @NotBlank
-    @Size(min = 1, max = 100)
-    String name,
+        @Size(max = 2000) String description,
 
-    @Size(max = 2000)
-    String description,
+        @NotNull GroupCategory category,
 
-    @NotNull
-    GroupCategory category,
+        @NotNull MapType mapType,
 
-    @NotNull
-    MapType mapType,
+        @NotNull Visibility visibility,
 
-    @NotNull
-    Visibility visibility,
+        @NotNull @Min(1) @Max(6) Integer maxMembers,
 
-    @NotNull
-    @Min(1)
-    @Max(6)
-    Integer maxMembers,
-
-    @NotNull
-    @Valid
-    InitialChallengeSettingRequest challenge
-) {
-}
+        @NotNull @Valid InitialChallengeSettingRequest challenge) {}

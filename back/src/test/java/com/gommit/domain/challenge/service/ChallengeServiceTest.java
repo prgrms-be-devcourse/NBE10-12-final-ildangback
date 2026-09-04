@@ -16,7 +16,6 @@ import com.gommit.domain.challenge.entity.ChallengeMember;
 import com.gommit.domain.challenge.entity.ChallengeMemberRole;
 import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.entity.ChallengeStatus;
-import com.gommit.domain.challenge.entity.DaysOfWeek;
 import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
@@ -120,7 +119,11 @@ class ChallengeServiceTest {
     }
 
     private ChallengeMember challengeMember(Long id, Challenge challenge, Long userId, ChallengeMemberRole role) {
-        ChallengeMember member = ChallengeMember.builder().challenge(challenge).userId(userId).role(role).build();
+        ChallengeMember member = ChallengeMember.builder()
+                .challenge(challenge)
+                .userId(userId)
+                .role(role)
+                .build();
         setBaseFields(member, id);
         return member;
     }
@@ -189,12 +192,17 @@ class ChallengeServiceTest {
         void throwsWhenStartDateIsNotFuture() {
             // given
             InitialChallengeSettingRequest setting = new InitialChallengeSettingRequest(
-                    LocalDate.now(), LocalDate.now().plusDays(7), FrequencyType.DAILY, null, null, 1, List.of(CheckInType.PHOTO));
+                    LocalDate.now(),
+                    LocalDate.now().plusDays(7),
+                    FrequencyType.DAILY,
+                    null,
+                    null,
+                    1,
+                    List.of(CheckInType.PHOTO));
 
             // when & then
             assertBusinessException(
-                    () -> challengeService.createInitialChallenge(12L, 1L, setting),
-                    ErrorCode.INVALID_START_DATE);
+                    () -> challengeService.createInitialChallenge(12L, 1L, setting), ErrorCode.INVALID_START_DATE);
             verify(challengeRepository, never()).save(any());
         }
 
@@ -203,12 +211,17 @@ class ChallengeServiceTest {
         void throwsWhenAllowedTypesIsEmpty() {
             // given
             InitialChallengeSettingRequest setting = new InitialChallengeSettingRequest(
-                    LocalDate.now().plusDays(1), LocalDate.now().plusDays(7), FrequencyType.DAILY, null, null, 1, List.of());
+                    LocalDate.now().plusDays(1),
+                    LocalDate.now().plusDays(7),
+                    FrequencyType.DAILY,
+                    null,
+                    null,
+                    1,
+                    List.of());
 
             // when & then
             assertBusinessException(
-                    () -> challengeService.createInitialChallenge(12L, 1L, setting),
-                    ErrorCode.NO_CHECK_IN_METHOD);
+                    () -> challengeService.createInitialChallenge(12L, 1L, setting), ErrorCode.NO_CHECK_IN_METHOD);
             verify(challengeRepository, never()).save(any());
         }
     }
@@ -230,7 +243,8 @@ class ChallengeServiceTest {
                     .thenReturn(Optional.of(owner));
             when(challengeMemberRepository.countByChallengeIdAndStatus(50L, ChallengeMemberStatus.ACTIVE))
                     .thenReturn(3L);
-            when(challengeProgressCalculator.calculateCurrentDay(eq(challenge), any(LocalDate.class))).thenReturn(2);
+            when(challengeProgressCalculator.calculateCurrentDay(eq(challenge), any(LocalDate.class)))
+                    .thenReturn(2);
             when(challengeProgressCalculator.calculatePeriodProgressRate(2, 7)).thenReturn(28.6);
 
             // when
@@ -252,9 +266,7 @@ class ChallengeServiceTest {
             when(challengeRepository.findById(999L)).thenReturn(Optional.empty());
 
             // when & then
-            assertBusinessException(
-                    () -> challengeService.getChallengeStatus(999L, 2L),
-                    ErrorCode.CHALLENGE_NOT_FOUND);
+            assertBusinessException(() -> challengeService.getChallengeStatus(999L, 2L), ErrorCode.CHALLENGE_NOT_FOUND);
         }
 
         @Test
@@ -266,9 +278,7 @@ class ChallengeServiceTest {
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.empty());
 
             // when & then
-            assertBusinessException(
-                    () -> challengeService.getChallengeStatus(50L, 2L),
-                    ErrorCode.NOT_CHALLENGE_MEMBER);
+            assertBusinessException(() -> challengeService.getChallengeStatus(50L, 2L), ErrorCode.NOT_CHALLENGE_MEMBER);
         }
     }
 
@@ -287,8 +297,7 @@ class ChallengeServiceTest {
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(requester));
             when(challengeMemberRepository.findAllByChallengeIdAndStatus(50L, ChallengeMemberStatus.ACTIVE))
                     .thenReturn(List.of(requester, member));
-            when(userRepository.findAllByIdIn(List.of(1L, 2L)))
-                    .thenReturn(List.of(user(1L, "방장"), user(2L, "멤버")));
+            when(userRepository.findAllByIdIn(List.of(1L, 2L))).thenReturn(List.of(user(1L, "방장"), user(2L, "멤버")));
 
             // when
             var response = challengeService.getMemberTodayStatuses(50L, 1L);
@@ -338,8 +347,7 @@ class ChallengeServiceTest {
 
             // when & then
             assertBusinessException(
-                    () -> challengeService.updateChallenge(50L, 2L, updateRequest()),
-                    ErrorCode.NOT_CHALLENGE_OWNER);
+                    () -> challengeService.updateChallenge(50L, 2L, updateRequest()), ErrorCode.NOT_CHALLENGE_OWNER);
         }
 
         @Test
@@ -353,8 +361,7 @@ class ChallengeServiceTest {
 
             // when & then
             assertBusinessException(
-                    () -> challengeService.updateChallenge(50L, 1L, updateRequest()),
-                    ErrorCode.CHALLENGE_NOT_EDITABLE);
+                    () -> challengeService.updateChallenge(50L, 1L, updateRequest()), ErrorCode.CHALLENGE_NOT_EDITABLE);
         }
 
         @Test
@@ -376,8 +383,7 @@ class ChallengeServiceTest {
 
             // when & then
             assertBusinessException(
-                    () -> challengeService.updateChallenge(50L, 1L, request),
-                    ErrorCode.INVALID_DAILY_COUNT);
+                    () -> challengeService.updateChallenge(50L, 1L, request), ErrorCode.INVALID_DAILY_COUNT);
         }
 
         @Test
@@ -410,10 +416,8 @@ class ChallengeServiceTest {
             ChallengeMember targetMember = challengeMember(71L, challenge, 2L, ChallengeMemberRole.MEMBER);
             ChallengeGroup group = group(12L, 1L);
             when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
-            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L))
-                    .thenReturn(Optional.of(currentOwner));
-            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L))
-                    .thenReturn(Optional.of(targetMember));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(currentOwner));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(targetMember));
             when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
 
             // when
@@ -434,8 +438,7 @@ class ChallengeServiceTest {
             Challenge challenge = challenge(50L, ChallengeStatus.READY);
             ChallengeMember currentOwner = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
             when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
-            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L))
-                    .thenReturn(Optional.of(currentOwner));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(currentOwner));
 
             // when & then
             assertBusinessException(
@@ -452,10 +455,8 @@ class ChallengeServiceTest {
             ChallengeMember targetMember = challengeMember(71L, challenge, 2L, ChallengeMemberRole.MEMBER);
             targetMember.leave();
             when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
-            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L))
-                    .thenReturn(Optional.of(currentOwner));
-            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L))
-                    .thenReturn(Optional.of(targetMember));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(currentOwner));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(targetMember));
 
             // when & then
             assertBusinessException(
