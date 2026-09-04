@@ -232,6 +232,61 @@ class GroupServiceTest {
             verify(challengeGroupRepository, never()).save(any());
             verify(groupMemberRepository, never()).save(any());
         }
+
+        @Test
+        @DisplayName("카테고리별 허용된 맵 타입이면 그룹을 생성한다")
+        void createsGroupForEachValidCategoryMapType() {
+            // given
+            when(challengeGroupRepository.save(any())).thenAnswer(invocation -> {
+                ChallengeGroup group = invocation.getArgument(0);
+                setBaseFields(group, 12L);
+                return group;
+            });
+            when(groupMemberRepository.save(any())).thenAnswer(invocation -> {
+                GroupMember member = invocation.getArgument(0);
+                setBaseFields(member, 30L);
+                return member;
+            });
+            when(challengeService.createInitialChallenge(eq(12L), eq(1L), any()))
+                    .thenReturn(challenge(50L, 12L, ChallengeStatus.READY));
+            when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "꼬밋러")));
+
+            // when & then
+            assertThat(groupService.createGroup(1L, createRequest(GroupCategory.DEV, MapType.STUDY_ROOM)).group().id())
+                    .isEqualTo(12L);
+            assertThat(groupService.createGroup(1L, createRequest(GroupCategory.READING, MapType.STUDY_ROOM)).group().id())
+                    .isEqualTo(12L);
+            assertThat(groupService.createGroup(1L, createRequest(GroupCategory.JOB, MapType.STUDY_ROOM)).group().id())
+                    .isEqualTo(12L);
+            assertThat(groupService.createGroup(1L, createRequest(GroupCategory.STUDY, MapType.STUDY_ROOM)).group().id())
+                    .isEqualTo(12L);
+            assertThat(groupService.createGroup(1L, createRequest(GroupCategory.EXERCISE, MapType.GYM)).group().id())
+                    .isEqualTo(12L);
+            assertThat(groupService.createGroup(1L, createRequest(GroupCategory.HEALTH, MapType.GYM)).group().id())
+                    .isEqualTo(12L);
+            assertThat(groupService.createGroup(1L, createRequest(GroupCategory.LIFE, MapType.STUDY_ROOM)).group().id())
+                    .isEqualTo(12L);
+            assertThat(groupService.createGroup(1L, createRequest(GroupCategory.ETC, MapType.STUDY_ROOM)).group().id())
+                    .isEqualTo(12L);
+        }
+
+        @Test
+        @DisplayName("그룹 생성 후 유저 정보가 없으면 USER_NOT_FOUND")
+        void throwsWhenOwnerUserMissing() {
+            // given
+            GroupCreateRequest request = createRequest(GroupCategory.EXERCISE, MapType.GYM);
+            ChallengeGroup savedGroup = group(12L, "오운완 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            GroupMember savedMember = groupMember(30L, savedGroup, 1L);
+            Challenge savedChallenge = challenge(50L, 12L, ChallengeStatus.READY);
+            when(challengeGroupRepository.save(any())).thenReturn(savedGroup);
+            when(groupMemberRepository.save(any())).thenReturn(savedMember);
+            when(challengeService.createInitialChallenge(12L, 1L, request.challenge()))
+                    .thenReturn(savedChallenge);
+            when(userRepository.findById(1L)).thenReturn(Optional.empty());
+
+            // when & then
+            assertBusinessException(() -> groupService.createGroup(1L, request), ErrorCode.USER_NOT_FOUND);
+        }
     }
 
     @Nested
@@ -297,6 +352,74 @@ class GroupServiceTest {
             assertThat(response.content().get(0).currentMembers()).isEqualTo(4);
             assertThat(response.hasNext()).isTrue();
             assertThat(response.nextCursor()).isEqualTo(12L);
+        }
+
+        @Test
+        @DisplayName("인기순이면 참여 인원 내림차순과 id 내림차순으로 정렬한다")
+        void sortsByPopularity() {
+            // given
+            ChallengeGroup first = group(11L, "아침 오운완", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            ChallengeGroup second = group(12L, "저녁 오운완", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            Challenge firstChallenge = challenge(101L, 11L, ChallengeStatus.READY);
+            Challenge secondChallenge = challenge(102L, 12L, ChallengeStatus.READY);
+            when(challengeGroupRepository.findAllByVisibilityAndStatus(Visibility.PUBLIC, GroupStatus.READY))
+                    .thenReturn(List.of(first, second));
+            when(challengeRepository.findAllByGroupIdInAndStatus(List.of(11L, 12L), ChallengeStatus.READY))
+                    .thenReturn(List.of(firstChallenge, secondChallenge));
+            when(groupMemberRepository.countByGroupIdsAndStatus(List.of(11L, 12L), GroupMemberStatus.ACTIVE))
+                    .thenReturn(List.of(memberCount(11L, 5L), memberCount(12L, 5L)));
+
+            // when
+            var response = groupService.getPublicGroups(null, null, GroupSort.POPULAR, null, 20);
+
+            // then
+            assertThat(response.content()).extracting("id").containsExactly(12L, 11L);
+        }
+
+        @Test
+        @DisplayName("시작임박순이면 시작일 오름차순과 id 내림차순으로 정렬한다")
+        void sortsByStartSoon() {
+            // given
+            ChallengeGroup first = group(11L, "아침 오운완", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            ChallengeGroup second = group(12L, "저녁 오운완", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            Challenge firstChallenge = challenge(101L, 11L, ChallengeStatus.READY);
+            Challenge secondChallenge = challenge(102L, 12L, ChallengeStatus.READY);
+            ReflectionTestUtils.setField(firstChallenge, "startDate", LocalDate.now().plusDays(5));
+            ReflectionTestUtils.setField(secondChallenge, "startDate", LocalDate.now().plusDays(2));
+            when(challengeGroupRepository.findAllByVisibilityAndStatus(Visibility.PUBLIC, GroupStatus.READY))
+                    .thenReturn(List.of(first, second));
+            when(challengeRepository.findAllByGroupIdInAndStatus(List.of(11L, 12L), ChallengeStatus.READY))
+                    .thenReturn(List.of(firstChallenge, secondChallenge));
+            when(groupMemberRepository.countByGroupIdsAndStatus(List.of(11L, 12L), GroupMemberStatus.ACTIVE))
+                    .thenReturn(List.of(memberCount(11L, 2L)));
+
+            // when
+            var response = groupService.getPublicGroups(null, null, GroupSort.START_SOON, null, 20);
+
+            // then
+            assertThat(response.content()).extracting("id").containsExactly(12L, 11L);
+            assertThat(response.content().get(0).currentMembers()).isZero();
+        }
+
+        @Test
+        @DisplayName("커서보다 작은 그룹만 반환한다")
+        void appliesCursor() {
+            // given
+            ChallengeGroup first = group(11L, "아침 오운완", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            ChallengeGroup second = group(12L, "저녁 오운완", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            when(challengeGroupRepository.findAllByVisibilityAndStatus(Visibility.PUBLIC, GroupStatus.READY))
+                    .thenReturn(List.of(first, second));
+            when(challengeRepository.findAllByGroupIdInAndStatus(List.of(11L, 12L), ChallengeStatus.READY))
+                    .thenReturn(List.of(challenge(101L, 11L, ChallengeStatus.READY), challenge(102L, 12L, ChallengeStatus.READY)));
+            when(groupMemberRepository.countByGroupIdsAndStatus(List.of(11L, 12L), GroupMemberStatus.ACTIVE))
+                    .thenReturn(List.of());
+
+            // when
+            var response = groupService.getPublicGroups(null, null, GroupSort.LATEST, 12L, 20);
+
+            // then
+            assertThat(response.content()).extracting("id").containsExactly(11L);
+            assertThat(response.hasNext()).isFalse();
         }
     }
 
@@ -415,6 +538,33 @@ class GroupServiceTest {
         }
 
         @Test
+        @DisplayName("READY 상태가 아니면 GROUP_NOT_JOINABLE")
+        void throwsWhenGroupIsNotReady() {
+            // given
+            ChallengeGroup group = group(12L, "진행 중 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            group.activate();
+            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+
+            // when & then
+            assertBusinessException(() -> groupService.joinGroup(12L, 2L), ErrorCode.GROUP_NOT_JOINABLE);
+            verify(groupMemberRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("READY 챌린지가 없으면 GROUP_NOT_JOINABLE")
+        void throwsWhenReadyChallengeMissing() {
+            // given
+            ChallengeGroup group = group(12L, "오운완 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.READY))
+                    .thenReturn(Optional.empty());
+
+            // when & then
+            assertBusinessException(() -> groupService.joinGroup(12L, 2L), ErrorCode.GROUP_NOT_JOINABLE);
+            verify(groupMemberRepository, never()).save(any());
+        }
+
+        @Test
         @DisplayName("이미 참여 이력이 있으면 ALREADY_JOINED")
         void throwsWhenAlreadyJoined() {
             // given
@@ -446,6 +596,29 @@ class GroupServiceTest {
             // when & then
             assertBusinessException(() -> groupService.joinGroup(12L, 2L), ErrorCode.GROUP_FULL);
             verify(groupMemberRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("참여 후 유저 정보가 없으면 USER_NOT_FOUND")
+        void throwsWhenUserMissingAfterJoin() {
+            // given
+            ChallengeGroup group = group(12L, "오운완 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            Challenge challenge = challenge(50L, 12L, ChallengeStatus.READY);
+            GroupMember savedGroupMember = groupMember(30L, group, 2L);
+            ChallengeMember savedChallengeMember = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
+            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.READY))
+                    .thenReturn(Optional.of(challenge));
+            when(groupMemberRepository.existsByGroupIdAndUserId(12L, 2L)).thenReturn(false);
+            when(groupMemberRepository.countByGroupIdAndStatus(12L, GroupMemberStatus.ACTIVE))
+                    .thenReturn(1L);
+            when(groupMemberRepository.save(any())).thenReturn(savedGroupMember);
+            when(challengeMemberService.createChallengeMember(challenge, 2L, ChallengeMemberRole.MEMBER))
+                    .thenReturn(savedChallengeMember);
+            when(userRepository.findById(2L)).thenReturn(Optional.empty());
+
+            // when & then
+            assertBusinessException(() -> groupService.joinGroup(12L, 2L), ErrorCode.USER_NOT_FOUND);
         }
     }
 
@@ -496,6 +669,28 @@ class GroupServiceTest {
         }
 
         @Test
+        @DisplayName("그룹이 없으면 GROUP_NOT_FOUND")
+        void throwsWhenGroupNotFound() {
+            // given
+            when(challengeGroupRepository.findById(999L)).thenReturn(Optional.empty());
+
+            // when & then
+            assertBusinessException(() -> groupService.leaveGroup(999L, 2L), ErrorCode.GROUP_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("그룹 멤버 이력이 없으면 NOT_GROUP_MEMBER")
+        void throwsWhenGroupMemberMissing() {
+            // given
+            ChallengeGroup group = group(12L, "오운완 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(groupMemberRepository.findByGroupIdAndUserId(12L, 2L)).thenReturn(Optional.empty());
+
+            // when & then
+            assertBusinessException(() -> groupService.leaveGroup(12L, 2L), ErrorCode.NOT_GROUP_MEMBER);
+        }
+
+        @Test
         @DisplayName("그룹 OWNER는 바로 퇴장할 수 없다")
         void throwsWhenOwnerLeaves() {
             // given
@@ -507,6 +702,33 @@ class GroupServiceTest {
             // when & then
             assertBusinessException(() -> groupService.leaveGroup(12L, 1L), ErrorCode.GROUP_OWNER_CANNOT_LEAVE);
             assertThat(ownerMember.getStatus()).isEqualTo(GroupMemberStatus.ACTIVE);
+        }
+
+        @Test
+        @DisplayName("시즌 멤버가 없거나 이미 LEFT면 그룹 멤버만 LEFT 처리한다")
+        void leavesOnlyGroupMemberWhenChallengeMembersAreMissingOrLeft() {
+            // given
+            ChallengeGroup group = group(12L, "오운완 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            Challenge activeChallenge = challenge(50L, 12L, ChallengeStatus.ACTIVE);
+            Challenge readyChallenge = challenge(51L, 12L, ChallengeStatus.READY);
+            GroupMember groupMember = groupMember(30L, group, 2L);
+            ChallengeMember readyMember = challengeMember(71L, readyChallenge, 2L, ChallengeMemberRole.MEMBER);
+            readyMember.leave();
+            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(groupMemberRepository.findByGroupIdAndUserId(12L, 2L)).thenReturn(Optional.of(groupMember));
+            when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.ACTIVE))
+                    .thenReturn(Optional.of(activeChallenge));
+            when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.READY))
+                    .thenReturn(Optional.of(readyChallenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.empty());
+            when(challengeMemberRepository.findByChallengeIdAndUserId(51L, 2L)).thenReturn(Optional.of(readyMember));
+
+            // when
+            groupService.leaveGroup(12L, 2L);
+
+            // then
+            assertThat(groupMember.getStatus()).isEqualTo(GroupMemberStatus.LEFT);
+            assertThat(readyMember.getStatus()).isEqualTo(ChallengeMemberStatus.LEFT);
         }
     }
 
@@ -552,6 +774,106 @@ class GroupServiceTest {
 
             // when & then
             assertBusinessException(() -> groupService.getMyGroups(2L, null, null, 20), ErrorCode.GROUP_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("READY, ACTIVE, 다음 시즌이 없는 ENDED 시즌을 정렬하고 커서 응답으로 반환한다")
+        void returnsDisplayableStatusesWithHasNext() {
+            // given
+            ChallengeGroup readyGroup = group(12L, "준비 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            ChallengeGroup activeGroup = group(13L, "진행 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            activeGroup.activate();
+            ChallengeGroup endedGroup = group(14L, "종료 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            endedGroup.end();
+            Challenge readyChallenge = challenge(50L, 12L, ChallengeStatus.READY);
+            Challenge activeChallenge = challenge(51L, 13L, ChallengeStatus.ACTIVE);
+            Challenge endedChallenge = challenge(52L, 14L, ChallengeStatus.ENDED);
+            ChallengeMember readyMember = challengeMember(70L, readyChallenge, 2L, ChallengeMemberRole.MEMBER);
+            ChallengeMember activeMember = challengeMember(71L, activeChallenge, 2L, ChallengeMemberRole.MEMBER);
+            ChallengeMember endedMember = challengeMember(72L, endedChallenge, 2L, ChallengeMemberRole.MEMBER);
+            when(challengeMemberRepository.findAllByUserIdAndStatus(2L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(List.of(readyMember, activeMember, endedMember));
+            when(challengeGroupRepository.findAllById(List.of(12L, 13L, 14L)))
+                    .thenReturn(List.of(readyGroup, activeGroup, endedGroup));
+            when(challengeMemberRepository.countByChallengeIdAndStatus(any(), eq(ChallengeMemberStatus.ACTIVE)))
+                    .thenReturn(1L);
+            when(challengeProgressCalculator.calculateCurrentDay(any(), any(LocalDate.class))).thenReturn(1);
+            when(challengeProgressCalculator.calculatePeriodProgressRate(1, 7)).thenReturn(14.3);
+
+            // when
+            var response = groupService.getMyGroups(2L, null, null, 2);
+
+            // then
+            assertThat(response.content()).extracting("challengeId").containsExactly(52L, 51L);
+            assertThat(response.hasNext()).isTrue();
+            assertThat(response.nextCursor()).isEqualTo(71L);
+        }
+
+        @Test
+        @DisplayName("같은 그룹의 다음 시즌에 참여 중이면 종료 시즌은 제외한다")
+        void excludesEndedSeasonWhenCurrentSeasonExistsInSameGroup() {
+            // given
+            ChallengeGroup group = group(12L, "오운완 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            Challenge activeChallenge = challenge(50L, 12L, ChallengeStatus.ACTIVE);
+            Challenge endedChallenge = challenge(51L, 12L, ChallengeStatus.ENDED);
+            ChallengeMember activeMember = challengeMember(70L, activeChallenge, 2L, ChallengeMemberRole.MEMBER);
+            ChallengeMember endedMember = challengeMember(71L, endedChallenge, 2L, ChallengeMemberRole.MEMBER);
+            when(challengeMemberRepository.findAllByUserIdAndStatus(2L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(List.of(activeMember, endedMember));
+            when(challengeGroupRepository.findAllById(List.of(12L))).thenReturn(List.of(group));
+            when(challengeMemberRepository.countByChallengeIdAndStatus(50L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(1L);
+            when(challengeProgressCalculator.calculateCurrentDay(eq(activeChallenge), any(LocalDate.class)))
+                    .thenReturn(1);
+            when(challengeProgressCalculator.calculatePeriodProgressRate(1, 7)).thenReturn(14.3);
+
+            // when
+            var response = groupService.getMyGroups(2L, null, null, 20);
+
+            // then
+            assertThat(response.content()).extracting("challengeId").containsExactly(50L);
+        }
+
+        @Test
+        @DisplayName("그룹 상태와 커서 조건을 함께 적용한다")
+        void filtersByGroupStatusAndCursor() {
+            // given
+            ChallengeGroup activeGroup = group(12L, "진행 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            activeGroup.activate();
+            ChallengeGroup readyGroup = group(13L, "준비 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            Challenge activeChallenge = challenge(50L, 12L, ChallengeStatus.ACTIVE);
+            Challenge readyChallenge = challenge(51L, 13L, ChallengeStatus.READY);
+            ChallengeMember activeMember = challengeMember(70L, activeChallenge, 2L, ChallengeMemberRole.MEMBER);
+            ChallengeMember readyMember = challengeMember(71L, readyChallenge, 2L, ChallengeMemberRole.MEMBER);
+            when(challengeMemberRepository.findAllByUserIdAndStatus(2L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(List.of(activeMember, readyMember));
+            when(challengeGroupRepository.findAllById(List.of(12L, 13L))).thenReturn(List.of(activeGroup, readyGroup));
+            when(challengeMemberRepository.countByChallengeIdAndStatus(50L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(2L);
+            when(challengeProgressCalculator.calculateCurrentDay(eq(activeChallenge), any(LocalDate.class)))
+                    .thenReturn(2);
+            when(challengeProgressCalculator.calculatePeriodProgressRate(2, 7)).thenReturn(28.6);
+
+            // when
+            var response = groupService.getMyGroups(2L, GroupStatus.ACTIVE, 71L, 20);
+
+            // then
+            assertThat(response.content()).extracting("groupId").containsExactly(12L);
+        }
+
+        @Test
+        @DisplayName("상태 필터 중 그룹 정보가 없으면 GROUP_NOT_FOUND")
+        void throwsWhenGroupMissingDuringStatusFilter() {
+            // given
+            Challenge challenge = challenge(50L, 12L, ChallengeStatus.ACTIVE);
+            ChallengeMember member = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
+            when(challengeMemberRepository.findAllByUserIdAndStatus(2L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(List.of(member));
+            when(challengeGroupRepository.findAllById(List.of(12L))).thenReturn(List.of());
+
+            // when & then
+            assertBusinessException(
+                    () -> groupService.getMyGroups(2L, GroupStatus.ACTIVE, null, 20), ErrorCode.GROUP_NOT_FOUND);
         }
     }
 }

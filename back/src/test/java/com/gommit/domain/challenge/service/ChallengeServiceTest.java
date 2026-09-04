@@ -16,6 +16,7 @@ import com.gommit.domain.challenge.entity.ChallengeMember;
 import com.gommit.domain.challenge.entity.ChallengeMemberRole;
 import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.entity.ChallengeStatus;
+import com.gommit.domain.challenge.entity.DaysOfWeek;
 import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
@@ -224,6 +225,116 @@ class ChallengeServiceTest {
                     () -> challengeService.createInitialChallenge(12L, 1L, setting), ErrorCode.NO_CHECK_IN_METHOD);
             verify(challengeRepository, never()).save(any());
         }
+
+        @Test
+        @DisplayName("종료일이 시작일보다 빠르면 INVALID_PERIOD")
+        void throwsWhenEndDateIsBeforeStartDate() {
+            // given
+            LocalDate startDate = LocalDate.now().plusDays(5);
+            InitialChallengeSettingRequest setting = new InitialChallengeSettingRequest(
+                    startDate,
+                    startDate.minusDays(1),
+                    FrequencyType.DAILY,
+                    null,
+                    null,
+                    1,
+                    List.of(CheckInType.PHOTO));
+
+            // when & then
+            assertBusinessException(
+                    () -> challengeService.createInitialChallenge(12L, 1L, setting), ErrorCode.INVALID_PERIOD);
+            verify(challengeRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("요일 반복인데 요일이 비어 있으면 INVALID_FREQUENCY")
+        void throwsWhenDaysOfWeekFrequencyHasNoDays() {
+            // given
+            InitialChallengeSettingRequest setting = new InitialChallengeSettingRequest(
+                    LocalDate.now().plusDays(1),
+                    LocalDate.now().plusDays(7),
+                    FrequencyType.DAYS_OF_WEEK,
+                    null,
+                    List.of(),
+                    1,
+                    List.of(CheckInType.PHOTO));
+
+            // when & then
+            assertBusinessException(
+                    () -> challengeService.createInitialChallenge(12L, 1L, setting), ErrorCode.INVALID_FREQUENCY);
+            verify(challengeRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("N일마다 반복인데 주기가 없으면 INVALID_FREQUENCY")
+        void throwsWhenEveryNDaysHasNoFrequencyValue() {
+            // given
+            InitialChallengeSettingRequest setting = new InitialChallengeSettingRequest(
+                    LocalDate.now().plusDays(1),
+                    LocalDate.now().plusDays(7),
+                    FrequencyType.EVERY_N_DAYS,
+                    null,
+                    null,
+                    1,
+                    List.of(CheckInType.PHOTO));
+
+            // when & then
+            assertBusinessException(
+                    () -> challengeService.createInitialChallenge(12L, 1L, setting), ErrorCode.INVALID_FREQUENCY);
+            verify(challengeRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("요일 반복이면 선택 요일 수만 requiredDayCount로 계산하고 저장한다")
+        void createsDaysOfWeekChallenge() {
+            // given
+            LocalDate monday = LocalDate.of(2026, 9, 7);
+            InitialChallengeSettingRequest setting = new InitialChallengeSettingRequest(
+                    monday,
+                    monday.plusDays(6),
+                    FrequencyType.DAYS_OF_WEEK,
+                    null,
+                    List.of(DaysOfWeek.MON, DaysOfWeek.WED, DaysOfWeek.FRI),
+                    1,
+                    List.of(CheckInType.VIDEO));
+            Challenge savedChallenge = challenge(50L, ChallengeStatus.READY);
+            when(challengeRepository.save(any())).thenReturn(savedChallenge);
+
+            // when
+            challengeService.createInitialChallenge(12L, 1L, setting);
+
+            // then
+            ArgumentCaptor<Challenge> captor = ArgumentCaptor.forClass(Challenge.class);
+            verify(challengeRepository).save(captor.capture());
+            assertThat(captor.getValue().getRequiredDayCount()).isEqualTo(3);
+            assertThat(captor.getValue().getDaysOfWeek()).isEqualTo("MON,WED,FRI");
+            assertThat(captor.getValue().isAllowPhoto()).isFalse();
+        }
+
+        @Test
+        @DisplayName("N일마다 반복이면 주기 기준으로 requiredDayCount를 계산한다")
+        void createsEveryNDaysChallenge() {
+            // given
+            InitialChallengeSettingRequest setting = new InitialChallengeSettingRequest(
+                    LocalDate.now().plusDays(1),
+                    LocalDate.now().plusDays(7),
+                    FrequencyType.EVERY_N_DAYS,
+                    3,
+                    null,
+                    1,
+                    List.of(CheckInType.PHOTO));
+            Challenge savedChallenge = challenge(50L, ChallengeStatus.READY);
+            when(challengeRepository.save(any())).thenReturn(savedChallenge);
+
+            // when
+            challengeService.createInitialChallenge(12L, 1L, setting);
+
+            // then
+            ArgumentCaptor<Challenge> captor = ArgumentCaptor.forClass(Challenge.class);
+            verify(challengeRepository).save(captor.capture());
+            assertThat(captor.getValue().getRequiredDayCount()).isEqualTo(3);
+            assertThat(captor.getValue().getFrequencyValue()).isEqualTo(3);
+        }
     }
 
     @Nested
@@ -280,6 +391,80 @@ class ChallengeServiceTest {
             // when & then
             assertBusinessException(() -> challengeService.getChallengeStatus(50L, 2L), ErrorCode.CHALLENGE_NOT_MEMBER);
         }
+
+        @Test
+        @DisplayName("OWNER 멤버가 없으면 CHALLENGE_NOT_OWNER")
+        void throwsWhenOwnerMemberMissing() {
+            // given
+            Challenge challenge = challenge(50L, ChallengeStatus.ACTIVE);
+            ChallengeMember member = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(member));
+            when(challengeMemberRepository.findByChallengeIdAndRole(50L, ChallengeMemberRole.OWNER))
+                    .thenReturn(Optional.empty());
+
+            // when & then
+            assertBusinessException(() -> challengeService.getChallengeStatus(50L, 2L), ErrorCode.CHALLENGE_NOT_OWNER);
+        }
+
+        @Test
+        @DisplayName("오늘이 요일 인증일이면 isCheckInDay=true를 반환한다")
+        void returnsTrueWhenTodayMatchesDaysOfWeek() {
+            // given
+            LocalDate today = LocalDate.now();
+            DaysOfWeek todayOfWeek = DaysOfWeek.getDaysOfWeek(today.getDayOfWeek());
+            Challenge challenge = challenge(50L, ChallengeStatus.ACTIVE);
+            ReflectionTestUtils.setField(challenge, "startDate", today.minusDays(1));
+            ReflectionTestUtils.setField(challenge, "endDate", today.plusDays(1));
+            ReflectionTestUtils.setField(challenge, "frequencyType", FrequencyType.DAYS_OF_WEEK);
+            ReflectionTestUtils.setField(challenge, "daysOfWeek", todayOfWeek.name());
+            ChallengeMember member = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
+            ChallengeMember owner = challengeMember(71L, challenge, 1L, ChallengeMemberRole.OWNER);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(member));
+            when(challengeMemberRepository.findByChallengeIdAndRole(50L, ChallengeMemberRole.OWNER))
+                    .thenReturn(Optional.of(owner));
+            when(challengeMemberRepository.countByChallengeIdAndStatus(50L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(2L);
+            when(challengeProgressCalculator.calculateCurrentDay(eq(challenge), any(LocalDate.class)))
+                    .thenReturn(1);
+            when(challengeProgressCalculator.calculatePeriodProgressRate(1, 7)).thenReturn(14.3);
+
+            // when
+            var response = challengeService.getChallengeStatus(50L, 2L);
+
+            // then
+            assertThat(response.isCheckInDay()).isTrue();
+        }
+
+        @Test
+        @DisplayName("오늘이 N일마다 인증일이 아니면 isCheckInDay=false를 반환한다")
+        void returnsFalseWhenTodayDoesNotMatchEveryNDays() {
+            // given
+            LocalDate today = LocalDate.now();
+            Challenge challenge = challenge(50L, ChallengeStatus.ACTIVE);
+            ReflectionTestUtils.setField(challenge, "startDate", today.minusDays(1));
+            ReflectionTestUtils.setField(challenge, "endDate", today.plusDays(1));
+            ReflectionTestUtils.setField(challenge, "frequencyType", FrequencyType.EVERY_N_DAYS);
+            ReflectionTestUtils.setField(challenge, "frequencyValue", 2);
+            ChallengeMember member = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
+            ChallengeMember owner = challengeMember(71L, challenge, 1L, ChallengeMemberRole.OWNER);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(member));
+            when(challengeMemberRepository.findByChallengeIdAndRole(50L, ChallengeMemberRole.OWNER))
+                    .thenReturn(Optional.of(owner));
+            when(challengeMemberRepository.countByChallengeIdAndStatus(50L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(2L);
+            when(challengeProgressCalculator.calculateCurrentDay(eq(challenge), any(LocalDate.class)))
+                    .thenReturn(1);
+            when(challengeProgressCalculator.calculatePeriodProgressRate(1, 7)).thenReturn(14.3);
+
+            // when
+            var response = challengeService.getChallengeStatus(50L, 2L);
+
+            // then
+            assertThat(response.isCheckInDay()).isFalse();
+        }
     }
 
     @Nested
@@ -307,6 +492,30 @@ class ChallengeServiceTest {
             assertThat(response.get(0).nickname()).isEqualTo("방장");
             assertThat(response.get(0).todayCheckInCount()).isZero();
             assertThat(response.get(1).nickname()).isEqualTo("멤버");
+        }
+
+        @Test
+        @DisplayName("챌린지가 없으면 CHALLENGE_NOT_FOUND")
+        void throwsWhenChallengeMissing() {
+            // given
+            when(challengeRepository.findById(999L)).thenReturn(Optional.empty());
+
+            // when & then
+            assertBusinessException(
+                    () -> challengeService.getMemberTodayStatuses(999L, 1L), ErrorCode.CHALLENGE_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("요청자가 시즌 멤버가 아니면 CHALLENGE_NOT_MEMBER")
+        void throwsWhenRequesterIsNotChallengeMember() {
+            // given
+            Challenge challenge = challenge(50L, ChallengeStatus.ACTIVE);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.empty());
+
+            // when & then
+            assertBusinessException(
+                    () -> challengeService.getMemberTodayStatuses(50L, 1L), ErrorCode.CHALLENGE_NOT_MEMBER);
         }
     }
 
@@ -401,6 +610,159 @@ class ChallengeServiceTest {
                     () -> challengeService.updateChallenge(50L, 1L, updateRequest()),
                     ErrorCode.EXTENSION_START_DATE_NOT_EDITABLE);
         }
+
+        @Test
+        @DisplayName("챌린지가 없으면 CHALLENGE_NOT_FOUND")
+        void throwsWhenChallengeMissing() {
+            // given
+            when(challengeRepository.findById(999L)).thenReturn(Optional.empty());
+
+            // when & then
+            assertBusinessException(
+                    () -> challengeService.updateChallenge(999L, 1L, updateRequest()), ErrorCode.CHALLENGE_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("요청자가 시즌 멤버가 아니면 CHALLENGE_NOT_MEMBER")
+        void throwsWhenRequesterIsNotChallengeMember() {
+            // given
+            Challenge challenge = challenge(50L, ChallengeStatus.READY);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.empty());
+
+            // when & then
+            assertBusinessException(
+                    () -> challengeService.updateChallenge(50L, 1L, updateRequest()), ErrorCode.CHALLENGE_NOT_MEMBER);
+        }
+
+        @Test
+        @DisplayName("시작일이 오늘이면 INVALID_START_DATE")
+        void throwsWhenStartDateIsNotFuture() {
+            // given
+            Challenge challenge = challenge(50L, ChallengeStatus.READY);
+            ChallengeMember owner = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
+            ChallengeUpdateRequest request = new ChallengeUpdateRequest(
+                    LocalDate.now(),
+                    LocalDate.now().plusDays(10),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(owner));
+
+            // when & then
+            assertBusinessException(
+                    () -> challengeService.updateChallenge(50L, 1L, request), ErrorCode.INVALID_START_DATE);
+        }
+
+        @Test
+        @DisplayName("종료일이 시작일보다 빠르면 INVALID_PERIOD")
+        void throwsWhenEndDateIsBeforeStartDate() {
+            // given
+            Challenge challenge = challenge(50L, ChallengeStatus.READY);
+            ChallengeMember owner = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
+            LocalDate startDate = LocalDate.now().plusDays(5);
+            ChallengeUpdateRequest request = new ChallengeUpdateRequest(
+                    startDate,
+                    startDate.minusDays(1),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(owner));
+
+            // when & then
+            assertBusinessException(() -> challengeService.updateChallenge(50L, 1L, request), ErrorCode.INVALID_PERIOD);
+        }
+
+        @Test
+        @DisplayName("요일 반복인데 요일이 비어 있으면 INVALID_FREQUENCY")
+        void throwsWhenDaysOfWeekFrequencyHasNoDays() {
+            // given
+            Challenge challenge = challenge(50L, ChallengeStatus.READY);
+            ChallengeMember owner = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
+            ChallengeUpdateRequest request = new ChallengeUpdateRequest(
+                    null,
+                    null,
+                    FrequencyType.DAYS_OF_WEEK,
+                    null,
+                    List.of(),
+                    null,
+                    null);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(owner));
+
+            // when & then
+            assertBusinessException(
+                    () -> challengeService.updateChallenge(50L, 1L, request), ErrorCode.INVALID_FREQUENCY);
+        }
+
+        @Test
+        @DisplayName("N일마다 반복 주기가 범위를 벗어나면 INVALID_FREQUENCY")
+        void throwsWhenEveryNDaysFrequencyIsOutOfRange() {
+            // given
+            Challenge challenge = challenge(50L, ChallengeStatus.READY);
+            ChallengeMember owner = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
+            ChallengeUpdateRequest request = new ChallengeUpdateRequest(
+                    null,
+                    null,
+                    FrequencyType.EVERY_N_DAYS,
+                    8,
+                    null,
+                    null,
+                    null);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(owner));
+
+            // when & then
+            assertBusinessException(
+                    () -> challengeService.updateChallenge(50L, 1L, request), ErrorCode.INVALID_FREQUENCY);
+        }
+
+        @Test
+        @DisplayName("인증 방식이 비어 있으면 NO_CHECK_IN_METHOD")
+        void throwsWhenAllowedTypesIsEmpty() {
+            // given
+            Challenge challenge = challenge(50L, ChallengeStatus.READY);
+            ReflectionTestUtils.setField(challenge, "allowPhoto", false);
+            ChallengeMember owner = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
+            ChallengeUpdateRequest request = new ChallengeUpdateRequest(null, null, null, null, null, null, null);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(owner));
+
+            // when & then
+            assertBusinessException(
+                    () -> challengeService.updateChallenge(50L, 1L, request), ErrorCode.NO_CHECK_IN_METHOD);
+        }
+
+        @Test
+        @DisplayName("기존 요일 반복 설정을 유지해서 수정한다")
+        void updatesWithExistingDaysOfWeekSetting() {
+            // given
+            LocalDate monday = LocalDate.of(2026, 9, 7);
+            Challenge challenge = challenge(50L, ChallengeStatus.READY);
+            ReflectionTestUtils.setField(challenge, "startDate", monday);
+            ReflectionTestUtils.setField(challenge, "endDate", monday.plusDays(6));
+            ReflectionTestUtils.setField(challenge, "frequencyType", FrequencyType.DAYS_OF_WEEK);
+            ReflectionTestUtils.setField(challenge, "daysOfWeek", "MON,WED");
+            ReflectionTestUtils.setField(challenge, "requiredDayCount", 2);
+            ChallengeMember owner = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
+            ChallengeUpdateRequest request = new ChallengeUpdateRequest(null, null, null, null, null, 2, null);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(owner));
+
+            // when
+            var response = challengeService.updateChallenge(50L, 1L, request);
+
+            // then
+            assertThat(response.frequencyType()).isEqualTo(FrequencyType.DAYS_OF_WEEK);
+            assertThat(response.daysOfWeek()).containsExactly(DaysOfWeek.MON, DaysOfWeek.WED);
+            assertThat(challenge.getRequiredDayCount()).isEqualTo(2);
+        }
     }
 
     @Nested
@@ -463,6 +825,102 @@ class ChallengeServiceTest {
                     () -> challengeService.delegateOwner(50L, 1L, new OwnerDelegationRequest(2L)),
                     ErrorCode.CHALLENGE_NOT_MEMBER);
             assertThat(currentOwner.getRole()).isEqualTo(ChallengeMemberRole.OWNER);
+        }
+
+        @Test
+        @DisplayName("챌린지가 없으면 CHALLENGE_NOT_FOUND")
+        void throwsWhenChallengeMissing() {
+            // given
+            when(challengeRepository.findById(999L)).thenReturn(Optional.empty());
+
+            // when & then
+            assertBusinessException(
+                    () -> challengeService.delegateOwner(999L, 1L, new OwnerDelegationRequest(2L)),
+                    ErrorCode.CHALLENGE_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("요청자가 시즌 멤버가 아니면 CHALLENGE_NOT_MEMBER")
+        void throwsWhenRequesterIsNotChallengeMember() {
+            // given
+            Challenge challenge = challenge(50L, ChallengeStatus.READY);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.empty());
+
+            // when & then
+            assertBusinessException(
+                    () -> challengeService.delegateOwner(50L, 1L, new OwnerDelegationRequest(2L)),
+                    ErrorCode.CHALLENGE_NOT_MEMBER);
+        }
+
+        @Test
+        @DisplayName("현재 멤버가 OWNER가 아니면 CHALLENGE_NOT_OWNER")
+        void throwsWhenRequesterIsNotOwner() {
+            // given
+            Challenge challenge = challenge(50L, ChallengeStatus.READY);
+            ChallengeMember member = challengeMember(70L, challenge, 1L, ChallengeMemberRole.MEMBER);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(member));
+
+            // when & then
+            assertBusinessException(
+                    () -> challengeService.delegateOwner(50L, 1L, new OwnerDelegationRequest(2L)),
+                    ErrorCode.CHALLENGE_NOT_OWNER);
+        }
+
+        @Test
+        @DisplayName("위임 대상 멤버가 없으면 CHALLENGE_NOT_MEMBER")
+        void throwsWhenTargetMemberMissing() {
+            // given
+            Challenge challenge = challenge(50L, ChallengeStatus.READY);
+            ChallengeMember currentOwner = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(currentOwner));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.empty());
+
+            // when & then
+            assertBusinessException(
+                    () -> challengeService.delegateOwner(50L, 1L, new OwnerDelegationRequest(2L)),
+                    ErrorCode.CHALLENGE_NOT_MEMBER);
+        }
+
+        @Test
+        @DisplayName("첫 시즌이 아니고 ACTIVE도 아니면 그룹 OWNER는 변경하지 않는다")
+        void delegatesWithoutChangingGroupOwnerForReadyExtension() {
+            // given
+            Challenge challenge = challenge(50L, ChallengeStatus.READY);
+            ReflectionTestUtils.setField(challenge, "seqNo", 2);
+            ChallengeMember currentOwner = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
+            ChallengeMember targetMember = challengeMember(71L, challenge, 2L, ChallengeMemberRole.MEMBER);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(currentOwner));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(targetMember));
+
+            // when
+            challengeService.delegateOwner(50L, 1L, new OwnerDelegationRequest(2L));
+
+            // then
+            assertThat(currentOwner.getRole()).isEqualTo(ChallengeMemberRole.MEMBER);
+            assertThat(targetMember.getRole()).isEqualTo(ChallengeMemberRole.OWNER);
+            verify(challengeGroupRepository, never()).findById(any());
+        }
+
+        @Test
+        @DisplayName("그룹 정보를 찾을 수 없으면 GROUP_NOT_FOUND")
+        void throwsWhenGroupMissing() {
+            // given
+            Challenge challenge = challenge(50L, ChallengeStatus.ACTIVE);
+            ChallengeMember currentOwner = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
+            ChallengeMember targetMember = challengeMember(71L, challenge, 2L, ChallengeMemberRole.MEMBER);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(currentOwner));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(targetMember));
+            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.empty());
+
+            // when & then
+            assertBusinessException(
+                    () -> challengeService.delegateOwner(50L, 1L, new OwnerDelegationRequest(2L)),
+                    ErrorCode.GROUP_NOT_FOUND);
         }
     }
 }
