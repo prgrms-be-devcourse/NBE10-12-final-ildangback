@@ -51,7 +51,7 @@ export function CheckInGridSection<T extends CheckIn>({
       items={items}
       groupByDate={groupByDate}
       showAuthor={showAuthor}
-      onSelect={(item) => onSelect(item as T)}
+      onSelect={onSelect}
       hasNext={hasNext}
       loadingMore={loadingMore}
       onLoadMore={loadMore}

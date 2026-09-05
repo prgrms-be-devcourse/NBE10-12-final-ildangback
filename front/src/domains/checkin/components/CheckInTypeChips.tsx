@@ -23,20 +23,21 @@ export function CheckInTypeChips({ value, onChange }: Props) {
       <Chip active={value === "PHOTO"} onClick={() => onChange("PHOTO")}>
         사진
       </Chip>
-      <button
-        type="button"
-        onClick={() => showToast("영상 인증은 아직 지원하지 않아요")}
-        className="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-[13px] font-medium text-gray-300"
-      >
-        영상
-      </button>
-      <button
-        type="button"
-        onClick={() => showToast("라이브 인증은 아직 지원하지 않아요")}
-        className="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-[13px] font-medium text-gray-300"
-      >
-        라이브
-      </button>
+      {UNSUPPORTED_TYPES.map(({ label, message }) => (
+        <button
+          key={label}
+          type="button"
+          onClick={() => showToast(message)}
+          className="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-[13px] font-medium text-gray-300"
+        >
+          {label}
+        </button>
+      ))}
     </div>
   );
 }
+
+const UNSUPPORTED_TYPES = [
+  { label: "영상", message: "영상 인증은 아직 지원하지 않아요" },
+  { label: "라이브", message: "라이브 인증은 아직 지원하지 않아요" },
+];

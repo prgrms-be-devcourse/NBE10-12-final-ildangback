@@ -3,19 +3,19 @@ import type { CheckIn } from "../types";
 import { CheckInCell } from "./CheckInCell";
 import { LoadMore } from "./LoadMore";
 
-interface Props {
-  items: CheckIn[];
+interface Props<T extends CheckIn> {
+  items: T[];
   /** true 면 businessDate 별로 "8월 25일" 헤더를 붙여 그룹. 갤러리 탭은 false(평평). */
   groupByDate?: boolean;
   showAuthor?: boolean;
-  onSelect: (item: CheckIn) => void;
+  onSelect: (item: T) => void;
   hasNext: boolean;
   loadingMore: boolean;
   onLoadMore: () => void;
 }
 
 /** 인증 3열 그리드 + 커서 무한스크롤. 갤러리 탭 · 프로필 모아보기가 공유. */
-export function CheckInGrid({
+export function CheckInGrid<T extends CheckIn>({
   items,
   groupByDate = false,
   showAuthor = false,
@@ -23,7 +23,7 @@ export function CheckInGrid({
   hasNext,
   loadingMore,
   onLoadMore,
-}: Props) {
+}: Props<T>) {
   return (
     <>
       {groupByDate ? (
@@ -48,14 +48,14 @@ export function CheckInGrid({
   );
 }
 
-function Cells({
+function Cells<T extends CheckIn>({
   items,
   showAuthor,
   onSelect,
 }: {
-  items: CheckIn[];
+  items: T[];
   showAuthor: boolean;
-  onSelect: (item: CheckIn) => void;
+  onSelect: (item: T) => void;
 }) {
   return (
     <div className="grid grid-cols-3 gap-1">
@@ -72,8 +72,8 @@ function Cells({
 }
 
 /** 응답이 이미 최신순이라 순서를 유지하며 businessDate 로 묶기만 한다. */
-function groupByBusinessDate(items: CheckIn[]): [string, CheckIn[]][] {
-  const groups: [string, CheckIn[]][] = [];
+function groupByBusinessDate<T extends CheckIn>(items: T[]): [string, T[]][] {
+  const groups: [string, T[]][] = [];
   for (const item of items) {
     const last = groups.at(-1);
     if (last && last[0] === item.businessDate) last[1].push(item);
