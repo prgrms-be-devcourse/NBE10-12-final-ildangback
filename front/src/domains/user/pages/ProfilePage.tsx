@@ -18,7 +18,12 @@ const MENU: { icon: string; label: string; to?: string }[] = [
   { icon: pixelIcons.personalStats, label: "개인 통계" },
   { icon: pixelIcons.monthlyMergeArchive, label: "월간 머지 아카이브" },
   { icon: pixelIcons.pointHistory, label: "포인트 내역" },
-  { icon: pixelIcons.badgeAchievement, label: "참여했던 챌린지" },
+  // TODO(임시): "참여했던 챌린지" 목록 화면이 생기면 그리로. 지금은 전체 인증으로 직행.
+  {
+    icon: pixelIcons.badgeAchievement,
+    label: "참여했던 챌린지",
+    to: "/profile/check-ins",
+  },
   { icon: pixelIcons.settingsGear, label: "설정", to: "/profile/settings" },
 ];
 

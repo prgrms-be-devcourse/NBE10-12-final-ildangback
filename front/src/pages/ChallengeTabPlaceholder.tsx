@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import challengeHero from "../assets/illustrations/challenge-hero.webp";
 import iconBook from "../assets/icons/book-purple.webp";
 import iconCamera from "../assets/icons/camera-purple.webp";
@@ -16,6 +17,13 @@ export function ChallengeTabPlaceholder() {
       {user ? (
         <div className="px-6 py-20 text-center text-[14px] text-gray-500">
           챌린지 도메인 화면이 들어올 자리입니다.
+          {/* TODO(임시): 챌린지 상세/목록 화면이 생기면 이 링크를 지운다. 체크인 플로우 확인용. */}
+          <Link
+            to="/challenges/1"
+            className="mt-4 block font-semibold text-purple-500 underline"
+          >
+            체크인 플로우 열기 (임시)
+          </Link>
         </div>
       ) : (
         <SignUpPrompt
