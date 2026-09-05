@@ -60,7 +60,7 @@ export function TermsAgreement({ value, onChange }: Props) {
               <button
                 type="button"
                 onClick={() => setModalDoc(TERMS_DOCUMENTS[key])}
-                className="p-1 text-purple-400 hover:text-purple-600"
+                className="rounded p-1 text-purple-400 hover:text-purple-600 focus-visible:ring-2 focus-visible:ring-purple-300 focus-visible:outline-none"
                 aria-label={`${title} 내용 보기`}
               >
                 <CaretRightIcon size={16} aria-hidden />
