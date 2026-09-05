@@ -12,6 +12,7 @@ import com.gommit.domain.user.dto.request.ChangePasswordRequest;
 import com.gommit.domain.user.dto.request.DeleteAccountRequest;
 import com.gommit.domain.user.dto.request.UpdateProfileRequest;
 import com.gommit.domain.user.entity.User;
+import com.gommit.domain.user.repository.AuthIdentityRepository;
 import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
@@ -36,6 +37,9 @@ class UserServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private AuthIdentityRepository authIdentityRepository;
 
     @Mock
     private RefreshTokenService refreshTokenService;
@@ -184,7 +188,7 @@ class UserServiceTest {
     class DeleteAccount {
 
         @Test
-        @DisplayName("식별자를 치환하고 모든 RT 를 폐기한다")
+        @DisplayName("식별자를 치환하고 소셜 연결과 모든 RT 를 폐기한다")
         void deleteAccountReplacesIdentifiersAndRevokesTokens() {
             givenActiveUser();
             given(passwordEncoder.matches(anyString(), anyString())).willReturn(true);
@@ -194,6 +198,7 @@ class UserServiceTest {
             assertThat(user.getEmail()).isEqualTo("deleted_42@example.com");
             assertThat(user.getNickname()).isEqualTo("탈퇴한사용자_42");
             assertThat(user.getDeletedAt()).isNotNull();
+            verify(authIdentityRepository).deleteByUserId(USER_ID);
             verify(refreshTokenService).revokeAll(USER_ID);
         }
 
