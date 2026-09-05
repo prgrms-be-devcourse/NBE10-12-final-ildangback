@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
+import { CheckInGalleryTab } from "../domains/checkin/components/CheckInGalleryTab";
 import { CheckInMethodSheet } from "../domains/checkin/components/CheckInMethodSheet";
 import { useTodayCheckInStatus } from "../domains/checkin/lib/useTodayCheckInStatus";
 import { TopBar } from "../shared/ui/TopBar";
@@ -75,7 +76,9 @@ export function StubChallengeDetailPage() {
       <div className="flex flex-1 flex-col">
         {activeTab === "status" && <StubTabPanel label="현황" />}
         {activeTab === "dailyLog" && <StubTabPanel label="일일 로그" />}
-        {activeTab === "gallery" && <StubTabPanel label="갤러리" />}
+        {activeTab === "gallery" && (
+          <CheckInGalleryTab challengeId={Number(challengeId)} />
+        )}
       </div>
 
       <CheckInMethodSheet

@@ -7,3 +7,16 @@ export function formatDate(isoLocalDateTime: string): string {
   const [year, month, day] = isoLocalDateTime.slice(0, 10).split("-");
   return `${year}년 ${Number(month)}월 ${Number(day)}일`;
 }
+
+/** "2026-08-25T..." → "8월 25일". 날짜 그룹 헤더용. 파싱 안 함(위 참고). */
+export function formatMonthDay(isoLocalDate: string): string {
+  const [, month, day] = isoLocalDate.slice(0, 10).split("-");
+  return `${Number(month)}월 ${Number(day)}일`;
+}
+
+/** "2026-09-02T14:32:54" → "9월 2일 14:32". 라이트박스 시간 표시용. */
+export function formatDateTimeMinute(isoLocalDateTime: string): string {
+  const [, month, day] = isoLocalDateTime.slice(0, 10).split("-");
+  const time = isoLocalDateTime.slice(11, 16);
+  return `${Number(month)}월 ${Number(day)}일 ${time}`;
+}

@@ -54,7 +54,7 @@ export function CheckInMethodSheet({
             <MethodRow
               icon={<CameraIcon size={26} weight="fill" />}
               title="사진 인증"
-              subtitle="멘트 추천 받아요"
+              subtitle="사진으로 오늘의 인증을 해요"
               disabled={!photoAllowed}
               onClick={onSelectPhoto}
             />
