@@ -23,6 +23,19 @@ spring:
   flyway:
     enabled: true
 
+  http:
+    clients:
+      connect-timeout: 5s
+      read-timeout: 5s
+
+  mail:
+    properties:
+      mail:
+        smtp:
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
   data:
     web:
       pageable:
@@ -39,7 +52,7 @@ auth-token:
     expiration: 15m
   refresh-token:
     expiration: 30d
-    reuse-grace-period: 30s
+    reuse-grace-period: 3s
 
 media:
   storage:

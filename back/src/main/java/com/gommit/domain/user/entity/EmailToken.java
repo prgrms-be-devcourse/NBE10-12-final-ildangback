@@ -9,9 +9,9 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Getter
-@Table(name = "refresh_tokens")
+@Table(name = "email_tokens")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class RefreshToken extends BaseEntity {
+public class EmailToken extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -20,16 +20,19 @@ public class RefreshToken extends BaseEntity {
     @Column(nullable = false, length = 255)
     private String tokenHash;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private EmailTokenType tokenType;
+
     @Column(nullable = false)
     private LocalDateTime expiresAt;
 
-    private LocalDateTime rotatedAt;
+    private LocalDateTime usedAt;
 
-    private LocalDateTime revokedAt;
-
-    public RefreshToken(User user, String tokenHash, LocalDateTime expiresAt) {
+    public EmailToken(User user, String tokenHash, EmailTokenType tokenType, LocalDateTime expiresAt) {
         this.user = user;
         this.tokenHash = tokenHash;
+        this.tokenType = tokenType;
         this.expiresAt = expiresAt;
     }
 
@@ -37,11 +40,7 @@ public class RefreshToken extends BaseEntity {
         return expiresAt.isBefore(LocalDateTime.now());
     }
 
-    public boolean isRevoked() {
-        return revokedAt != null;
-    }
-
-    public boolean isRotated() {
-        return rotatedAt != null;
+    public boolean isUsed() {
+        return usedAt != null;
     }
 }

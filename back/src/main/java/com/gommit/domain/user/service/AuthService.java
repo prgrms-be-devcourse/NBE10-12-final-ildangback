@@ -24,6 +24,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final RefreshTokenService refreshTokenService;
+    private final EmailVerificationService emailVerificationService;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
 
@@ -42,10 +43,13 @@ public class AuthService {
 
         User user = new User(email, passwordEncoder.encode(request.password()), nickname);
         try {
-            return new UserSummaryResponse(userRepository.saveAndFlush(user));
+            user = userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException e) {
             throw new BusinessException(ErrorCode.ACCOUNT_INFO_DUPLICATED);
         }
+
+        emailVerificationService.send(user);
+        return new UserSummaryResponse(user);
     }
 
     // 로그인
@@ -55,12 +59,12 @@ public class AuthService {
                 .findByEmailAndDeletedAtIsNull(request.email())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS));
 
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+        if (user.getPassword() == null || !passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
 
         TokenResponse tokens = new TokenResponse(issueAccessToken(user), refreshTokenService.issue(user));
-        return new LoginResponse(tokens, new UserProfileResponse(user));
+        return new LoginResponse(tokens, new UserProfileResponse(user), false);
     }
 
     // 토큰 재발급

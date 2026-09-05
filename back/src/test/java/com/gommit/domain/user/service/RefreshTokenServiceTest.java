@@ -15,6 +15,7 @@ import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import com.gommit.global.security.AuthTokenProperties;
+import com.gommit.global.security.SecureTokenProvider;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -38,7 +39,13 @@ class RefreshTokenServiceTest {
     private RefreshTokenRepository refreshTokenRepository;
 
     @Mock
+    private RefreshTokenReuseRevoker refreshTokenReuseRevoker;
+
+    @Mock
     private UserRepository userRepository;
+
+    @Spy
+    private SecureTokenProvider secureTokenProvider = new SecureTokenProvider();
 
     @Spy
     private AuthTokenProperties authTokenProperties = new AuthTokenProperties(
@@ -91,6 +98,13 @@ class RefreshTokenServiceTest {
         return raw;
     }
 
+    private String givenRotatedToken(User user, LocalDateTime rotatedAt) {
+        String raw = refreshTokenService.issue(user);
+        given(refreshTokenRepository.findByTokenHashForUpdate(anyString()))
+                .willReturn(Optional.of(UserFixture.rotatedRefreshToken(7L, user, "hash", rotatedAt)));
+        return raw;
+    }
+
     private String givenRevokedToken(User user, LocalDateTime revokedAt) {
         String raw = refreshTokenService.issue(user);
         given(refreshTokenRepository.findByTokenHashForUpdate(anyString()))
@@ -110,15 +124,15 @@ class RefreshTokenServiceTest {
     class Rotate {
 
         @Test
-        @DisplayName("유효한 RT 는 폐기되고 소유자가 반환된다")
-        void rotateRevokesAndReturnsOwner() {
+        @DisplayName("유효한 RT 는 로테이션 처리되고 소유자가 반환된다")
+        void rotateMarksRotatedAndReturnsOwner() {
             User user = UserFixture.user();
             String raw = givenStoredToken(user, LocalDateTime.now().plusDays(30));
-            given(refreshTokenRepository.revokeIfActive(anyLong(), any())).willReturn(1);
+            given(refreshTokenRepository.rotateIfActive(anyLong(), any())).willReturn(1);
             given(userRepository.findByIdAndDeletedAtIsNull(42L)).willReturn(Optional.of(user));
 
             assertThat(refreshTokenService.rotate(raw).user()).isEqualTo(user);
-            verify(refreshTokenRepository).revokeIfActive(eq(7L), any());
+            verify(refreshTokenRepository).rotateIfActive(eq(7L), any());
         }
 
         @Test
@@ -136,27 +150,38 @@ class RefreshTokenServiceTest {
                     givenStoredToken(UserFixture.user(), LocalDateTime.now().minusSeconds(1));
 
             assertRefreshTokenInvalid(raw);
-            verify(refreshTokenRepository, never()).revokeIfActive(anyLong(), any());
+            verify(refreshTokenRepository, never()).rotateIfActive(anyLong(), any());
         }
 
         @Test
-        @DisplayName("폐기됐어도 유예 30초 안이면 재발급된다")
-        void rotateAcceptsRevokedTokenWithinGrace() {
+        @DisplayName("로테이션된 지 유예 안이면 재발급된다. 탭 동시 갱신")
+        void rotateAcceptsRotatedTokenWithinGrace() {
             User user = UserFixture.user();
-            String raw = givenRevokedToken(user, LocalDateTime.now().minusSeconds(GRACE.toSeconds() - 5));
+            String raw = givenRotatedToken(user, LocalDateTime.now().minusSeconds(GRACE.toSeconds() - 5));
             given(userRepository.findByIdAndDeletedAtIsNull(42L)).willReturn(Optional.of(user));
 
             assertThat(refreshTokenService.rotate(raw).user()).isEqualTo(user);
+            verify(refreshTokenReuseRevoker, never()).revokeAll(anyLong(), any());
         }
 
         @Test
-        @DisplayName("유예를 넘긴 폐기 RT 는 401 이고, 탐지 비활성 상태에서는 전체 폐기를 하지 않는다")
-        void rotateRejectsRevokedTokenPastGrace() {
+        @DisplayName("유예를 넘긴 로테이션 RT 는 401 이고 전체 폐기로 이어진다")
+        void rotateRejectsRotatedTokenPastGrace() {
             String raw =
-                    givenRevokedToken(UserFixture.user(), LocalDateTime.now().minusSeconds(GRACE.toSeconds() + 5));
+                    givenRotatedToken(UserFixture.user(), LocalDateTime.now().minusSeconds(GRACE.toSeconds() + 5));
 
             assertRefreshTokenInvalid(raw);
-            verify(refreshTokenRepository, never()).revokeAllByUserId(anyLong(), any());
+            verify(refreshTokenReuseRevoker).revokeAll(eq(42L), any());
+        }
+
+        // 로그아웃한 RT 로 들어온 것은 재사용이 아니다. 다른 기기까지 끊으면 안 된다
+        @Test
+        @DisplayName("세션이 끊긴 RT 는 방금 끊겼어도 401 이고 전체 폐기를 하지 않는다")
+        void rotateRejectsRevokedTokenWithoutGrace() {
+            String raw = givenRevokedToken(UserFixture.user(), LocalDateTime.now());
+
+            assertRefreshTokenInvalid(raw);
+            verify(refreshTokenReuseRevoker, never()).revokeAll(anyLong(), any());
         }
 
         @Test
@@ -164,7 +189,7 @@ class RefreshTokenServiceTest {
         void rotateRejectsTokenOfDeletedAccount() {
             String raw =
                     givenStoredToken(UserFixture.user(), LocalDateTime.now().plusDays(30));
-            given(refreshTokenRepository.revokeIfActive(anyLong(), any())).willReturn(1);
+            given(refreshTokenRepository.rotateIfActive(anyLong(), any())).willReturn(1);
             given(userRepository.findByIdAndDeletedAtIsNull(42L)).willReturn(Optional.empty());
 
             assertRefreshTokenInvalid(raw);

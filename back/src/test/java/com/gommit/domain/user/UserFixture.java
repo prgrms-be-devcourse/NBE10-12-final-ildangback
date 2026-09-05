@@ -28,7 +28,15 @@ public final class UserFixture {
         return token;
     }
 
-    // 이미 폐기된 RT. revokedAt 을 상대 시간으로 세팅해 유예 분기를 덮는다.
+    // 로테이션으로 교체된 RT. rotatedAt 을 상대 시간으로 세팅해 유예 분기를 덮는다.
+    public static RefreshToken rotatedRefreshToken(Long id, User user, String tokenHash, LocalDateTime rotatedAt) {
+        RefreshToken token =
+                refreshToken(id, user, tokenHash, LocalDateTime.now().plusDays(30));
+        ReflectionTestUtils.setField(token, "rotatedAt", rotatedAt);
+        return token;
+    }
+
+    // 세션이 끊긴 RT. 유예를 받지 않는다.
     public static RefreshToken revokedRefreshToken(Long id, User user, String tokenHash, LocalDateTime revokedAt) {
         RefreshToken token =
                 refreshToken(id, user, tokenHash, LocalDateTime.now().plusDays(30));
