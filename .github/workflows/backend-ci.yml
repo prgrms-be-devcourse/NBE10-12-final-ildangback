@@ -144,10 +144,15 @@ jobs:
               return out;
             };
 
-            const allViolations = [
-              ...readViolations('./back/build/reports/checkstyle/main.xml'),
-              ...readViolations('./back/build/reports/checkstyle/test.xml'),
+            // 리포트가 없으면 위반 0건이 되어 "통과" 로 찍힌다. 컴파일이 깨져 checkstyle 이
+            // 돌기 전에 빌드가 멈춰도 이 스텝은 always() 라 실행되므로, 검사하지 않은 것을
+            // 통과로 보고하게 된다. 파일이 있었는지를 따로 들고 있어야 구분할 수 있다.
+            const CHECKSTYLE_REPORTS = [
+              './back/build/reports/checkstyle/main.xml',
+              './back/build/reports/checkstyle/test.xml',
             ];
+            const foundReports = CHECKSTYLE_REPORTS.filter(f => fs.existsSync(f));
+            const allViolations = foundReports.flatMap(readViolations);
             const myViolations = allViolations.filter(v => isMine(v.path));
 
             // outcome 은 success, failure, skipped, cancelled 넷이다.
@@ -168,23 +173,33 @@ jobs:
             let body = `${MARKER}\n`;
             body += `📌 **기준 커밋**: [\`${sha.substring(0, 7)}\`](https://github.com/${repoPath}/commit/${sha}) - ${subject}\n\n`;
 
-            if (changed) {
-              body += `아래 표는 **이 PR 이 바꾼 파일**만 담았습니다. 괄호 안이 저장소 전체 수치입니다.\n\n`;
-            }
+            // 각주를 붙일지 정하는 값들. 전부 통과한 코멘트에 "표에는" 이나
+            // "머지를 막지 않습니다" 가 붙으면 가리키는 대상이 없어 읽는 사람만 헷갈린다.
+            let hasFinding = false;
+            let hasTable = false;
 
             // 포맷
             if (!formatRan) {
               body += `❔ 포맷 검사를 실행하지 못했습니다 (스텝 ${formatOutcome}).\n\n`;
+              hasFinding = true;
             } else if (formatFailed) {
               body += `⚠️ **포맷 위반이 있습니다.** \`./gradlew spotlessApply\` 실행 후 커밋해주세요.\n\n`;
+              hasFinding = true;
             } else {
               body += `✅ 포맷 통과\n\n`;
             }
 
             // Checkstyle
-            if (myViolations.length === 0) {
+            if (foundReports.length === 0) {
+              body += `❔ Checkstyle 리포트가 없습니다. 검사가 돌기 전에 빌드가 멈춘 것으로 보입니다.\n`;
+              hasFinding = true;
+            } else if (myViolations.length === 0) {
               const scope = allViolations.length > 0 ? ` (전체 ${allViolations.length}건)` : '';
               body += `✅ Checkstyle 통과${scope}\n`;
+              if (foundReports.length < CHECKSTYLE_REPORTS.length) {
+                body += `\n❔ 리포트 일부가 없어 완전한 결과가 아닙니다.\n`;
+                hasFinding = true;
+              }
             } else {
               body += `### Checkstyle 위반 ${myViolations.length}건 (전체 ${allViolations.length}건)\n`;
               body += `| 파일 | 라인 | 내용 |\n|------|------|------|\n`;
@@ -194,9 +209,18 @@ jobs:
               if (myViolations.length > 20) {
                 body += `\n_외 ${myViolations.length - 20}건_\n`;
               }
+              hasFinding = true;
+              hasTable = Boolean(changed);
             }
 
-            body += `\n> 이 리포트는 경고입니다. 머지를 막지 않습니다.`;
+            if (hasFinding) {
+              const notes = [];
+              if (hasTable) {
+                notes.push('표에는 이 PR 이 바꾼 파일만 담았습니다. 괄호 안이 저장소 전체 건수입니다.');
+              }
+              notes.push('이 리포트는 경고입니다. 머지를 막지 않습니다.');
+              body += `\n` + notes.map(n => `> ${n}`).join('\n') + `\n`;
+            }
 
             const comments = await github.rest.issues.listComments({
               issue_number: context.issue.number,

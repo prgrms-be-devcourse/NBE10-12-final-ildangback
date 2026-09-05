@@ -176,15 +176,18 @@ jobs:
             let body = `${MARKER}\n`;
             body += `📌 **기준 커밋**: [\`${sha.substring(0, 7)}\`](https://github.com/${repoPath}/commit/${sha}) - ${subject}\n\n`;
 
-            if (changed) {
-              body += `아래 표는 **이 PR 이 바꾼 파일**만 담았습니다. 괄호 안이 저장소 전체 수치입니다.\n\n`;
-            }
+            // 각주를 붙일지 정하는 값들. 전부 통과한 코멘트에 "표에는" 이나
+            // "머지를 막지 않습니다" 가 붙으면 가리키는 대상이 없어 읽는 사람만 헷갈린다.
+            let hasFinding = false;
+            let hasTable = false;
 
             // 포맷
             if (!formatRan) {
               body += `❔ 포맷 검사를 실행하지 못했습니다 (스텝 ${formatOutcome}).\n\n`;
+              hasFinding = true;
             } else if (formatFailed) {
               body += `⚠️ **포맷 위반이 있습니다.** \`pnpm format\` 실행 후 커밋해주세요.\n\n`;
+              hasFinding = true;
             } else {
               body += `✅ 포맷 통과\n\n`;
             }
@@ -196,6 +199,7 @@ jobs:
             const lintRan = fs.existsSync(ws + 'eslint.json');
             if (!lintRan) {
               body += `❔ **ESLint 를 실행하지 못했습니다** (스텝 ${lintOutcome}). Actions 로그를 확인해주세요.\n`;
+              hasFinding = true;
             } else if (myLint.length === 0) {
               const scope = allLint.length > 0 ? ` (전체 ${allLint.length}건)` : '';
               body += `✅ ESLint 통과${scope}\n`;
@@ -211,9 +215,18 @@ jobs:
               if (myLint.length > 20) {
                 body += `\n_외 ${myLint.length - 20}건_\n`;
               }
+              hasFinding = true;
+              hasTable = Boolean(changed);
             }
 
-            body += `\n> 이 리포트는 경고입니다. 머지를 막지 않습니다. 빌드(\`pnpm build\`) 실패만 머지를 막습니다.`;
+            if (hasFinding) {
+              const notes = [];
+              if (hasTable) {
+                notes.push('표에는 이 PR 이 바꾼 파일만 담았습니다. 괄호 안이 저장소 전체 건수입니다.');
+              }
+              notes.push('이 리포트는 경고입니다. 머지를 막지 않습니다. 빌드(`pnpm build`) 실패만 머지를 막습니다.');
+              body += `\n` + notes.map(n => `> ${n}`).join('\n') + `\n`;
+            }
 
             const comments = await github.rest.issues.listComments({
               issue_number: context.issue.number,
