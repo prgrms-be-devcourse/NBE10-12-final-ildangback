@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
 import { formatMonthDay } from "../../../shared/lib/date";
 import type { CheckIn } from "../types";
 import { CheckInCell } from "./CheckInCell";
+import { LoadMore } from "./LoadMore";
 
 interface Props {
   items: CheckIn[];
@@ -24,20 +24,6 @@ export function CheckInGrid({
   loadingMore,
   onLoadMore,
 }: Props) {
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) onLoadMore();
-      },
-      { rootMargin: "240px" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [onLoadMore]);
-
   return (
     <>
       {groupByDate ? (
@@ -53,16 +39,11 @@ export function CheckInGrid({
         <Cells items={items} showAuthor={showAuthor} onSelect={onSelect} />
       )}
 
-      {hasNext && <div ref={sentinelRef} className="h-1" />}
-      {loadingMore && (
-        <div className="flex justify-center py-4">
-          <span
-            role="status"
-            aria-label="더 불러오는 중"
-            className="size-6 animate-spin rounded-full border-3 border-purple-200 border-t-purple-500"
-          />
-        </div>
-      )}
+      <LoadMore
+        hasNext={hasNext}
+        loadingMore={loadingMore}
+        onLoadMore={onLoadMore}
+      />
     </>
   );
 }

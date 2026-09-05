@@ -1,4 +1,4 @@
-import type { GalleryQuery, MyCheckInQuery } from "./api";
+import type { DailyLogQuery, GalleryQuery, MyCheckInQuery } from "./api";
 import type {
   ChallengeAlbumSummary,
   ChallengeMember,
@@ -6,6 +6,8 @@ import type {
   CheckInCursorResponse,
   CheckInResultResponse,
   CursorPageMeta,
+  DailyLog,
+  DailyLogCursorResponse,
   MyChallengeSummary,
   MyCheckIn,
   MyCheckInCursorResponse,
@@ -185,6 +187,49 @@ export function stubMyCheckIns(query: MyCheckInQuery): MyCheckInCursorResponse {
     query.size ?? 20,
   );
   return { content, meta: { ...meta, totalCount } };
+}
+
+// ── 일일 로그 스텁 ──────────────────────────────────────────────────────────
+
+// 하루 1건, 2026-09 22건 / 2026-08 20건. videoUrl 은 항상 null(영상 생성 전).
+// totalCount(참여 인원)를 1~6 으로 돌려서 placeholder 타일 배치를 눈으로 확인 가능.
+const STUB_DAILY_LOGS: DailyLog[] = Array.from({ length: 42 }, (_, i) => {
+  const id = 42 - i;
+  const inSeptember = id >= 21;
+  const day = inSeptember ? id - 20 : id;
+  const month = inSeptember ? "09" : "08";
+  const totalCount = (id % 6) + 1;
+  // 7일마다 한 번은 아무도 인증 안 한 날(completedCount 0) — 빈 문구 확인용.
+  const completedCount = id % 7 === 0 ? 0 : Math.max(1, totalCount - (id % 3));
+  return {
+    id,
+    businessDate: `2026-${month}-${String(day).padStart(2, "0")}`,
+    videoUrl: null,
+    completedCount,
+    totalCount,
+  };
+});
+
+export function stubDailyLogs(query: DailyLogQuery): DailyLogCursorResponse {
+  const monthRows = query.month
+    ? STUB_DAILY_LOGS.filter((d) => d.businessDate.startsWith(query.month!))
+    : STUB_DAILY_LOGS;
+  const { content, meta } = stubCursorPage(
+    monthRows,
+    query.cursor,
+    query.size ?? 20,
+  );
+  const recordDays = monthRows.length;
+  const avgRate =
+    recordDays === 0
+      ? 0
+      : Math.round(
+          monthRows.reduce(
+            (sum, d) => sum + (d.completedCount / d.totalCount) * 100,
+            0,
+          ) / recordDays,
+        );
+  return { content, meta: { ...meta, recordDays, avgRate } };
 }
 
 export function stubSubmitResult(input: {

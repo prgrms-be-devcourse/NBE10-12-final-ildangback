@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   stubChallengeMembers,
+  stubDailyLogs,
   stubGallery,
   stubSubmitResult,
   stubTodayStatus,
@@ -72,5 +73,34 @@ describe("gallery dev stub", () => {
     const mine = stubGallery({ userId: member.userId, size: 100 });
     expect(mine.content.every((c) => c.userId === member.userId)).toBe(true);
     expect(mine.content.length).toBeGreaterThan(0);
+  });
+});
+
+describe("daily-log dev stub", () => {
+  it("filters by month and reports the banner aggregates for that month", () => {
+    const res = stubDailyLogs({ month: "2026-08", size: 100 });
+
+    expect(res.content.length).toBeGreaterThan(0);
+    expect(res.content.every((d) => d.businessDate.startsWith("2026-08"))).toBe(
+      true,
+    );
+    expect(res.content.every((d) => d.videoUrl === null)).toBe(true);
+    expect(res.meta.recordDays).toBe(res.content.length);
+    expect(res.meta.avgRate).toBeGreaterThan(0);
+    expect(res.meta.avgRate).toBeLessThanOrEqual(100);
+  });
+
+  it("pages within a month", () => {
+    const first = stubDailyLogs({ month: "2026-09", size: 10 });
+    expect(first.content).toHaveLength(10);
+    expect(first.meta.hasNext).toBe(true);
+
+    const second = stubDailyLogs({
+      month: "2026-09",
+      size: 10,
+      cursor: first.meta.nextCursor!,
+    });
+    const ids = [...first.content, ...second.content].map((d) => d.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });

@@ -20,3 +20,12 @@ export function formatDateTimeMinute(isoLocalDateTime: string): string {
   const time = isoLocalDateTime.slice(11, 16);
   return `${Number(month)}월 ${Number(day)}일 ${time}`;
 }
+
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+/** "2026-08-19..." → "8월 19일 (수)". Date 는 "정오" 기준이라 요일이 안 밀린다. */
+export function formatMonthDayWeekday(isoLocalDate: string): string {
+  const [y, m, d] = isoLocalDate.slice(0, 10).split("-").map(Number);
+  const weekday = WEEKDAYS[new Date(y, m - 1, d, 12).getDay()];
+  return `${m}월 ${d}일 (${weekday})`;
+}

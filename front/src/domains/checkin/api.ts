@@ -3,6 +3,7 @@ import {
   isCheckInStubEnabled,
   stubChallengeAlbumSummary,
   stubChallengeMembers,
+  stubDailyLogs,
   stubGallery,
   stubMyChallenges,
   stubMyCheckIns,
@@ -15,6 +16,7 @@ import type {
   CheckInCursorResponse,
   CheckInResultResponse,
   CheckInType,
+  DailyLogCursorResponse,
   MyChallengeSummary,
   MyCheckInCursorResponse,
   TodayCheckInStatus,
@@ -174,4 +176,32 @@ export function getChallengeAlbumSummary(
     return Promise.resolve(stubChallengeAlbumSummary(challengeId));
   }
   return apiFetch(`/api/challenges/${challengeId}`);
+}
+
+export interface DailyLogQuery {
+  /**
+   * yyyy-MM. ⚠️ 낙관적 — `GET /challenges/{id}/daily-logs` 는 아직 cursor·size 만.
+   * daily-log API 는 후속 PR. (front/docs/checkin-gallery-backend-asks.md)
+   */
+  month?: string;
+  cursor?: number;
+  size?: number;
+}
+
+/** GET /challenges/{challengeId}/daily-logs (일일 로그 탭 - 무한스크롤) */
+export function getDailyLogs(
+  challengeId: number,
+  query: DailyLogQuery = {},
+): Promise<DailyLogCursorResponse> {
+  if (isCheckInStubEnabled()) {
+    return new Promise((resolve) =>
+      setTimeout(() => resolve(stubDailyLogs(query)), 300),
+    );
+  }
+  const qs = buildQuery({
+    month: query.month,
+    cursor: query.cursor,
+    size: query.size,
+  });
+  return apiFetch(`/api/challenges/${challengeId}/daily-logs${qs}`);
 }

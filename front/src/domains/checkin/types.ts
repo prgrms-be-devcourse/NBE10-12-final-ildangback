@@ -126,3 +126,38 @@ export interface ChallengeAlbumSummary {
   startDate: string;
   endDate: string;
 }
+
+// ── 일일 로그 (GET /challenges/{id}/daily-logs) ─────────────────────────────
+
+/**
+ * 하루치 일일 로그. 서버가 ffmpeg 로 참여자 인증을 타일로 합쳐 만든 영상 1개다.
+ * `videoUrl` 은 영상 생성 전이면 null — 그동안 프론트는 타일 자리를 placeholder 로 채운다.
+ */
+export interface DailyLog {
+  id: number;
+  businessDate: string;
+  videoUrl: string | null;
+  /** 당일 목표 달성 인원 */
+  completedCount: number;
+  /** 전체 그룹 인원 */
+  totalCount: number;
+}
+
+/**
+ * 커서 메타 + 헤더 배너용 월 집계.
+ *
+ * ⚠️ `recordDays`·`avgRate` 는 스펙에 아직 없음 — daily-log API 는 후속 PR 이며 그때
+ * `GET /challenges/{id}/daily-logs` 에 `month` 파라미터와 이 집계 메타를 함께 요청한다.
+ * (front/docs/checkin-gallery-backend-asks.md)
+ */
+export interface DailyLogPageMeta extends CursorPageMeta {
+  /** 이번 달 기록이 있는 날 수 */
+  recordDays: number;
+  /** 이번 달 평균 달성률 (0~100) */
+  avgRate: number;
+}
+
+export interface DailyLogCursorResponse {
+  content: DailyLog[];
+  meta: DailyLogPageMeta;
+}

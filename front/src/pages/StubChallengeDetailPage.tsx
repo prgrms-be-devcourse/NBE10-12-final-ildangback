@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { CheckInGalleryTab } from "../domains/checkin/components/CheckInGalleryTab";
 import { CheckInMethodSheet } from "../domains/checkin/components/CheckInMethodSheet";
+import { DailyLogTimeline } from "../domains/checkin/components/DailyLogTimeline";
 import { useTodayCheckInStatus } from "../domains/checkin/lib/useTodayCheckInStatus";
 import { TopBar } from "../shared/ui/TopBar";
 import { StubChallengeHeaderCard } from "./StubChallengeHeaderCard";
@@ -15,11 +16,11 @@ import { StubChallengeHeaderCard } from "./StubChallengeHeaderCard";
  *
  * 이 셸이 하는 일:
  *   - 상단 카드(StubChallengeHeaderCard) + "오늘 인증하기" → CheckInMethodSheet
- *   - 현황 / 일일 로그 / 갤러리 3개 탭. 현황·일일 로그는 다른 도메인 몫이라 placeholder 다.
- *   - 갤러리 탭만 실제 구현(CheckInGalleryTab, 체크인 도메인).
+ *   - 현황 / 일일 로그 / 갤러리 3개 탭. 갤러리·일일 로그는 체크인 도메인이 채웠고,
+ *     현황은 challenge 도메인 몫이라 아직 placeholder 다.
  *
  * 실제 챌린지 상세가 붙을 때는 이 TABS 배열의 각 panel 만 실제 컴포넌트로 갈아끼우면
- * 된다. 갤러리 panel 은 그대로 두고 status·dailyLog 만 교체하는 형태가 목표다.
+ * 된다. 갤러리·일일 로그 panel 은 그대로 두고 status 만 교체하는 형태가 목표다.
  */
 type TabKey = "status" | "dailyLog" | "gallery";
 
@@ -75,7 +76,9 @@ export function StubChallengeDetailPage() {
 
       <div className="flex flex-1 flex-col">
         {activeTab === "status" && <StubTabPanel label="현황" />}
-        {activeTab === "dailyLog" && <StubTabPanel label="일일 로그" />}
+        {activeTab === "dailyLog" && (
+          <DailyLogTimeline challengeId={Number(challengeId)} />
+        )}
         {activeTab === "gallery" && (
           <CheckInGalleryTab challengeId={Number(challengeId)} />
         )}
