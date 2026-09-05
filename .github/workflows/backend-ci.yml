@@ -31,6 +31,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # base 와의 merge-base 가 있어야 "이 PR 이 바꾼 파일" 을 계산할 수 있다
+          fetch-depth: 0
 
       - name: Set up JDK 25
         uses: actions/setup-java@v4
@@ -46,6 +49,18 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
+      # Checkstyle 은 back/src 전체를 검사한다. 이 PR 이 건드리지 않은 파일의 위반까지
+      # 코멘트 표에 실리면 아무도 표를 읽지 않게 되므로, 바뀐 파일 목록을 뽑아 필터로 쓴다.
+      # git diff --name-only 는 저장소 루트 기준 경로를 뱉는다 (back/src/... 형태).
+      - name: Collect changed files
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          git fetch --no-tags origin "$BASE_REF"
+          git diff --name-only "origin/$BASE_REF...HEAD" > "$GITHUB_WORKSPACE/changed-files.txt"
+          echo "변경 파일 $(wc -l < "$GITHUB_WORKSPACE/changed-files.txt")건"
+
       - name: Run Tests with Coverage
         run: ./gradlew check
         env:
@@ -55,6 +70,7 @@ jobs:
 
       - name: Check Formatting
         id: spotless
+        if: always()
         continue-on-error: true
         run: ./gradlew spotlessCheck
 
@@ -84,6 +100,19 @@ jobs:
             const fs = require('fs');
 
             const MARKER = '## 🧹 코드 스타일 리포트';
+            const ws = process.env.GITHUB_WORKSPACE + '/';
+
+            // 이 PR 이 바꾼 파일 (저장소 루트 기준 경로). 없으면 필터를 걸지 않는다.
+            const changedFile = ws + 'changed-files.txt';
+            const changed = fs.existsSync(changedFile)
+              ? new Set(
+                  fs.readFileSync(changedFile, 'utf-8').split('\n').map(s => s.trim()).filter(Boolean)
+                )
+              : null;
+
+            const toRepoPath = (abs) => (abs.startsWith(ws) ? abs.slice(ws.length) : abs);
+            const toShort = (p) => p.replace(/^back\/src\/(main|test)\/java\//, '');
+            const isMine = (repoPath) => !changed || changed.has(repoPath);
 
             // Checkstyle XML 파싱. 위반이 없으면 <file> 안에 <error>가 없다.
             const readViolations = (file) => {
@@ -93,12 +122,13 @@ jobs:
               const fileRe = /<file name="([^"]+)">([\s\S]*?)<\/file>/g;
               let fm;
               while ((fm = fileRe.exec(xml)) !== null) {
-                const name = fm[1].split('/src/').pop();
+                const repoPath = toRepoPath(fm[1]);
                 const errRe = /<error line="(\d+)"[^>]*severity="([^"]*)"[^>]*message="([^"]*)"/g;
                 let em;
                 while ((em = errRe.exec(fm[2])) !== null) {
                   out.push({
-                    file: name,
+                    path: repoPath,
+                    file: toShort(repoPath),
                     line: em[1],
                     severity: em[2],
                     message: em[3]
@@ -114,32 +144,55 @@ jobs:
               return out;
             };
 
-            const violations = [
+            const allViolations = [
               ...readViolations('./back/build/reports/checkstyle/main.xml'),
               ...readViolations('./back/build/reports/checkstyle/test.xml'),
             ];
+            const myViolations = allViolations.filter(v => isMine(v.path));
 
-            const formatFailed = process.env.SPOTLESS_OUTCOME === 'failure';
+            // outcome 은 success, failure, skipped, cancelled 넷이다.
+            // skipped 를 통과로 읽으면 검사하지 않은 것을 "통과" 라고 보고하게 된다.
+            const formatOutcome = process.env.SPOTLESS_OUTCOME;
+            const formatFailed = formatOutcome === 'failure';
+            const formatRan = formatOutcome === 'success' || formatFailed;
 
-            let body = `${MARKER}\n\n`;
+            const sha = context.payload.pull_request.head.sha;
+            const commit = await github.rest.repos.getCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: sha,
+            });
+            const subject = commit.data.commit.message.split('\n')[0];
+            const repoPath = `${context.repo.owner}/${context.repo.repo}`;
 
-            if (formatFailed) {
-              body += `⚠️ **포맷 위반이 있습니다.** \`./gradlew spotlessApply\` 를 실행한 뒤 커밋해주세요.\n\n`;
+            let body = `${MARKER}\n`;
+            body += `📌 **기준 커밋**: [\`${sha.substring(0, 7)}\`](https://github.com/${repoPath}/commit/${sha}) - ${subject}\n\n`;
+
+            if (changed) {
+              body += `아래 표는 **이 PR 이 바꾼 파일**만 담았습니다. 괄호 안이 저장소 전체 수치입니다.\n\n`;
+            }
+
+            // 포맷
+            if (!formatRan) {
+              body += `❔ 포맷 검사를 실행하지 못했습니다 (스텝 ${formatOutcome}).\n\n`;
+            } else if (formatFailed) {
+              body += `⚠️ **포맷 위반이 있습니다.** \`./gradlew spotlessApply\` 실행 후 커밋해주세요.\n\n`;
             } else {
               body += `✅ 포맷 통과\n\n`;
             }
 
-            if (violations.length === 0) {
-              body += `✅ Checkstyle 통과\n`;
+            // Checkstyle
+            if (myViolations.length === 0) {
+              const scope = allViolations.length > 0 ? ` (전체 ${allViolations.length}건)` : '';
+              body += `✅ Checkstyle 통과${scope}\n`;
             } else {
-              const shown = violations.slice(0, 20);
-              body += `### Checkstyle 위반 ${violations.length}건\n`;
+              body += `### Checkstyle 위반 ${myViolations.length}건 (전체 ${allViolations.length}건)\n`;
               body += `| 파일 | 라인 | 내용 |\n|------|------|------|\n`;
-              shown.forEach(v => {
+              myViolations.slice(0, 20).forEach(v => {
                 body += `| \`${v.file}\` | ${v.line} | ${v.message} |\n`;
               });
-              if (violations.length > shown.length) {
-                body += `\n_외 ${violations.length - shown.length}건_\n`;
+              if (myViolations.length > 20) {
+                body += `\n_외 ${myViolations.length - 20}건_\n`;
               }
             }
 
@@ -177,106 +230,116 @@ jobs:
           script: |
             const fs = require('fs');
 
-            const htmlFile = './back/build/reports/jacoco/test/html/index.html';
-            if (!fs.existsSync(htmlFile)) {
-              console.log('Jacoco report not found');
+            // HTML 이 아니라 XML 을 읽는다. build.gradle 에서 xml.required = true 로 항상 생성된다.
+            //
+            // HTML 의 막대 셀은 "14 of 130" 처럼 나오는데 이게 "커버 14 / 전체 130" 이 아니라
+            // "빠뜨린 14 / 전체 130" 이다. 앞자리를 커버로 읽으면 옆 칸의 89% 와 어긋난 표가 나온다.
+            // XML 은 <counter type="BRANCH" missed="14" covered="116"/> 처럼 이름표가 붙어 있어
+            // 뒤집힐 여지가 없고, 컬럼 순서를 세지 않아도 되고, n/a 나 self-closing 셀 예외도 없다.
+            const XML = './back/build/reports/jacoco/test/jacocoTestReport.xml';
+            if (!fs.existsSync(XML)) {
+              console.log('Jacoco XML not found');
               return;
             }
 
-            const html = fs.readFileSync(htmlFile, 'utf-8');
+            const attr = (s, key) => (new RegExp(key + '="([^"]*)"').exec(s) || [])[1];
 
-            const commitSha = context.payload.pull_request.head.sha.substring(0, 7);
+            // 자식 요소(class, sourcefile)의 counter 가 먼저 나오고 자기 자신의 집계가 마지막에 나온다.
+            // 같은 type 을 덮어쓰면 마지막 값, 즉 그 요소의 집계가 남는다.
+            const countersOf = (chunk) => {
+              const out = {};
+              for (const m of chunk.matchAll(/<counter\b([^>]*?)\/>/g)) {
+                const type = attr(m[1], 'type');
+                if (!type) continue;
+                out[type] = { missed: Number(attr(m[1], 'missed')), covered: Number(attr(m[1], 'covered')) };
+              }
+              return out;
+            };
+
+            // jacoco HTML 은 퍼센트를 내림한다. 리포트와 코멘트가 다른 숫자를 보이지 않도록 맞춘다.
+            const pct = (c) => {
+              if (!c) return null;
+              const total = c.missed + c.covered;
+              return total === 0 ? null : Math.floor((c.covered / total) * 100);
+            };
+
+            const parse = (xml) => {
+              const packages = new Map();
+              for (const m of xml.matchAll(/<package\b([^>]*)>([\s\S]*?)<\/package>/g)) {
+                const name = (attr(m[1], 'name') || '').replace(/\//g, '.');
+                packages.set(name, countersOf(m[2]));
+              }
+              // report 자신의 counter 는 마지막 </package> 뒤에 온다.
+              const cut = xml.lastIndexOf('</package>');
+              return { total: countersOf(cut === -1 ? xml : xml.slice(cut)), packages };
+            };
+
+            const current = parse(fs.readFileSync(XML, 'utf-8'));
+
+            const commitSha = context.payload.pull_request.head.sha;
             const commit = await github.rest.repos.getCommit({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              ref: context.payload.pull_request.head.sha
+              ref: commitSha,
             });
             const commitMessage = commit.data.commit.message.split('\n')[0];
+            const repoPath = `${context.repo.owner}/${context.repo.repo}`;
 
-            // jacoco html의 <td>는 내용이 없으면(예: 분기 0개일 때 Missed Branches 바) self-closing으로 나온다
-            // (<td class="bar" id="d27"/>). </td> 짝만 찾는 정규식은 이 셀을 건너뛰고 다음 셀과 합쳐버려서
-            // 그 뒤 모든 컬럼이 한 칸씩 밀리므로, self-closing 형태도 명시적으로 매치해야 한다.
-            const CELL_RE = /<td\b[^>]*\/>|<td\b[^>]*>(.*?)<\/td>/gs;
-            const cellsOf = row => [...row.matchAll(CELL_RE)].map(m => m[1] ?? '');
-            const num = s => parseInt(String(s).replace(/,/g, ''), 10);
+            // 전체 현황
+            const metrics = [
+              { key: 'LINE', label: '라인', goal: 80 },
+              { key: 'BRANCH', label: '브랜치', goal: 70 },
+            ];
 
-            // Missed Branches 바 셀은 텍스트 없이 <img title="N"> 두 개(빨강=missed, 초록=covered)만 담고 있다.
-            const branchCounts = cell => {
-              if (!cell.trim()) return null;
-              let missed = 0;
-              let covered = 0;
-              for (const m of cell.matchAll(/(red|green)bar\.gif"[^>]*title="(\d+)"/g)) {
-                if (m[1] === 'red') missed = num(m[2]);
-                else covered = num(m[2]);
+            let overallReport = `### 전체 커버리지 현황\n`;
+            overallReport += `| 메트릭 | 커버리지 | 커버 / 전체 | 상태 | 목표 |\n|---|---|---|---|---|\n`;
+
+            metrics.forEach(({ key, label, goal }) => {
+              const c = current.total[key];
+              const value = pct(c);
+              if (value === null) {
+                overallReport += `| **${label}** | n/a | 0 / 0 | - | ${goal}% |\n`;
+                return;
               }
-              return { missed, total: missed + covered };
-            };
-
-            // 컬럼 순서(고정): Element, MissedInstr, Instr%, MissedBranch, Branch%|n/a,
-            //                  MissedCxty, Cxty, MissedLines, Lines, MissedMethods, Methods, MissedClasses, Classes
-            // 실제 Line%는 jacoco가 텍스트로 주지 않으므로 MissedLines/Lines로 직접 계산한다.
-            const totalRow = html.match(/<tfoot>.*?<tr>(.*?)<\/tr>.*?<\/tfoot>/s)?.[1];
-            const totalCells = totalRow ? cellsOf(totalRow) : [];
-
-            let overallReport = '';
-            if (totalCells.length >= 9) {
-              const missedLines = num(totalCells[7]);
-              const totalLines = num(totalCells[8]);
-              const linesPercent = Math.round((totalLines - missedLines) / totalLines * 100);
-              const branchesPercent = parseInt(totalCells[4]);
-              const [branchesCovered, branchesTotal] = totalCells[3].split(' of ').map(num);
-
-              const linesStatus = linesPercent >= 80 ? '✅' : '⚠️';
-              const branchesStatus = branchesPercent >= 70 ? '✅' : '⚠️';
-
-              overallReport = `### ✅ 전체 커버리지 현황\n| 메트릭 | 커버리지 | 라인 수 | 상태 | 목표 |\n|--------|---------|--------|------|------|\n| **라인** | ${linesPercent}% | ${totalLines - missedLines}/${totalLines} | ${linesStatus} | 80% |\n| **브랜치** | ${branchesPercent}% | ${branchesCovered}/${branchesTotal} | ${branchesStatus} | 70% |\n`;
-            }
-
-            const rows = html.match(/<tbody>.*?<\/tbody>/s)?.[0].match(/<tr>.*?<\/tr>/g) || [];
-
-            const packages = [];
-            rows.forEach(row => {
-              const cells = cellsOf(row);
-              if (cells.length < 9) return;
-
-              const nameMatch = cells[0].match(/<a[^>]*>([^<]+)<\/a>/);
-              if (!nameMatch) return;
-
-              const missedLines = num(cells[7]);
-              const totalLines = num(cells[8]);
-              const lineCov = totalLines > 0 ? Math.round((totalLines - missedLines) / totalLines * 100) : 100;
-
-              // 분기가 0개인 클래스는 jacoco가 "n/a"를 준다 — 0%가 아니라 "커버할 게 없다"는 뜻이다.
-              const branchCell = cells[4].trim();
-              const branchCov = branchCell === 'n/a' ? null : parseInt(branchCell);
-
-              packages.push({
-                name: nameMatch[1].replace(/com\.gommit\.domain\./, ''),
-                line: lineCov,
-                branch: branchCov,
-                branchCounts: branchCounts(cells[3]),
-              });
+              const status = value >= goal ? '✅' : '⚠️';
+              overallReport += `| **${label}** | ${value}% | ${c.covered} / ${c.missed + c.covered} | ${status} | ${goal}% |\n`;
             });
 
-            packages.sort((a, b) => b.line - a.line);
+            // 패키지별
+            const shortName = (n) => n.replace(/^com\.gommit\.domain\./, '');
+            const rows = [...current.packages.entries()]
+              .map(([name, counters]) => ({
+                name: shortName(name),
+                line: pct(counters.LINE),
+                lineCounts: counters.LINE,
+                branch: pct(counters.BRANCH),
+                branchCounts: counters.BRANCH,
+              }))
+              .sort((a, b) => (b.line ?? -1) - (a.line ?? -1));
 
             let packageReport = '';
-            if (packages.length > 0) {
-              packageReport = `### 📦 패키지별 커버리지\n| 패키지 | 라인 | 브랜치 |\n|--------|------|--------|\n`;
-              packages.forEach(pkg => {
-                const lineStatus = pkg.line >= 80 ? '✅' : pkg.line >= 70 ? '⚠️' : '❌';
+            if (rows.length > 0) {
+              packageReport = `### 패키지별 커버리지\n| 패키지 | 라인 | 브랜치 |\n|---|---|---|\n`;
+              rows.forEach(r => {
+                const lineStatus = r.line >= 80 ? '✅' : r.line >= 70 ? '⚠️' : '❌';
+                const counts = r.lineCounts ? ` (${r.lineCounts.covered}/${r.lineCounts.covered + r.lineCounts.missed})` : '';
+                const lineCell = r.line === null ? 'n/a' : `${r.line}% ${lineStatus}${counts}`;
+
+                // 분기가 0개인 패키지는 counter 자체가 없다. 0% 가 아니라 "셀 게 없다" 는 뜻이다.
                 let branchCell = 'n/a';
-                if (pkg.branch !== null) {
-                  const branchStatus = pkg.branch >= 70 ? '✅' : pkg.branch >= 60 ? '⚠️' : '❌';
-                  const counts = pkg.branchCounts ? ` (${pkg.branchCounts.total - pkg.branchCounts.missed}/${pkg.branchCounts.total})` : '';
-                  branchCell = `${pkg.branch}% ${branchStatus}${counts}`;
+                if (r.branch !== null) {
+                  const branchStatus = r.branch >= 70 ? '✅' : r.branch >= 60 ? '⚠️' : '❌';
+                  branchCell = `${r.branch}% ${branchStatus} (${r.branchCounts.covered}/${r.branchCounts.covered + r.branchCounts.missed})`;
                 }
-                packageReport += `| ${pkg.name} | ${pkg.line}% ${lineStatus} | ${branchCell} |\n`;
+
+                packageReport += `| ${r.name} | ${lineCell} | ${branchCell} |\n`;
               });
             }
 
-            const repoPath = `${context.repo.owner}/${context.repo.repo}`;
-            const comment = `## 📊 Jacoco 커버리지 리포트\n📌 **기준 커밋**: [\`${commitSha}\`](https://github.com/${repoPath}/commit/${context.payload.pull_request.head.sha}) - ${commitMessage}\n\n${overallReport}\n\n${packageReport}\n\n💬 [상세 리포트 보기](https://github.com/${repoPath}/actions/runs/${context.runId})`;
+            let header = `## 📊 Jacoco 커버리지 리포트\n`;
+            header += `📌 **기준 커밋**: [\`${commitSha.substring(0, 7)}\`](https://github.com/${repoPath}/commit/${commitSha}) - ${commitMessage}\n`;
+
+            const comment = `${header}\n${overallReport}\n${packageReport}\n💬 [상세 리포트 보기](https://github.com/${repoPath}/actions/runs/${context.runId})`;
 
             const comments = await github.rest.issues.listComments({
               issue_number: context.issue.number,

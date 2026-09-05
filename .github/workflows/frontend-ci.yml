@@ -11,6 +11,9 @@ on:
     paths:
       - 'front/**'
       - '.github/workflows/frontend-ci.yml'
+    # paths 필터가 걸린 워크플로는 해당 경로가 안 바뀌면 아예 실행되지 않는다.
+    # 지금은 required status check 가 없어서 문제가 없지만, 나중에 이 워크플로를
+    # required 로 걸면 백엔드만 고친 PR 이 "Expected — Waiting for status" 에서 멈춘다.
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -31,6 +34,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # base 와의 merge-base 가 있어야 "이 PR 이 바꾼 파일" 을 계산할 수 있다
+          fetch-depth: 0
 
       # package.json 의 packageManager 필드를 읽어 로컬과 같은 pnpm 버전을 쓴다.
       # 이 저장소는 package.json 이 front/ 아래에 있으므로 경로를 명시해야 한다
@@ -53,18 +59,43 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # 타입 에러와 빌드 실패는 머지를 막는다 (백엔드의 컴파일·테스트에 대응)
+      # ESLint 와 Prettier 리포트를 이 PR 이 바꾼 파일로 좁히는 데 쓴다.
+      # git diff --name-only 는 저장소 루트 기준 경로를 뱉는다 (front/src/... 형태).
+      - name: Collect changed files
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          git fetch --no-tags origin "$BASE_REF"
+          git diff --name-only "origin/$BASE_REF...HEAD" > "$GITHUB_WORKSPACE/changed-files.txt"
+          echo "변경 파일 $(wc -l < "$GITHUB_WORKSPACE/changed-files.txt")건"
+
+      # 타입 에러와 빌드 실패는 머지를 막는다 (백엔드의 컴파일과 테스트에 대응)
       - name: Build
         run: pnpm build
 
-      # 린트와 포맷은 경고만 한다 (백엔드의 Checkstyle·Spotless 정책과 동일)
+      # 린트와 포맷은 경고만 한다 (백엔드의 Checkstyle, Spotless 정책과 동일)
+      #
+      # pnpm lint 대신 json 포맷터를 직접 부른다. 통과/실패만 알려주고 Actions 로그로
+      # 보내면 아무도 안 열어보므로, 코멘트에 파일과 라인이 있는 표를 만들기 위해서다.
+      #
+      # 빌드가 깨져도 리포트는 올라와야 한다. always() 가 없으면 앞 스텝이 실패한 순간
+      # 이 스텝이 건너뛰어지고, 코멘트에 "통과" 가 찍혀 사실과 달라진다.
+      #
+      # json 은 코멘트 표를 만드는 재료다. 그것만 쓰면 Actions 로그가 텅 비고,
+      # 코멘트는 PR 에서만 만들어지므로 main 과 dev push 때는 결과를 볼 데가 없어진다.
+      # 그래서 사람이 읽을 출력도 한 번 낸다. 스텝 성패는 이쪽이 정한다.
       - name: Lint
         id: lint
+        if: always()
         continue-on-error: true
-        run: pnpm lint
+        run: |
+          pnpm exec eslint . --format json --output-file "$GITHUB_WORKSPACE/eslint.json" || true
+          pnpm lint
 
       - name: Format check
         id: format
+        if: always()
         continue-on-error: true
         run: pnpm format:check
 
@@ -76,23 +107,110 @@ jobs:
           FORMAT_OUTCOME: ${{ steps.format.outcome }}
         with:
           script: |
+            const fs = require('fs');
+
             const MARKER = '## 🎨 프론트 코드 스타일 리포트';
+            const ws = process.env.GITHUB_WORKSPACE + '/';
 
-            const lintFailed = process.env.LINT_OUTCOME === 'failure';
-            const formatFailed = process.env.FORMAT_OUTCOME === 'failure';
+            // 이 PR 이 바꾼 파일 (저장소 루트 기준 경로). 없으면 필터를 걸지 않는다.
+            const changedFile = ws + 'changed-files.txt';
+            const changed = fs.existsSync(changedFile)
+              ? new Set(
+                  fs.readFileSync(changedFile, 'utf-8').split('\n').map(s => s.trim()).filter(Boolean)
+                )
+              : null;
 
-            let body = `${MARKER}\n\n`;
+            const toRepoPath = (abs) => (abs.startsWith(ws) ? abs.slice(ws.length) : abs);
+            const toShort = (p) => p.replace(/^front\//, '');
+            const isMine = (repoPath) => !changed || changed.has(repoPath);
+            const escape = (s) => String(s).replace(/\|/g, '\\|').replace(/\n/g, ' ');
 
-            if (formatFailed) {
-              body += `⚠️ **포맷 위반이 있습니다.** \`pnpm format\` 을 실행한 뒤 커밋해주세요.\n\n`;
+            // ESLint json 포맷: [{ filePath, messages: [{ ruleId, severity, message, line }] }]
+            // severity 2 가 error, 1 이 warning 이다.
+            const readEslint = () => {
+              const file = ws + 'eslint.json';
+              if (!fs.existsSync(file)) return [];
+              let report;
+              try {
+                report = JSON.parse(fs.readFileSync(file, 'utf-8'));
+              } catch (e) {
+                console.log('eslint.json 파싱 실패:', e.message);
+                return [];
+              }
+              const out = [];
+              for (const entry of report) {
+                const repoPath = toRepoPath(entry.filePath);
+                for (const m of entry.messages || []) {
+                  out.push({
+                    path: repoPath,
+                    file: toShort(repoPath),
+                    line: m.line ?? 0,
+                    level: m.severity === 2 ? 'error' : 'warn',
+                    rule: m.ruleId || '-',
+                    message: escape(m.message),
+                  });
+                }
+              }
+              return out;
+            };
+
+            const allLint = readEslint();
+            const myLint = allLint.filter(v => isMine(v.path));
+            allLint.forEach(v => console.log(`${v.file}:${v.line} [${v.level}] ${v.rule} ${v.message}`));
+
+            // outcome 은 success, failure, skipped, cancelled 넷이다.
+            // skipped 를 통과로 읽으면 검사하지 않은 것을 "통과" 라고 보고하게 된다.
+            const formatOutcome = process.env.FORMAT_OUTCOME;
+            const formatFailed = formatOutcome === 'failure';
+            const formatRan = formatOutcome === 'success' || formatFailed;
+
+            const sha = context.payload.pull_request.head.sha;
+            const commit = await github.rest.repos.getCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: sha,
+            });
+            const subject = commit.data.commit.message.split('\n')[0];
+            const repoPath = `${context.repo.owner}/${context.repo.repo}`;
+
+            let body = `${MARKER}\n`;
+            body += `📌 **기준 커밋**: [\`${sha.substring(0, 7)}\`](https://github.com/${repoPath}/commit/${sha}) - ${subject}\n\n`;
+
+            if (changed) {
+              body += `아래 표는 **이 PR 이 바꾼 파일**만 담았습니다. 괄호 안이 저장소 전체 수치입니다.\n\n`;
+            }
+
+            // 포맷
+            if (!formatRan) {
+              body += `❔ 포맷 검사를 실행하지 못했습니다 (스텝 ${formatOutcome}).\n\n`;
+            } else if (formatFailed) {
+              body += `⚠️ **포맷 위반이 있습니다.** \`pnpm format\` 실행 후 커밋해주세요.\n\n`;
             } else {
               body += `✅ 포맷 통과\n\n`;
             }
 
-            if (lintFailed) {
-              body += `⚠️ **ESLint 위반이 있습니다.** Actions 로그에서 상세 내용을 확인해주세요.\n`;
+            // ESLint
+            // 위반이 있으면 eslint 는 종료 코드 1 로 끝나므로 outcome 만으로는 구분이 안 된다.
+            // json 을 읽었으면 실행된 것이고, 못 읽었는데 실패면 실행 자체가 깨진 것이다.
+            const lintOutcome = process.env.LINT_OUTCOME;
+            const lintRan = fs.existsSync(ws + 'eslint.json');
+            if (!lintRan) {
+              body += `❔ **ESLint 를 실행하지 못했습니다** (스텝 ${lintOutcome}). Actions 로그를 확인해주세요.\n`;
+            } else if (myLint.length === 0) {
+              const scope = allLint.length > 0 ? ` (전체 ${allLint.length}건)` : '';
+              body += `✅ ESLint 통과${scope}\n`;
             } else {
-              body += `✅ ESLint 통과\n`;
+              const errors = myLint.filter(v => v.level === 'error').length;
+              body += `### ESLint 위반 ${myLint.length}건 (전체 ${allLint.length}건, 이 중 error ${errors}건)\n`;
+              body += `| 파일 | 라인 | 등급 | 규칙 | 내용 |\n|---|---|---|---|---|\n`;
+              // error 를 먼저 보여준다
+              const sorted = [...myLint].sort((a, b) => (a.level === b.level ? 0 : a.level === 'error' ? -1 : 1));
+              sorted.slice(0, 20).forEach(v => {
+                body += `| \`${v.file}\` | ${v.line} | ${v.level} | \`${v.rule}\` | ${v.message} |\n`;
+              });
+              if (myLint.length > 20) {
+                body += `\n_외 ${myLint.length - 20}건_\n`;
+              }
             }
 
             body += `\n> 이 리포트는 경고입니다. 머지를 막지 않습니다. 빌드(\`pnpm build\`) 실패만 머지를 막습니다.`;
