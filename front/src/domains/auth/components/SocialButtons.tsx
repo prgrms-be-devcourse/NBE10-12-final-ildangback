@@ -1,3 +1,7 @@
+import { useEffect, useState } from "react";
+import { useToast } from "../../../shared/lib/useToast";
+import { startOAuth, type OAuthProviderId } from "../oauth";
+
 function NaverIcon() {
   return (
     <svg className="size-4.5 fill-current" viewBox="0 0 24 24">
@@ -30,6 +34,32 @@ function GoogleIcon() {
 }
 
 export function SocialButtons() {
+  const { showToast } = useToast();
+  // 어느 버튼을 눌렀는지까지 들고 있어야 그 버튼만 이동 중으로 바꿀 수 있다.
+  const [leaving, setLeaving] = useState<OAuthProviderId | null>(null);
+
+  // 프로바이더 화면에서 뒤로가기로 돌아오면 브라우저가 페이지를 통째로 되살린다(bfcache).
+  // 나가면서 잠가둔 상태까지 같이 살아나서, 풀어주지 않으면 버튼이 계속 눌리지 않는다.
+  useEffect(() => {
+    const restore = (event: PageTransitionEvent) => {
+      if (event.persisted) setLeaving(null);
+    };
+    window.addEventListener("pageshow", restore);
+    return () => window.removeEventListener("pageshow", restore);
+  }, []);
+
+  const go = async (provider: OAuthProviderId) => {
+    setLeaving(provider);
+    try {
+      await startOAuth(provider);
+    } catch {
+      // 클라이언트 ID 가 비었거나 crypto.subtle 이 없는 경우다.
+      // 후자는 https 나 localhost 가 아닌 주소로 열었을 때 생긴다.
+      setLeaving(null);
+      showToast("소셜 로그인을 시작하지 못했어요. 잠시 후 다시 시도해 주세요.");
+    }
+  };
+
   return (
     <section className="mt-8" aria-label="소셜 로그인">
       <div className="flex items-center gap-3">
@@ -41,20 +71,22 @@ export function SocialButtons() {
       <div className="mt-5 flex flex-col gap-3">
         <button
           type="button"
-          disabled
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#03C75A] text-[15px] font-semibold text-white transition-opacity hover:opacity-95"
+          disabled={leaving !== null}
+          onClick={() => go("naver")}
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#03C75A] text-[15px] font-semibold text-white transition-opacity hover:opacity-95 focus-visible:ring-2 focus-visible:ring-purple-300 focus-visible:outline-none disabled:opacity-40"
         >
           <NaverIcon />
-          네이버로 계속하기
+          {leaving === "naver" ? "네이버로 이동 중…" : "네이버로 계속하기"}
         </button>
 
         <button
           type="button"
-          disabled
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-purple-200 bg-white text-[15px] font-semibold text-gray-900 transition-colors hover:bg-gray-50"
+          disabled={leaving !== null}
+          onClick={() => go("google")}
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-purple-200 bg-white text-[15px] font-semibold text-gray-900 transition-colors hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-purple-300 focus-visible:outline-none disabled:opacity-40"
         >
           <GoogleIcon />
-          Google로 계속하기
+          {leaving === "google" ? "Google로 이동 중…" : "Google로 계속하기"}
         </button>
       </div>
     </section>

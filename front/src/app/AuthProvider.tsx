@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import * as authApi from "../domains/auth/api";
+import type { OAuthProviderId } from "../domains/auth/oauth";
 import { getMyProfile } from "../domains/user/api";
 import { setSessionExpiredHandler } from "../shared/api/client";
 import { tokenStore } from "../shared/api/tokenStore";
@@ -56,6 +57,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStatus("authenticated");
   }, []);
 
+  const signInWithOAuth = useCallback(
+    async (provider: OAuthProviderId, body: authApi.OAuthLoginRequest) => {
+      const result = await authApi.oauthLogin(provider, body);
+      setUser(result.user);
+      setStatus("authenticated");
+      return result.newUser;
+    },
+    [],
+  );
+
   const signOut = useCallback(async () => {
     await authApi.logout().catch(() => undefined);
     setUser(null);
@@ -68,8 +79,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ status, user, signIn, signOut, replaceUser }),
-    [status, user, signIn, signOut, replaceUser],
+    () => ({ status, user, signIn, signInWithOAuth, signOut, replaceUser }),
+    [status, user, signIn, signInWithOAuth, signOut, replaceUser],
   );
 
   return <AuthContext value={value}>{children}</AuthContext>;

@@ -28,11 +28,16 @@ export function changePassword(body: ChangePasswordRequest): Promise<void> {
   return apiFetch("/api/users/me/password", { method: "PATCH", body });
 }
 
-/** 소프트 딜리트. 서버가 모든 RT 를 폐기하므로 로컬 토큰도 지운다. */
-export async function deleteAccount(password: string): Promise<void> {
+/**
+ * 소프트 딜리트. 서버가 모든 RT 를 폐기하므로 로컬 토큰도 지운다.
+ *
+ * 비밀번호는 선택이다 — 소셜 전용 가입자는 비밀번호가 없어서 필수로 두면 영영 탈퇴하지
+ * 못한다. 빈 문자열을 보내면 서버가 대조에 실패해 401 이 되므로 아예 키를 뺀다.
+ */
+export async function deleteAccount(password?: string): Promise<void> {
   await apiFetch<void>("/api/users/me", {
     method: "DELETE",
-    body: { password },
+    body: password ? { password } : {},
   });
   tokenStore.clear();
 }

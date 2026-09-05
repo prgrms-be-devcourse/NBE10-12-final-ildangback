@@ -10,7 +10,6 @@ import { Button } from "../../../shared/ui/Button";
 import { FormAlert } from "../../../shared/ui/FormAlert";
 import { Logo } from "../../../shared/ui/Logo";
 import { TextField } from "../../../shared/ui/TextField";
-import { useToast } from "../../../shared/lib/useToast";
 import { TopBar } from "../../../shared/ui/TopBar";
 import { SocialButtons } from "../components/SocialButtons";
 
@@ -23,7 +22,6 @@ type LoginForm = z.infer<typeof schema>;
 
 export function LoginPage() {
   const { signIn } = useAuth();
-  const { showToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
   const [formError, setFormError] = useState<string | null>(null);
@@ -90,6 +88,8 @@ export function LoginPage() {
             label="이메일"
             type="email"
             autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
             placeholder="이메일을 입력해주세요"
             error={errors.email?.message}
             {...register("email")}
@@ -105,13 +105,12 @@ export function LoginPage() {
           />
 
           <div className="flex justify-end text-[13px]">
-            <button
-              type="button"
+            <Link
+              to="/forgot-password"
               className="font-medium text-purple-500 hover:underline"
-              onClick={() => showToast("비밀번호 재설정 기능은 준비 중입니다.")}
             >
               비밀번호 찾기
-            </button>
+            </Link>
           </div>
 
           <FormAlert message={formError} />
