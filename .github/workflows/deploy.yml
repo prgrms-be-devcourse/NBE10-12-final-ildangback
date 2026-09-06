@@ -74,6 +74,7 @@ jobs:
         env:
           INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
           TAG: ${{ needs.build.outputs.tag }}
+          SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
@@ -98,7 +99,7 @@ jobs:
             --document-name "AWS-RunShellScript" \
             --comment "deploy $TAG" \
             --timeout-seconds 600 \
-            --parameters "commands=['sudo -u ec2-user bash /opt/team1-app/deploy.sh $TAG']" \
+            --parameters "commands=['sudo -u ec2-user bash /opt/team1-app/deploy.sh $TAG $SHA']" \
             --query 'Command.CommandId' --output text)
           echo "command: $CMD_ID"
 

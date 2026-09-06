@@ -58,7 +58,10 @@ terraform apply
   `repo:<repo>:environment:production` sub 만 허용하므로 환경 이름이 안 맞으면
   `configure-aws-credentials` 단계가 실패한다.
 - Terraform `deploy_environment` 변수(기본 `production`)와 이름 일치시킬 것.
-- (선택) Deployment protection rules → Required reviewers 를 걸면 배포 승인 게이트가 된다.
+- **Deployment protection rules → Required reviewers 를 반드시 1명 이상 건다.**
+  `deploy.yml` 은 push(main) 외에 `workflow_dispatch` 로도 돈다. 옛 커밋이나 다른 브랜치에서
+  dispatch 하면 `back:latest` 태그가 그 코드로 이동해 prod 포인터가 뒤로 갈 수 있다.
+  승인 게이트가 그걸 막는 유일한 장치다. (롤백은 이 워크플로 대신 런북 3장의 SSM 직접 호출로 한다.)
 
 `GITHUB_TOKEN` 은 자동 제공. GHCR 패키지는 **public 으로 전환** 권장(Settings → Packages →
 change visibility) → EC2 에서 `docker login` 불필요. private 로 두려면 1-4 에서 로그인.
@@ -113,7 +116,8 @@ open https://go-mmit.site                          # 프론트
 ## 2. 일상 배포
 
 `main` 에 백엔드/인프라 변경 머지 → `deploy.yml` 자동 실행:
-빌드 → GHCR push (`:<sha>` + `:latest`) → SSM 이 `deploy.sh <sha>` 실행 → 헬스체크.
+빌드 → GHCR push (`:<sha>` + `:latest`) → SSM 이 `deploy.sh <12자-sha> <풀-sha>` 실행 → 헬스체크.
+(2번째 인자로 배포 커밋에 `src` 를 고정 → 이미지와 compose/nginx 설정이 같은 커밋.)
 
 수동 실행: Actions → Deploy Backend → Run workflow.
 
@@ -125,10 +129,13 @@ open https://go-mmit.site                          # 프론트
 
 ```bash
 aws ssm start-session --target <instance-id>
-sudo -u ec2-user bash /opt/team1-app/deploy.sh <이전-커밋-SHA-12자>
+# 1번째 = 이미지 태그(12자), 2번째 = 같은 커밋의 풀 SHA (src 를 그 커밋으로 되돌림)
+sudo -u ec2-user bash /opt/team1-app/deploy.sh <이전-12자-SHA> <이전-풀-SHA>
 ```
 
 이전 이미지는 GHCR 에 `back:<sha>` 로 남아 있다. GHCR Packages 에서 태그 목록 확인.
+`deploy.sh` 가 `docker image prune` 로 72시간 지난 이미지를 지우므로, 3일보다 오래된
+버전으로 롤백하려면 GHCR 에서 다시 pull 된다(자동). 문제 없음.
 
 ---
 

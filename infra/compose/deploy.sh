@@ -13,11 +13,17 @@ set -euo pipefail
 APP_DIR=/opt/team1-app
 cd "$APP_DIR"
 
-TAG="${1:?usage: deploy.sh <image-tag>}"
+TAG="${1:?usage: deploy.sh <image-tag> [git-ref]}"
+REF="${2:-origin/main}"
 
-# 1. 리포지토리 최신화 (compose / nginx 설정도 여기서 옴)
+# 1. 리포지토리를 배포 대상 커밋으로 맞춘다 (compose / nginx 설정도 여기서 옴).
+#    CD 가 2번째 인자로 배포 커밋 SHA 를 넘기면 그 커밋에 고정 → 이미지와 설정이 같은 커밋.
+#    인자 없으면 origin/main HEAD (수동 호출 하위호환).
 git -C "$APP_DIR/src" fetch --depth 1 origin main
-git -C "$APP_DIR/src" reset --hard origin/main
+if [ "$REF" != "origin/main" ]; then
+  git -C "$APP_DIR/src" fetch --depth 1 origin "$REF"
+fi
+git -C "$APP_DIR/src" reset --hard "$REF"
 
 # 2. 배포물을 작업 디렉터리로 동기화
 rsync -a --delete "$APP_DIR/src/infra/nginx/" "$APP_DIR/nginx/"
@@ -42,7 +48,9 @@ echo "waiting for health..."
 for i in $(seq 1 40); do
   if curl -fsS http://localhost:8080/actuator/health >/dev/null 2>&1; then
     echo "healthy after $((i * 3))s"
-    docker image prune -f >/dev/null || true
+    # 안 쓰는 이미지 정리. -a = 태그만 있고 컨테이너가 안 쓰는 것도 대상(옛 back:<sha>).
+    # until=72h = 최근 3일치는 남겨 빠른 롤백 시 재pull 없이 되돌림. 실행 중 이미지는 항상 보호됨.
+    docker image prune -af --filter "until=72h" >/dev/null || true
     exit 0
   fi
   sleep 3

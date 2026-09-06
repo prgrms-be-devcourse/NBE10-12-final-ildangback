@@ -14,9 +14,14 @@ set +a
 
 OUT="$APP_DIR/backups/gommit-$(date +%Y%m%d-%H%M).sql.gz"
 
+# mysqldump 나 gzip 이 실패하면(pipefail) 잘린 .gz 가 백업처럼 남는다 → 실패 시 삭제.
+trap 'rm -f "$OUT"' ERR
+
 docker compose exec -T mysql \
   mysqldump -uroot -p"${MYSQL_ROOT_PASSWORD}" --single-transaction --routines --events "${DB_NAME}" \
   | gzip > "$OUT"
+
+trap - ERR
 
 echo "$(date -Is) backup ok: $OUT ($(du -h "$OUT" | cut -f1))"
 

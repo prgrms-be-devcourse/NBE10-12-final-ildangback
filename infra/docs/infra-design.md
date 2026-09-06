@@ -326,12 +326,14 @@ DB에 있고, 이게 날아가면 서비스가 끝난다. 데모/평가 중에 �
 
 ### Q10 — 시크릿 관리 → 확정
 
-- **GitHub Actions Secrets가 소스.** 배포 스텝이 EC2에 `.env` 를 렌더(`chmod 600`),
-  compose `env_file` 로 주입. SSM Parameter Store는 이 규모에 오버킬.
-- 항목: `DB_HOST` `DB_PORT` `DB_NAME` `DB_USERNAME` `DB_PASSWORD` `JWT_SECRET_KEY`
-  `CORS_ALLOWED_ORIGINS` `CLOUDINARY_CLOUD_NAME` `CLOUDINARY_API_KEY` `CLOUDINARY_API_SECRET`
-  `SPRING_PROFILES_ACTIVE=prod` `MEDIA_STORAGE_PROVIDER=cloudinary`
-  `JAVA_TOOL_OPTIONS=-Duser.timezone=Asia/Seoul`
+- **`/opt/team1-app/.env` 가 소스. 최초 1회 수동 배치**(`chmod 600`, 템플릿 `infra/compose/.env.example`,
+  절차 runbook 1-4). compose `env_file` 로 주입. SSM Parameter Store는 이 규모에 오버킬.
+- **배포(`deploy.sh`)는 `.env` 를 렌더하지 않는다** — `IMAGE_TAG` 한 줄만 갱신한다. 시크릿 값
+  변경·회전은 SSM 셸로 `.env` 를 직접 고친 뒤 `docker compose up -d`.
+  (GitHub Actions 로 렌더하려면 전체 `.env` 를 Actions Secret 하나에 넣고 배포 스텝에서 써야 하는데,
+  현재는 그 복잡도를 안 지고 수동 배치로 간다.)
+- 항목 목록은 `infra/compose/.env.example` 이 단일 출처. GitHub Actions Secrets 에는 배포에 필요한
+  `EC2_INSTANCE_ID` / `AWS_DEPLOY_ROLE_ARN` 만 둔다(앱 시크릿 아님).
 
 ### Q11 — 스케줄러(새벽 4시) + 18:00 정지
 
@@ -609,15 +611,15 @@ DB에 있고, 이게 날아가면 서비스가 끝난다. 데모/평가 중에 �
 
   | 대상 | `mem_limit` | 내역 |
   |---|---|---|
-  | `mysql` | 500m | `innodb_buffer_pool_size=384M` + 오버헤드 |
+  | `mysql` | 600m | `innodb_buffer_pool_size=256M` + 스레드 버퍼(50 conn) + InnoDB 오버헤드. 500m/384M 은 RSS 가 한계를 넘겨 OOM-kill 위험이라 조정 |
   | `back` (JVM + ffmpeg) | 1200m | `-Xmx768m` + 힙 외 ~250M + ffmpeg 인코딩 시 ~300M (동시성 1) |
   | `nginx` | 64m | |
-  | OS + 버퍼 캐시 | ~250m | (컨테이너 밖) |
+  | OS + 버퍼 캐시 | ~150m | (컨테이너 밖) |
   | **합** | **~2GB** | ffmpeg 인코딩 중엔 잠깐 swap을 건드릴 수 있음 — 느려질 뿐 안 죽음 |
 
   ffmpeg는 `back` 컨테이너 안에서 돌므로 그 1200m를 JVM과 나눠 쓴다. 인코딩을 트래픽 적은
   새벽으로 몰면 여유가 는다. 그래도 부족하면 `t4g.medium`(4GB) 결재 요청.
-- **튜닝 프리셋** (부하 보고 조정): MySQL `innodb_buffer_pool_size=384M`, `max_connections=50`
+- **튜닝 프리셋** (부하 보고 조정): MySQL `innodb_buffer_pool_size=256M`, `max_connections=50`
   / JVM `-Xmx768m` / HikariCP `maximum-pool-size=10`.
 
 ### Q25 — nginx 파라미터
