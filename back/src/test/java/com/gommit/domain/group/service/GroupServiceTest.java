@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.gommit.domain.background.service.BackgroundPurchaseService;
 import com.gommit.domain.challenge.dto.request.InitialChallengeSettingRequest;
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.ChallengeMember;
@@ -89,6 +90,9 @@ class GroupServiceTest {
 
     @Mock
     private BusinessClock businessClock;
+
+    @Mock
+    private BackgroundPurchaseService backgroundPurchaseService;
 
     @InjectMocks
     private GroupService groupService;
