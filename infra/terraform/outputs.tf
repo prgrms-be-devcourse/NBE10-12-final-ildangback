@@ -23,6 +23,11 @@ output "ssm_start_command" {
 }
 
 output "ssm_session_command" {
-  description = "SSH 대신 셸 접속"
+  description = "기본 셸 접속 경로 (SSM). IAM 접근이 있는 사람용"
   value       = "aws ssm start-session --target ${aws_instance.app.id} --region ${var.aws_region}"
+}
+
+output "ssh_command" {
+  description = "SSM 을 못 쓰는 운영자 1인용. ssh_allowed_cidrs 를 채우고 런북대로 키 등록했을 때만 동작"
+  value       = length(var.ssh_allowed_cidrs) > 0 ? "ssh ec2-user@${aws_eip.app.public_ip}" : "(ssh_allowed_cidrs 비어있음 — SSH 미개방)"
 }

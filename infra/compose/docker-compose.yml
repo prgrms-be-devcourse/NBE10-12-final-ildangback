@@ -65,8 +65,7 @@ services:
       retries: 12
       start_period: 30s
 
-# 야간 mysqldump 는 호스트 cron 이 backup.sh 를 돌린다 (user-data.sh 에서 03:50 등록).
-
+# 야간 mysqldump 는 호스트 cron 이 backup.sh 를 돌린다 (user-data.sh 에서 등록 - 04:20).
 volumes:
   mysql-data:
   media-tmp:

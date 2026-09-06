@@ -44,7 +44,7 @@ terraform apply
 > ⚠️ `apply` 직후 `terraform.tfstate` 를 팀 드라이브에 업로드 (시크릿 파일 취급, git 아님).
 > 이후에도 `apply` 할 때마다 갱신본 업로드. **인프라 담당자 1인만 apply.**
 
-### 1-3. GitHub Actions Secrets
+### 1-3. GitHub Actions Secrets + Environment
 
 리포 Settings → Secrets and variables → Actions:
 
@@ -52,6 +52,13 @@ terraform apply
 |---|---|
 | `EC2_INSTANCE_ID` | terraform output |
 | `AWS_DEPLOY_ROLE_ARN` | terraform output |
+
+리포 Settings → Environments → **`production` 생성**:
+- `deploy.yml` 의 `deploy` job 이 이 환경에서 돈다. OIDC 신뢰 정책(`iam.tf`)이
+  `repo:<repo>:environment:production` sub 만 허용하므로 환경 이름이 안 맞으면
+  `configure-aws-credentials` 단계가 실패한다.
+- Terraform `deploy_environment` 변수(기본 `production`)와 이름 일치시킬 것.
+- (선택) Deployment protection rules → Required reviewers 를 걸면 배포 승인 게이트가 된다.
 
 `GITHUB_TOKEN` 은 자동 제공. GHCR 패키지는 **public 으로 전환** 권장(Settings → Packages →
 change visibility) → EC2 에서 `docker login` 불필요. private 로 두려면 1-4 에서 로그인.
@@ -127,7 +134,7 @@ sudo -u ec2-user bash /opt/team1-app/deploy.sh <이전-커밋-SHA-12자>
 
 ## 4. DB 백업 / 복구
 
-- **자동**: 호스트 cron 이 매일 03:50 `backup.sh` → `/opt/team1-app/backups/gommit-YYYYMMDD-HHMM.sql.gz`, 7일 보관.
+- **자동**: 호스트 cron 이 매일 04:20 `backup.sh` → `/opt/team1-app/backups/gommit-YYYYMMDD-HHMM.sql.gz`, 7일 보관.
 - **자동 2차**: DLM 이 매일 18:30 루트 EBS 볼륨 스냅샷, 7일 보관.
 
 ### 논리 복구 (mysqldump 에서)
@@ -162,6 +169,8 @@ docker compose restart back
 
 ## 6. 셸 접속 / 로그
 
+**기본 경로 (SSM) — IAM 자격증명이 있는 사람 (인프라 담당자·CI):**
+
 ```bash
 aws ssm start-session --target <instance-id> --region ap-northeast-2
 
@@ -172,6 +181,34 @@ docker compose logs --tail=50 nginx
 docker stats --no-stream          # 메모리 압박 확인 (2GB 박스)
 free -h; swapon --show
 ```
+
+### 6-1. SSH 예외 접속 (Q14 추가결정)
+
+IAM 을 나눠줄 수 없어 SSM 을 못 쓰는 운영자 1인 전용. 그 외에는 위 SSM 을 쓴다.
+
+**최초 1회 설정 (인프라 담당자가):**
+
+1. 그 사람에게 키쌍 생성 요청 — `ssh-keygen -t ed25519 -C team1-ops -f ~/.ssh/team1` .
+   `-C` 는 이름 대신 `team1-ops` 같은 중립 문자열로. 공개키(`team1.pub`)만 전달받는다.
+2. 그 사람 공인 IP 확인 (`curl ifconfig.me`), `infra/terraform/terraform.tfvars` 에:
+   ```hcl
+   ssh_allowed_cidrs = ["<그사람-IP>/32"]
+   ```
+   `terraform apply` — SG 22 규칙만 라이브 추가, 인스턴스 재시작 없음.
+3. 공개키를 인스턴스 `authorized_keys` 에 등록 (SSM 으로):
+   ```bash
+   aws ssm start-session --target <instance-id> --region ap-northeast-2
+   sudo -u ec2-user tee -a /home/ec2-user/.ssh/authorized_keys <<'KEY'
+   ssh-ed25519 AAAA... team1-ops
+   KEY
+   ```
+
+**접속 (그 사람이):** `ssh -i ~/.ssh/team1 ec2-user@<EIP>`
+인스턴스가 켜진 03:30~18:00 에만 된다.
+
+**IP 가 바뀌면:** `terraform.tfvars` 의 `/32` 갱신 → `terraform apply`. 키는 그대로.
+
+**인스턴스 재빌드 시:** `authorized_keys` 는 새 볼륨이라 3번을 다시 한다 (부트스트랩에 안 박음).
 
 ---
 

@@ -203,12 +203,12 @@ monorepo 안 `infra/` 디렉터리. `feat/infra-idk` → 다른 브랜치 머지
 | Swap | 파일 스왑 2GB | 2GB RAM에 JVM+MySQL+ffmpeg 동시 부하 대비 |
 | EBS | 루트 gp3 30GB 단일 + docker `mysql-data` named volume (Q13) | 별도 볼륨은 안 씀 — 단순. 백업은 mysqldump + DLM 스냅샷 |
 | EIP | 1개, 인스턴스에 attach | 18:00 stop/start 후에도 IP 유지. **주의: 2024년부터 EIP는 attach 여부 무관 시간당 과금(~월 $3.6)** |
-| 보안그룹 | **22 없음** (배포·디버그 모두 SSM), 443 = Cloudflare IP 대역만, 그 외 차단 (Q14) | 오리진 우회 차단 |
+| 보안그룹 | 443 = Cloudflare IP 대역만, 22 = 기본 미개방(배포·디버그 = SSM), `var.ssh_allowed_cidrs` 로 운영자 1인 `/32` 예외만 (Q14) | 오리진 우회 차단 |
 
 **Terraform 관리 대상**: VPC(1) / IGW / 퍼블릭 서브넷(1) / 라우트테이블 / EC2 / EIP /
 보안그룹 / IAM 역할(SSM, GHCR pull) / cloudflare DNS 레코드 / EventBridge Scheduler(03:30
 start) / DLM(EBS 스냅샷). provider 블록에 `default_tags { tags = { Team = "devcos-team01" } }`
-→ 모든 AWS 리소스에 태그 자동. (key pair 불필요 — SSM만 사용)
+→ 모든 AWS 리소스에 태그 자동. (key pair 미사용 — SSM 이 기본. SSH 예외 1인은 authorized_keys 직접 등록, Q14 추가결정)
 
 **예산 개산**: `t4g.small` 24시간 ≈ 월 $12, gp3 30GB ≈ $2.4, EIP ≈ $3.6, 아웃바운드 전송
 100GB/월 무료. 18:00 정지로 가동시간이 절반이면 컴퓨트도 절반. 8만원(≈ $57) 안에 충분.
@@ -413,6 +413,28 @@ DB에 있고, 이게 날아가면 서비스가 끝난다. 데모/평가 중에 �
 - **Cloudflare 서버 IP 대역만**: 트래픽이 반드시 Cloudflare를 거쳐야 EC2에 도달 → 우회 불가.
 - **결정: Cloudflare IP 대역만.** Cloudflare가 공개하는 IP 목록을 보안그룹 or nginx에 반영
   (Terraform에서 `http` 데이터소스로 목록을 받아 SG 규칙 생성).
+
+**추가결정 (2026-09-07) — SSH 예외 1인:**
+
+- 상황: 팀 AWS 계정이 IAM 사용자/역할을 나눠줄 수 없다. 그래서 인프라 담당자 외 운영자
+  1인은 SSM Session Manager 를 쓸 자격증명이 없다. 그 1인이 셸 접속(로그 확인, 디스크 정리,
+  DB 수동 복구)을 해야 한다.
+- 대안 검토:
+  - 로그만 필요 → 로그 반출(Loki/CloudWatch) 후 브라우저. 이번 요구는 대화형 셸이라 부족.
+  - 재시작/배포만 → GitHub Actions `workflow_dispatch`. 역시 대화형 셸을 못 대체.
+  - 공유 IAM 사용자에 SSM 권한 부여 → 계정이 IAM 편집을 막아 불가.
+- **결정: 그 1인의 공인 IP `/32` 에만 22 를 연다.** `var.ssh_allowed_cidrs` (기본 `[]` =
+  미개방). 키는 `ec2-user` `authorized_keys` 에 그 사람 공개키 1개만. SSM 경로는 그대로 유지
+  (담당자·CI 는 계속 SSM).
+- 잔여 리스크와 완화:
+  - 22 는 Cloudflare 뒤가 아니라 **오리진 직접 노출** → `/32` 로만, `0.0.0.0/0` 은 변수
+    validation + `tftest` 가 차단.
+  - 비밀번호 로그인은 AL2023 기본값이 off, 키 인증만.
+  - 노출창은 인스턴스가 켜진 03:30~18:00 뿐(루트 계정이 18:00 stop).
+  - 키가 1개라 접속 주체가 특정된다. 필요 시 `fail2ban` 추가.
+  - IP 변동 시 `terraform.tfvars` 갱신 후 `apply` — SG 규칙만 라이브 교체, 무중단.
+- `tftest`: `security_group_locks_origin` 은 "기본값이면 22 규칙 0개", `ssh_exception_is_narrow`
+  는 "열더라도 22/tcp·`/32` 만" 을 검증.
 
 ### Q15 — Cloudflare를 Terraform으로 관리? → DNS만 Terraform, Pages는 대시보드
 
@@ -668,7 +690,7 @@ infra/
     providers.tf           # aws(default_tags Team) + cloudflare
     variables.tf
     network.tf             # VPC / IGW / 퍼블릭 서브넷 1 / 라우트테이블
-    security.tf            # SG: 443 = Cloudflare IPv4 대역만 (http 데이터소스), 22 없음
+    security.tf            # SG: 443 = Cloudflare IPv4 대역만 (http 데이터소스), 22 = ssh_allowed_cidrs 예외만
     iam.tf                 # ① EC2 SSM 역할 ② GitHub OIDC 배포 역할 ③ Scheduler ④ DLM
     ec2.tf                 # AL2023 arm64 AMI, t4g.small, gp3 30GB(Backup=true), EIP
     dns.tf                 # cloudflare_record: api A → EIP, proxied (apex는 Pages가 관리)
@@ -683,7 +705,7 @@ infra/
     docker-compose.yml     # nginx + back + mysql (mem_limit 프리셋, healthcheck, expose)
     .env.example
     deploy.sh              # EC2 배포 스크립트 (git pull + sync + compose + health), 롤백도 이것
-    backup.sh             # 야간 mysqldump (호스트 cron 03:50)
+    backup.sh             # 야간 mysqldump (호스트 cron 04:20)
   nginx/
     nginx.conf             # client_max_body_size 20m, real_ip(CF), auth 레이트리밋 존, gzip 생략
     conf.d/api.conf        # api.go-mmit.site: TLS, /api/media 버퍼링 off, /api/auth 레이트리밋
@@ -724,7 +746,7 @@ front/
 
 | 검사 | 막는 사고 |
 |---|---|
-| `tftest` security_group_locks_origin | SG 에 22(SSH)·0.0.0.0/0 개방 → 오리진 직접 노출, Cloudflare 우회 |
+| `tftest` security_group_locks_origin / ssh_exception_is_narrow | 443 에 0.0.0.0/0, 또는 SSH 예외가 `/32`·22 를 벗어나 넓게 열림 → 오리진 직접 노출, Cloudflare 우회 |
 | `tftest` instance_is_hardened_and_cheap | 인스턴스 타입 상향(결재·예산), IMDSv2 해제(SSRF→자격증명 탈취), 루트 볼륨 미암호화, `user_data_replace_on_change=true`(수정 시 .env/certs 유실), IAM 프로파일 분리(SSM 배포 불가) |
 | `tftest` auto_start_before_batch | 기동 크론이 03:30·Asia/Seoul 이 아님 → 04:00 정산 배치 누락 |
 | `tftest` backup_policy_enabled | DLM 스냅샷 비활성 → 볼륨 백업 소실 |
@@ -747,6 +769,8 @@ front/
 - **GHCR 패키지 visibility**: public 전환 권장(EC2 `docker login` 불필요) — runbook 1-3.
 - **Cloudflare Origin CA 인증서**: 발급 후 EC2 `certs/` 에 배치 — runbook 1-1, 1-4.
 - **최초 배포**: runbook 1장 순서대로 (Terraform → Secrets → EC2 셋업 → Pages).
+- **SSH 예외 1인**: `ssh_allowed_cidrs` 에 그 사람 공인 IP `/32`, 공개키는 런북 "SSH 예외
+  접속" 절차대로 등록. IP 바뀌면 tfvars 갱신 후 `apply`.
 
 ## 부록 A. 라운드별 진행 기록
 
@@ -760,3 +784,5 @@ front/
   `./gradlew bootJar`, `pnpm build` 통과.
 - 테스트 (2026-09-04): `infra.tftest.hcl`(5 pass) + `ActuatorSecurityTest`(2 pass) +
   `infra-ci.yml`. `terraform test`·`actionlint`·`shellcheck` 로컬 통과.
+- 추가결정 (2026-09-07): mysqldump cron 03:50→04:20. Q14 SSH 예외 1인 —
+  `ssh_allowed_cidrs` `/32` 화이트리스트, SSM 경로 유지. `tftest` +1 (`ssh_exception_is_narrow`).

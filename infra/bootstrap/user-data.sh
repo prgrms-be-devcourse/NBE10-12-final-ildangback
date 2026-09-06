@@ -32,6 +32,13 @@ chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 # ---- SSM 에이전트 (AL2023 기본 포함, 실행 보장) --------------------------
 systemctl enable --now amazon-ssm-agent
 
+# ---- SSH 예외 접속 (Q14 추가결정) --------------------------------------
+# 배포·운영은 SSM 이 원칙. IAM 을 못 나눠 SSM 을 못 쓰는 운영자 1인만 SSH 를 쓴다.
+# SG 22 개방은 var.ssh_allowed_cidrs 로 하고, 공개키 등록은 이 부트스트랩이 아니라
+# 런북 "SSH 예외 접속" 절차(SSM 으로 authorized_keys 에 append)로 한다.
+# 부트스트랩에 키를 박지 않는 이유: user_data_replace_on_change=false 라 현재 인스턴스엔
+# 어차피 반영 안 되고, 리포에 공개키가 남는다. 인스턴스 재빌드 시 런북 체크리스트로 재등록.
+
 # ---- 앱 디렉터리 ---------------------------------------------------------
 install -d -o ec2-user -g ec2-user "${APP_DIR}"
 install -d -o ec2-user -g ec2-user "${APP_DIR}/certs"       # Cloudflare Origin CA 인증서
@@ -39,10 +46,11 @@ install -d -o ec2-user -g ec2-user "${APP_DIR}/backups"     # mysqldump 출력
 install -d -o ec2-user -g ec2-user "${APP_DIR}/nginx"       # deploy.sh 가 리포에서 동기화
 # src/(리포 clone), .env, certs/*, 최초 docker login 은 runbook 의 "최초 1회" 절차 참고.
 
-# ---- 야간 mysqldump cron (03:50 KST) -----------------------------------
+# ---- 야간 mysqldump cron (04:20 KST) -----------------------------------
+# 03:30 자동 start + 04:00 배치 이후. dockerd/mysql health 올라올 시간 확보.
 cat > /etc/cron.d/team1-db-backup <<'CRON'
 CRON_TZ=Asia/Seoul
-50 3 * * * ec2-user /bin/bash /opt/team1-app/backup.sh >> /opt/team1-app/backups/backup.log 2>&1
+20 4 * * * ec2-user /bin/bash /opt/team1-app/backup.sh >> /opt/team1-app/backups/backup.log 2>&1
 CRON
 chmod 644 /etc/cron.d/team1-db-backup
 

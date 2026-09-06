@@ -4,7 +4,12 @@
 #
 # 각 run 블록은 "이 설정이 깨지면 무슨 사고가 나는가"를 error_message 에 적었다.
 
-mock_provider "aws" {}
+mock_provider "aws" {
+  # 모의 apply 시 IAM 역할 ARN 이 유효한 형식이어야 scheduler/dlm 의 role_arn 검증을 통과.
+  mock_resource "aws_iam_role" {
+    defaults = { arn = "arn:aws:iam::123456789012:role/mock" }
+  }
+}
 mock_provider "cloudflare" {}
 
 # security.tf 의 data.http(Cloudflare IP 목록)를 가짜 3개 대역으로 대체.
@@ -26,13 +31,13 @@ variables {
 run "security_group_locks_origin" {
   command = plan
 
-  # 막는 사고: 누가 인그레스에 22(SSH)나 넓은 포트를 추가 → 인터넷에서 EC2 직접 접근.
+  # 막는 사고: 누가 443 규칙의 포트/프로토콜을 바꿈.
   assert {
     condition = alltrue([
       for r in values(aws_vpc_security_group_ingress_rule.https_from_cloudflare) :
       r.from_port == 443 && r.to_port == 443 && r.ip_protocol == "tcp"
     ])
-    error_message = "보안그룹 인그레스에 443/tcp 외 규칙이 있다. SSH(22)나 임의 포트가 열리면 배포 채널이 SSM 인데도 인스턴스가 직접 노출된다."
+    error_message = "443 인그레스에 443/tcp 외 규칙이 섞였다."
   }
 
   # 막는 사고: 누가 cidr_ipv4 를 "0.0.0.0/0" 으로 바꿈 → Cloudflare 우회(엣지 DDoS/WAF 무력화).
@@ -42,6 +47,31 @@ run "security_group_locks_origin" {
       r.cidr_ipv4 != "0.0.0.0/0" && r.cidr_ipv4 != "::/0"
     ])
     error_message = "인그레스에 0.0.0.0/0 이 있다. 443 은 Cloudflare IP 대역만 허용해야 오리진 우회를 막는다 (design Q14)."
+  }
+
+  # 기본값(ssh_allowed_cidrs=[])이면 SSH 규칙이 0개여야 한다 (SSM 전용 = 원래 설계).
+  assert {
+    condition     = length(aws_vpc_security_group_ingress_rule.ssh_operator) == 0
+    error_message = "ssh_allowed_cidrs 를 안 줬는데 22 규칙이 생겼다. 기본은 SSH 미개방이어야 한다."
+  }
+}
+
+# -----------------------------------------------------------------------------
+run "ssh_exception_is_narrow" {
+  command = plan
+
+  variables {
+    ssh_allowed_cidrs = ["203.0.113.7/32"]
+  }
+
+  # 막는 사고: 예외 SSH 를 열되 포트가 22 아님 / 와일드카드로 넓힘 → 오리진 전면 노출.
+  assert {
+    condition = alltrue([
+      for r in values(aws_vpc_security_group_ingress_rule.ssh_operator) :
+      r.from_port == 22 && r.to_port == 22 && r.ip_protocol == "tcp" &&
+      r.cidr_ipv4 != "0.0.0.0/0" && r.cidr_ipv4 != "::/0" && endswith(r.cidr_ipv4, "/32")
+    ])
+    error_message = "SSH 예외 규칙이 22/tcp·단일 호스트(/32) 조건을 벗어났다 (design Q14 추가결정)."
   }
 }
 
@@ -107,6 +137,24 @@ run "backup_policy_enabled" {
   assert {
     condition     = aws_dlm_lifecycle_policy.ebs_daily.state == "ENABLED"
     error_message = "DLM 스냅샷 정책이 ENABLED 가 아니다. 볼륨 단위 2차 백업이 사라진다 (design Q13)."
+  }
+}
+
+# -----------------------------------------------------------------------------
+run "deploy_oidc_is_environment_scoped" {
+  # assume_role_policy 는 AWS 가 정규화해 plan 단계엔 unknown → apply(모의) 로 확정값 검사.
+  command = apply
+
+  # 막는 사고: 누가 sub 조건을 repo:<repo>:* 같은 와일드카드로 넓힘 → 아무 브랜치/태그/PR
+  #           워크플로가 deploy-role 을 탈취해 ssm:SendCommand 로 EC2 임의 명령 실행 (design 보안 메모).
+  assert {
+    condition     = can(regex("repo:[^\"]+:environment:[^\"]+", aws_iam_role.deploy.assume_role_policy))
+    error_message = "deploy-role 신뢰 정책 sub 가 GitHub Environment 로 한정돼 있지 않다. repo:<repo>:environment:<env> 형태여야 브랜치/PR 에서의 역할 탈취를 막는다."
+  }
+
+  assert {
+    condition     = !can(regex("repo:[^\"]*:[*]", aws_iam_role.deploy.assume_role_policy))
+    error_message = "deploy-role 신뢰 정책에 repo:...:* 와일드카드 sub 가 있다. 특정 environment 로 좁혀야 한다."
   }
 }
 
