@@ -95,6 +95,17 @@ class PersonalPointServiceTest {
             verify(userPointHistoryRepository).save(captor.capture());
             assertThat(captor.getValue().getBalanceAfter()).isEqualTo(1040);
         }
+
+        @Test
+        @DisplayName("amount가 0 이하면 INVALID_INPUT_VALUE 예외가 발생하고 저장하지 않는다")
+        void throwsWhenAmountIsNotPositive() {
+            assertThatThrownBy(() -> personalPointService.reward(1L, 32L, 0, UserPointReason.CHECK_IN, "오운완"))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+            verify(userPointHistoryRepository, never()).save(any());
+        }
     }
 
     @Nested
@@ -123,6 +134,17 @@ class PersonalPointServiceTest {
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.POINT_INSUFFICIENT);
+
+            verify(userPointHistoryRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("amount가 0 이하면 INVALID_INPUT_VALUE 예외가 발생하고 저장하지 않는다")
+        void throwsWhenAmountIsNotPositive() {
+            assertThatThrownBy(() -> personalPointService.deduct(1L, -10, UserPointReason.ITEM_PURCHASE, "핑크 왕리본"))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
 
             verify(userPointHistoryRepository, never()).save(any());
         }

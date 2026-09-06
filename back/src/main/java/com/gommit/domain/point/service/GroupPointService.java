@@ -32,6 +32,9 @@ public class GroupPointService {
 
     @Transactional
     public void reward(Long groupId, int amount, GroupPointReason reason, String sourceName) {
+        if (amount <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
         GroupPoint point = lockOrCreatePoint(groupId);
         point.add(amount);
         groupPointHistoryRepository.save(GroupPointHistory.of(groupId, sourceName, amount, reason, point.getBalance()));
@@ -39,6 +42,9 @@ public class GroupPointService {
 
     @Transactional
     public void deduct(Long groupId, int amount, GroupPointReason reason, String sourceName) {
+        if (amount <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
         GroupPoint point = lockOrCreatePoint(groupId);
         if (point.getBalance() < amount) {
             throw new BusinessException(ErrorCode.POINT_INSUFFICIENT);

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -96,6 +97,17 @@ class GroupPointServiceTest {
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.POINT_INSUFFICIENT);
+        }
+
+        @Test
+        @DisplayName("amount가 0 이하면 INVALID_INPUT_VALUE 예외가 발생하고 저장하지 않는다")
+        void throwsWhenAmountIsNotPositive() {
+            assertThatThrownBy(() -> groupPointService.reward(12L, 0, GroupPointReason.DAILY_ALL_COMPLETE, "오운완"))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+            verify(groupPointHistoryRepository, never()).save(any());
         }
     }
 

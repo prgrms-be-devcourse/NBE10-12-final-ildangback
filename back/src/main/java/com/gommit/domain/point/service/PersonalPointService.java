@@ -31,6 +31,9 @@ public class PersonalPointService {
 
     @Transactional
     public void reward(Long userId, Long challengeId, int amount, UserPointReason reason, String sourceName) {
+        if (amount <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
         UserPoint point = lockOrCreatePoint(userId);
         point.add(amount);
         userPointHistoryRepository.save(
@@ -39,6 +42,9 @@ public class PersonalPointService {
 
     @Transactional
     public void deduct(Long userId, int amount, UserPointReason reason, String sourceName) {
+        if (amount <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
         UserPoint point = lockOrCreatePoint(userId);
         if (point.getBalance() < amount) {
             throw new BusinessException(ErrorCode.POINT_INSUFFICIENT);
