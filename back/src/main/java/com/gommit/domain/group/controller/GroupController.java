@@ -47,7 +47,6 @@ public class GroupController {
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         SliceResponse<GroupSummaryResponse> response =
                 groupService.getPublicGroups(keyword, category, sort, cursor, size);
-
         return ResponseEntity.ok(response);
     }
 
@@ -59,7 +58,6 @@ public class GroupController {
             @RequestParam(required = false) Long cursor,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         SliceResponse<MyGroupSummaryResponse> response = groupService.getMyGroups(actor.getId(), status, cursor, size);
-
         return ResponseEntity.ok(response);
     }
 
@@ -71,12 +69,10 @@ public class GroupController {
         return ResponseEntity.ok(groupService.getGroupDetail(groupId));
     }
 
-    // 그릅 참여
     @Operation(summary = "공개 그룹 참여", description = "현재 로그인한 사용자가 모집 중인 공개 그룹에 참여. 그룹 멤버와 현재 READY 챌린지의 챌린지 멤버로 함께 등록.")
     @PostMapping("/{groupId}/members")
     public ResponseEntity<GroupJoinResponse> joinGroup(@PathVariable Long groupId, @CurrentUser SecurityUser actor) {
         GroupJoinResponse response = groupService.joinGroup(groupId, actor.getId());
-
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -87,7 +83,6 @@ public class GroupController {
     @DeleteMapping("/{groupId}/members/me")
     public ResponseEntity<Void> leaveGroup(@PathVariable Long groupId, @CurrentUser SecurityUser actor) {
         groupService.leaveGroup(groupId, actor.getId());
-
         return ResponseEntity.noContent().build();
     }
 }

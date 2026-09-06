@@ -13,16 +13,12 @@ import org.springframework.stereotype.Component;
 public class ChallengeProgressCalculator {
     // 현재까지 진행된 인증 예정일 수 계산
     public int calculateCurrentDay(Challenge challenge, LocalDate today) {
-        // 아직 시작 전인 챌린지
         if (challenge.getStatus() == ChallengeStatus.READY) {
             return 0;
         }
-
-        // 종료된 챌린지
         if (challenge.getStatus() == ChallengeStatus.ENDED) {
             return challenge.getRequiredDayCount();
         }
-
         return switch (challenge.getFrequencyType()) {
             case DAILY -> calculateDailyCurrentDay(challenge, today);
             case DAYS_OF_WEEK -> calculateDaysOfWeekCurrentDay(challenge, today);
@@ -42,35 +38,25 @@ public class ChallengeProgressCalculator {
         if (today.isBefore(challenge.getStartDate())) {
             return 0;
         }
-
         int currentDay = (int) ChronoUnit.DAYS.between(challenge.getStartDate(), today) + 1;
-
         return Math.min(currentDay, challenge.getRequiredDayCount());
     }
 
     private int calculateDaysOfWeekCurrentDay(Challenge challenge, LocalDate today) {
-
         if (today.isBefore(challenge.getStartDate())) {
             return 0;
         }
-
         List<DaysOfWeek> scheduledDays = Arrays.stream(challenge.getDaysOfWeek().split(","))
                 .map(DaysOfWeek::valueOf)
                 .toList();
-
         LocalDate endDate = today.isAfter(challenge.getEndDate()) ? challenge.getEndDate() : today;
-
         int count = 0;
-
         for (LocalDate date = challenge.getStartDate(); !date.isAfter(endDate); date = date.plusDays(1)) {
-
             DaysOfWeek currentDay = DaysOfWeek.getDaysOfWeek(date.getDayOfWeek());
-
             if (scheduledDays.contains(currentDay)) {
                 count++;
             }
         }
-
         return count;
     }
 
@@ -78,11 +64,8 @@ public class ChallengeProgressCalculator {
         if (today.isBefore(challenge.getStartDate())) {
             return 0;
         }
-
         long days = ChronoUnit.DAYS.between(challenge.getStartDate(), today);
-
         int currentDay = (int) (days / challenge.getFrequencyValue()) + 1;
-
         return Math.min(currentDay, challenge.getRequiredDayCount());
     }
 }
