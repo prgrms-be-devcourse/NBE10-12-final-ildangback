@@ -7,6 +7,7 @@ import com.gommit.domain.media.policy.StoragePolicy;
 import com.gommit.domain.media.support.MediaContentType;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -40,21 +41,36 @@ public class LocalStorageService implements StorageService {
     // 용량·매직바이트를 다시 확인하지 않고, 확장자는 선언된 Content-Type 에서만 가져온다.
     @Override
     public StorageResult store(MultipartFile file, MediaRole mediaRole) {
-        StoragePolicy policy = properties.policyFor(mediaRole);
-        String extension = MediaContentType.fromMimeType(file.getContentType())
-                .orElseThrow(() -> new BusinessException(ErrorCode.UNSUPPORTED_MEDIA_TYPE))
-                .extension();
+        MediaContentType contentType = MediaContentType.fromMimeType(file.getContentType())
+                .orElseThrow(() -> new BusinessException(ErrorCode.UNSUPPORTED_MEDIA_TYPE));
+        try (InputStream in = file.getInputStream()) {
+            return writeToStorage(in, contentType, mediaRole);
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.MEDIA_STORAGE_FAILED);
+        }
+    }
 
+    // 서버 생성 바이트 저장(업로드 아님) — DailyLog 몽타주처럼 사용자 파일이 아닌 콘텐츠.
+    @Override
+    public StorageResult storeGenerated(byte[] content, MediaContentType contentType, MediaRole mediaRole) {
+        return writeToStorage(new ByteArrayInputStream(content), contentType, mediaRole);
+    }
+
+    private StorageResult writeToStorage(InputStream in, MediaContentType contentType, MediaRole mediaRole) {
+        StoragePolicy policy = properties.policyFor(mediaRole);
         LocalDate today = LocalDate.now();
         String storageKey = "%s/%s/%s/%s.%s"
-                .formatted(policy.folder(), today.format(YEAR), today.format(MONTH), UUID.randomUUID(), extension);
+                .formatted(
+                        policy.folder(),
+                        today.format(YEAR),
+                        today.format(MONTH),
+                        UUID.randomUUID(),
+                        contentType.extension());
 
         Path destination = resolve(storageKey);
         try {
             Files.createDirectories(destination.getParent());
-            try (InputStream in = file.getInputStream()) {
-                Files.copy(in, destination);
-            }
+            Files.copy(in, destination);
         } catch (IOException e) {
             deleteQuietly(destination); // 중간까지 쓰인 파일 잔여물 제거
             throw new BusinessException(ErrorCode.MEDIA_STORAGE_FAILED);
