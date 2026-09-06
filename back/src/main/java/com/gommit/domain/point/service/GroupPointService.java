@@ -93,6 +93,6 @@ public class GroupPointService {
         }
         return groupPointRepository
                 .findWithLockByGroupId(groupId)
-                .orElseThrow(() -> new IllegalStateException("GroupPoint 생성에 실패했다. groupId=" + groupId));
+                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR));
     }
 }

@@ -99,6 +99,6 @@ public class PersonalPointService {
         }
         return userPointRepository
                 .findWithLockByUserId(userId)
-                .orElseThrow(() -> new IllegalStateException("UserPoint 생성에 실패했다. userId=" + userId));
+                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR));
     }
 }
