@@ -11,7 +11,6 @@ import com.gommit.domain.group.repository.GroupMemberRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -21,8 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class ChallengeExtensionService {
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-
     private final ChallengeRepository challengeRepository;
     private final ChallengeMemberRepository challengeMemberRepository;
     private final GroupMemberRepository groupMemberRepository;
@@ -113,7 +110,7 @@ public class ChallengeExtensionService {
 
     private void validateExtensionChoicePeriod(Challenge challenge) {
         LocalDate deadline = challenge.getEndDate().minusDays(2);
-        LocalDate today = LocalDate.now(KST);
+        LocalDate today = LocalDate.now();
 
         if (today.isAfter(deadline)) {
             throw new BusinessException(ErrorCode.EXTENSION_CHOICE_CLOSED);
@@ -210,7 +207,7 @@ public class ChallengeExtensionService {
 
     @Transactional
     public void finalizeExtensionsDueToday() {
-        LocalDate today = LocalDate.now(KST);
+        LocalDate today = LocalDate.now();
 
         List<Challenge> challenges = challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE);
 

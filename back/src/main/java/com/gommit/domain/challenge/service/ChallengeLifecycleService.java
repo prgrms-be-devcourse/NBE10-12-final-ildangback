@@ -21,15 +21,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class ChallengeLifecycleService {
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-
     private final ChallengeRepository challengeRepository;
     private final ChallengeMemberRepository challengeMemberRepository;
     private final ChallengeGroupRepository challengeGroupRepository;
 
     @Transactional
     public void activateChallengesDueToday() {
-        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        LocalDate today = LocalDate.now();
 
         List<Challenge> readyChallenges = challengeRepository.findAllByStatus(ChallengeStatus.READY);
 
@@ -61,7 +59,7 @@ public class ChallengeLifecycleService {
 
     @Transactional
     public void endChallengesDueToday() {
-        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        LocalDate today = LocalDate.now();
 
         List<Challenge> activeChallenges = challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE);
 
