@@ -39,7 +39,7 @@ public class ChallengeService {
     @Transactional
     public Challenge createInitialChallenge(Long groupId, Long userId, InitialChallengeSettingRequest setting) {
         validateInitialChallengeSetting(setting);
-        int requiredDayCount = calculateRequiredDayCount(
+        int requiredDayCount = challengeProgressCalculator.calculateRequiredDayCount(
                 setting.startDate(),
                 setting.endDate(),
                 setting.frequencyType(),
@@ -200,7 +200,7 @@ public class ChallengeService {
             throw new BusinessException(ErrorCode.NO_CHECK_IN_METHOD);
         }
         boolean allowPhoto = allowedTypes.contains(CheckInType.PHOTO);
-        int requiredDayCount = calculateRequiredDayCount(startDate, endDate, frequencyType, frequencyValue, daysOfWeek);
+        int requiredDayCount = challengeProgressCalculator.calculateRequiredDayCount(startDate, endDate, frequencyType, frequencyValue, daysOfWeek);
         String dayOfWeekValue = convertDaysOfWeek(daysOfWeek);
         challenge.updateSettings(
                 startDate,
@@ -317,33 +317,6 @@ public class ChallengeService {
             case EVERY_N_DAYS -> {
                 long days = ChronoUnit.DAYS.between(challenge.getStartDate(), today);
                 yield days % challenge.getFrequencyValue() == 0;
-            }
-        };
-    }
-
-    private int calculateRequiredDayCount(
-            LocalDate startDate,
-            LocalDate endDate,
-            FrequencyType frequencyType,
-            Integer frequencyValue,
-            List<DaysOfWeek> daysOfWeek) {
-        return switch (frequencyType) {
-            case DAILY -> (int) ChronoUnit.DAYS.between(startDate, endDate) + 1;
-            case DAYS_OF_WEEK -> {
-                int count = 0;
-                LocalDate date = startDate;
-                while(!date.isAfter(endDate)) {
-                    DaysOfWeek currentDay = DaysOfWeek.getDaysOfWeek(date.getDayOfWeek());
-                    if(daysOfWeek.contains(currentDay)) {
-                        count++;
-                    }
-                    date = date.plusDays(1);
-                }
-                yield count;
-            }
-            case EVERY_N_DAYS -> {
-                long days = ChronoUnit.DAYS.between(startDate, endDate);
-                yield (int) (days / frequencyValue) + 1;
             }
         };
     }

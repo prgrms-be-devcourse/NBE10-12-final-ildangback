@@ -12,6 +12,7 @@ import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ public class ChallengeExtensionService {
     private final ChallengeMemberRepository challengeMemberRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final ChallengeMemberService challengeMemberService;
+    private final ChallengeProgressCalculator challengeProgressCalculator;
 
     @Transactional
     public ExtensionChoiceResponse updateExtensionChoice(
@@ -117,6 +119,9 @@ public class ChallengeExtensionService {
         LocalDate nextStartDate = currentChallenge.getEndDate().plusDays(1);
         // 기본 기간은 현재 시즌과 동일
         LocalDate nextEndDate = nextStartDate.plusDays(periodDays);
+        List<DaysOfWeek> daysOfWeek = currentChallenge.getDaysOfWeek() == null ? null : Arrays.stream(currentChallenge.getDaysOfWeek().split(",")).map(String::trim).map(DaysOfWeek::valueOf).toList();
+        int requiredDayCount = challengeProgressCalculator.calculateRequiredDayCount(nextStartDate, nextEndDate, currentChallenge.getFrequencyType(), currentChallenge.getFrequencyValue(), daysOfWeek);
+
         Challenge nextChallenge = Challenge.builder()
                 .groupId(currentChallenge.getGroupId())
                 .seqNo(currentChallenge.getSeqNo() + 1)
@@ -127,7 +132,7 @@ public class ChallengeExtensionService {
                 .frequencyValue(currentChallenge.getFrequencyValue())
                 .daysOfWeek(currentChallenge.getDaysOfWeek())
                 .dailyCheckInCount(currentChallenge.getDailyCheckInCount())
-                .requiredDayCount(currentChallenge.getRequiredDayCount())
+                .requiredDayCount(requiredDayCount)
                 .allowPhoto(currentChallenge.isAllowPhoto())
                 // 새 시즌이므로 streak 초기화
                 .groupCurrentStreak(0)

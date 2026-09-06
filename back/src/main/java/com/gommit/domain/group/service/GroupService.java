@@ -205,7 +205,7 @@ public class GroupService {
     @Transactional
     public GroupJoinResponse joinGroup(Long groupId, Long userId) {
         ChallengeGroup group = challengeGroupRepository
-                .findById(groupId)
+                .findByIdWithLock(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
         if (group.getStatus() != GroupStatus.READY) {
             throw new BusinessException(ErrorCode.GROUP_NOT_JOINABLE);

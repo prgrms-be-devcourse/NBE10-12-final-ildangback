@@ -24,7 +24,6 @@ public enum ErrorCode {
     CHALLENGE_NOT_OWNER(HttpStatus.FORBIDDEN, "챌린지 OWNER 권한이 없습니다."),
     CHALLENGE_NOT_MEMBER(HttpStatus.FORBIDDEN, "챌린지에 참여 중인 멤버가 아닙니다."),
     CHALLENGE_NOT_EDITABLE(HttpStatus.FORBIDDEN, "READY 상태의 챌린지만 설정을 수정할 수 있습니다."),
-    INVALID_EXTENSION_START_DATE(HttpStatus.BAD_REQUEST, "연장 시즌의 시작일은 이전 시즌 종료일 이후여야 합니다."),
     INVALID_DAILY_COUNT(HttpStatus.BAD_REQUEST, "하루 인증 횟수가 허용 범위를 벗어났습니다."),
     CANNOT_DELEGATE_TO_SELF(HttpStatus.BAD_REQUEST, "자기 자신에게 OWNER를 위임할 수 없습니다."),
     EXTENSION_CHOICE_CLOSED(HttpStatus.CONFLICT, "연장 참여 의사 선택 기간이 마감되었습니다."),
