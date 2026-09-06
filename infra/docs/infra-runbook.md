@@ -224,7 +224,8 @@ IAM 을 나눠줄 수 없어 SSM 을 못 쓰는 운영자 1인 전용. 그 외�
 | 증상 | 확인 |
 |---|---|
 | 배포 실패 (health check failed) | `docker compose logs back` — Flyway/DB 연결/OOM |
-| `back` 계속 재시작 | `docker stats` 메모리, `-Xmx` 초과? `.env` DB 값? |
+| `back` 계속 재시작 | `docker stats` 메모리, `-Xmx` 초과? `.env` DB 값? ffmpeg 겹침이면 아래 참고 |
+| `back` OOM-kill 반복 (인코딩 중) | 동시성 1 확인. 2회 이상이면 사이드카 분리 검토 — `infra-design.md` Q24 "ffmpeg 인코딩 확장 사다리" |
 | 502 from Cloudflare | nginx up? `certs/origin.*` 존재? `docker compose logs nginx` |
 | 526 (invalid SSL) from Cloudflare | Origin CA 인증서 만료/불일치, SSL 모드 Full(strict) 확인 |
 | ffmpeg 중 앱 느려짐 | 정상 (동시성 1, swap 사용). 지속되면 인코딩을 새벽으로 이동 |
