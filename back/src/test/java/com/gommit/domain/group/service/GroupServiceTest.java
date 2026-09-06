@@ -252,21 +252,45 @@ class GroupServiceTest {
             when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "꼬밋러")));
 
             // when & then
-            assertThat(groupService.createGroup(1L, createRequest(GroupCategory.DEV, MapType.STUDY_ROOM)).group().id())
+            assertThat(groupService
+                            .createGroup(1L, createRequest(GroupCategory.DEV, MapType.STUDY_ROOM))
+                            .group()
+                            .id())
                     .isEqualTo(12L);
-            assertThat(groupService.createGroup(1L, createRequest(GroupCategory.READING, MapType.STUDY_ROOM)).group().id())
+            assertThat(groupService
+                            .createGroup(1L, createRequest(GroupCategory.READING, MapType.STUDY_ROOM))
+                            .group()
+                            .id())
                     .isEqualTo(12L);
-            assertThat(groupService.createGroup(1L, createRequest(GroupCategory.JOB, MapType.STUDY_ROOM)).group().id())
+            assertThat(groupService
+                            .createGroup(1L, createRequest(GroupCategory.JOB, MapType.STUDY_ROOM))
+                            .group()
+                            .id())
                     .isEqualTo(12L);
-            assertThat(groupService.createGroup(1L, createRequest(GroupCategory.STUDY, MapType.STUDY_ROOM)).group().id())
+            assertThat(groupService
+                            .createGroup(1L, createRequest(GroupCategory.STUDY, MapType.STUDY_ROOM))
+                            .group()
+                            .id())
                     .isEqualTo(12L);
-            assertThat(groupService.createGroup(1L, createRequest(GroupCategory.EXERCISE, MapType.GYM)).group().id())
+            assertThat(groupService
+                            .createGroup(1L, createRequest(GroupCategory.EXERCISE, MapType.GYM))
+                            .group()
+                            .id())
                     .isEqualTo(12L);
-            assertThat(groupService.createGroup(1L, createRequest(GroupCategory.HEALTH, MapType.GYM)).group().id())
+            assertThat(groupService
+                            .createGroup(1L, createRequest(GroupCategory.HEALTH, MapType.GYM))
+                            .group()
+                            .id())
                     .isEqualTo(12L);
-            assertThat(groupService.createGroup(1L, createRequest(GroupCategory.LIFE, MapType.STUDY_ROOM)).group().id())
+            assertThat(groupService
+                            .createGroup(1L, createRequest(GroupCategory.LIFE, MapType.STUDY_ROOM))
+                            .group()
+                            .id())
                     .isEqualTo(12L);
-            assertThat(groupService.createGroup(1L, createRequest(GroupCategory.ETC, MapType.STUDY_ROOM)).group().id())
+            assertThat(groupService
+                            .createGroup(1L, createRequest(GroupCategory.ETC, MapType.STUDY_ROOM))
+                            .group()
+                            .id())
                     .isEqualTo(12L);
         }
 
@@ -384,8 +408,10 @@ class GroupServiceTest {
             ChallengeGroup second = group(12L, "저녁 오운완", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
             Challenge firstChallenge = challenge(101L, 11L, ChallengeStatus.READY);
             Challenge secondChallenge = challenge(102L, 12L, ChallengeStatus.READY);
-            ReflectionTestUtils.setField(firstChallenge, "startDate", LocalDate.now().plusDays(5));
-            ReflectionTestUtils.setField(secondChallenge, "startDate", LocalDate.now().plusDays(2));
+            ReflectionTestUtils.setField(
+                    firstChallenge, "startDate", LocalDate.now().plusDays(5));
+            ReflectionTestUtils.setField(
+                    secondChallenge, "startDate", LocalDate.now().plusDays(2));
             when(challengeGroupRepository.findAllByVisibilityAndStatus(Visibility.PUBLIC, GroupStatus.READY))
                     .thenReturn(List.of(first, second));
             when(challengeRepository.findAllByGroupIdInAndStatus(List.of(11L, 12L), ChallengeStatus.READY))
@@ -410,7 +436,8 @@ class GroupServiceTest {
             when(challengeGroupRepository.findAllByVisibilityAndStatus(Visibility.PUBLIC, GroupStatus.READY))
                     .thenReturn(List.of(first, second));
             when(challengeRepository.findAllByGroupIdInAndStatus(List.of(11L, 12L), ChallengeStatus.READY))
-                    .thenReturn(List.of(challenge(101L, 11L, ChallengeStatus.READY), challenge(102L, 12L, ChallengeStatus.READY)));
+                    .thenReturn(List.of(
+                            challenge(101L, 11L, ChallengeStatus.READY), challenge(102L, 12L, ChallengeStatus.READY)));
             when(groupMemberRepository.countByGroupIdsAndStatus(List.of(11L, 12L), GroupMemberStatus.ACTIVE))
                     .thenReturn(List.of());
 
@@ -493,7 +520,7 @@ class GroupServiceTest {
             Challenge challenge = challenge(50L, 12L, ChallengeStatus.READY);
             GroupMember savedGroupMember = groupMember(30L, group, 2L);
             ChallengeMember savedChallengeMember = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeGroupRepository.findByIdWithLock(12L)).thenReturn(Optional.of(group));
             when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.READY))
                     .thenReturn(Optional.of(challenge));
             when(groupMemberRepository.existsByGroupIdAndUserId(12L, 2L)).thenReturn(false);
@@ -519,7 +546,7 @@ class GroupServiceTest {
         @DisplayName("그룹이 없으면 GROUP_NOT_FOUND")
         void throwsWhenGroupNotFound() {
             // given
-            when(challengeGroupRepository.findById(999L)).thenReturn(Optional.empty());
+            when(challengeGroupRepository.findByIdWithLock(999L)).thenReturn(Optional.empty());
 
             // when & then
             assertBusinessException(() -> groupService.joinGroup(999L, 2L), ErrorCode.GROUP_NOT_FOUND);
@@ -530,7 +557,7 @@ class GroupServiceTest {
         void throwsWhenGroupIsCodeOnly() {
             // given
             ChallengeGroup group = group(12L, "비공개 모임", GroupCategory.EXERCISE, Visibility.CODE_ONLY, 6);
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeGroupRepository.findByIdWithLock(12L)).thenReturn(Optional.of(group));
 
             // when & then
             assertBusinessException(() -> groupService.joinGroup(12L, 2L), ErrorCode.INVITE_CODE_REQUIRED);
@@ -543,7 +570,7 @@ class GroupServiceTest {
             // given
             ChallengeGroup group = group(12L, "진행 중 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
             group.activate();
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeGroupRepository.findByIdWithLock(12L)).thenReturn(Optional.of(group));
 
             // when & then
             assertBusinessException(() -> groupService.joinGroup(12L, 2L), ErrorCode.GROUP_NOT_JOINABLE);
@@ -555,7 +582,7 @@ class GroupServiceTest {
         void throwsWhenReadyChallengeMissing() {
             // given
             ChallengeGroup group = group(12L, "오운완 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeGroupRepository.findByIdWithLock(12L)).thenReturn(Optional.of(group));
             when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.READY))
                     .thenReturn(Optional.empty());
 
@@ -570,7 +597,7 @@ class GroupServiceTest {
             // given
             ChallengeGroup group = group(12L, "오운완 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
             Challenge challenge = challenge(50L, 12L, ChallengeStatus.READY);
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeGroupRepository.findByIdWithLock(12L)).thenReturn(Optional.of(group));
             when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.READY))
                     .thenReturn(Optional.of(challenge));
             when(groupMemberRepository.existsByGroupIdAndUserId(12L, 2L)).thenReturn(true);
@@ -586,7 +613,7 @@ class GroupServiceTest {
             // given
             ChallengeGroup group = group(12L, "오운완 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 2);
             Challenge challenge = challenge(50L, 12L, ChallengeStatus.READY);
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeGroupRepository.findByIdWithLock(12L)).thenReturn(Optional.of(group));
             when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.READY))
                     .thenReturn(Optional.of(challenge));
             when(groupMemberRepository.existsByGroupIdAndUserId(12L, 2L)).thenReturn(false);
@@ -606,7 +633,7 @@ class GroupServiceTest {
             Challenge challenge = challenge(50L, 12L, ChallengeStatus.READY);
             GroupMember savedGroupMember = groupMember(30L, group, 2L);
             ChallengeMember savedChallengeMember = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeGroupRepository.findByIdWithLock(12L)).thenReturn(Optional.of(group));
             when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.READY))
                     .thenReturn(Optional.of(challenge));
             when(groupMemberRepository.existsByGroupIdAndUserId(12L, 2L)).thenReturn(false);
@@ -797,7 +824,8 @@ class GroupServiceTest {
                     .thenReturn(List.of(readyGroup, activeGroup, endedGroup));
             when(challengeMemberRepository.countByChallengeIdAndStatus(any(), eq(ChallengeMemberStatus.ACTIVE)))
                     .thenReturn(1L);
-            when(challengeProgressCalculator.calculateCurrentDay(any(), any(LocalDate.class))).thenReturn(1);
+            when(challengeProgressCalculator.calculateCurrentDay(any(), any(LocalDate.class)))
+                    .thenReturn(1);
             when(challengeProgressCalculator.calculatePeriodProgressRate(1, 7)).thenReturn(14.3);
 
             // when

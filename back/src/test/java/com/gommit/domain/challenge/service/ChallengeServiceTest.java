@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,6 +43,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -66,8 +68,8 @@ class ChallengeServiceTest {
     @Mock
     private ChallengeMemberService challengeMemberService;
 
-    @Mock
-    private ChallengeProgressCalculator challengeProgressCalculator;
+    @Spy
+    private ChallengeProgressCalculator challengeProgressCalculator = new ChallengeProgressCalculator();
 
     @InjectMocks
     private ChallengeService challengeService;
@@ -232,13 +234,7 @@ class ChallengeServiceTest {
             // given
             LocalDate startDate = LocalDate.now().plusDays(5);
             InitialChallengeSettingRequest setting = new InitialChallengeSettingRequest(
-                    startDate,
-                    startDate.minusDays(1),
-                    FrequencyType.DAILY,
-                    null,
-                    null,
-                    1,
-                    List.of(CheckInType.PHOTO));
+                    startDate, startDate.minusDays(1), FrequencyType.DAILY, null, null, 1, List.of(CheckInType.PHOTO));
 
             // when & then
             assertBusinessException(
@@ -288,7 +284,8 @@ class ChallengeServiceTest {
         @DisplayName("요일 반복이면 선택 요일 수만 requiredDayCount로 계산하고 저장한다")
         void createsDaysOfWeekChallenge() {
             // given
-            LocalDate monday = LocalDate.of(2026, 9, 7);
+            LocalDate monday =
+                    LocalDate.now().with(java.time.temporal.TemporalAdjusters.next(java.time.DayOfWeek.MONDAY));
             InitialChallengeSettingRequest setting = new InitialChallengeSettingRequest(
                     monday,
                     monday.plusDays(6),
@@ -354,8 +351,7 @@ class ChallengeServiceTest {
                     .thenReturn(Optional.of(owner));
             when(challengeMemberRepository.countByChallengeIdAndStatus(50L, ChallengeMemberStatus.ACTIVE))
                     .thenReturn(3L);
-            when(challengeProgressCalculator.calculateCurrentDay(eq(challenge), any(LocalDate.class)))
-                    .thenReturn(2);
+            doReturn(2).when(challengeProgressCalculator).calculateCurrentDay(eq(challenge), any(LocalDate.class));
             when(challengeProgressCalculator.calculatePeriodProgressRate(2, 7)).thenReturn(28.6);
 
             // when
@@ -426,8 +422,7 @@ class ChallengeServiceTest {
                     .thenReturn(Optional.of(owner));
             when(challengeMemberRepository.countByChallengeIdAndStatus(50L, ChallengeMemberStatus.ACTIVE))
                     .thenReturn(2L);
-            when(challengeProgressCalculator.calculateCurrentDay(eq(challenge), any(LocalDate.class)))
-                    .thenReturn(1);
+            doReturn(1).when(challengeProgressCalculator).calculateCurrentDay(eq(challenge), any(LocalDate.class));
             when(challengeProgressCalculator.calculatePeriodProgressRate(1, 7)).thenReturn(14.3);
 
             // when
@@ -455,8 +450,7 @@ class ChallengeServiceTest {
                     .thenReturn(Optional.of(owner));
             when(challengeMemberRepository.countByChallengeIdAndStatus(50L, ChallengeMemberStatus.ACTIVE))
                     .thenReturn(2L);
-            when(challengeProgressCalculator.calculateCurrentDay(eq(challenge), any(LocalDate.class)))
-                    .thenReturn(1);
+            doReturn(1).when(challengeProgressCalculator).calculateCurrentDay(eq(challenge), any(LocalDate.class));
             when(challengeProgressCalculator.calculatePeriodProgressRate(1, 7)).thenReturn(14.3);
 
             // when
@@ -642,13 +636,7 @@ class ChallengeServiceTest {
             Challenge challenge = challenge(50L, ChallengeStatus.READY);
             ChallengeMember owner = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
             ChallengeUpdateRequest request = new ChallengeUpdateRequest(
-                    LocalDate.now(),
-                    LocalDate.now().plusDays(10),
-                    null,
-                    null,
-                    null,
-                    null,
-                    null);
+                    LocalDate.now(), LocalDate.now().plusDays(10), null, null, null, null, null);
             when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(owner));
 
@@ -664,14 +652,8 @@ class ChallengeServiceTest {
             Challenge challenge = challenge(50L, ChallengeStatus.READY);
             ChallengeMember owner = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
             LocalDate startDate = LocalDate.now().plusDays(5);
-            ChallengeUpdateRequest request = new ChallengeUpdateRequest(
-                    startDate,
-                    startDate.minusDays(1),
-                    null,
-                    null,
-                    null,
-                    null,
-                    null);
+            ChallengeUpdateRequest request =
+                    new ChallengeUpdateRequest(startDate, startDate.minusDays(1), null, null, null, null, null);
             when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(owner));
 
@@ -685,14 +667,8 @@ class ChallengeServiceTest {
             // given
             Challenge challenge = challenge(50L, ChallengeStatus.READY);
             ChallengeMember owner = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
-            ChallengeUpdateRequest request = new ChallengeUpdateRequest(
-                    null,
-                    null,
-                    FrequencyType.DAYS_OF_WEEK,
-                    null,
-                    List.of(),
-                    null,
-                    null);
+            ChallengeUpdateRequest request =
+                    new ChallengeUpdateRequest(null, null, FrequencyType.DAYS_OF_WEEK, null, List.of(), null, null);
             when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(owner));
 
@@ -707,14 +683,8 @@ class ChallengeServiceTest {
             // given
             Challenge challenge = challenge(50L, ChallengeStatus.READY);
             ChallengeMember owner = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
-            ChallengeUpdateRequest request = new ChallengeUpdateRequest(
-                    null,
-                    null,
-                    FrequencyType.EVERY_N_DAYS,
-                    8,
-                    null,
-                    null,
-                    null);
+            ChallengeUpdateRequest request =
+                    new ChallengeUpdateRequest(null, null, FrequencyType.EVERY_N_DAYS, 8, null, null, null);
             when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(owner));
 
@@ -740,10 +710,30 @@ class ChallengeServiceTest {
         }
 
         @Test
+        @DisplayName("READY 챌린지의 종료일만 변경해도 인증 예정일 수를 다시 계산한다")
+        void recalculatesWhenOnlyPeriodChanges() {
+            // given
+            Challenge challenge = challenge(50L, ChallengeStatus.READY);
+            ChallengeMember owner = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
+            LocalDate endDate = challenge.getStartDate().plusDays(9);
+            ChallengeUpdateRequest request = new ChallengeUpdateRequest(null, endDate, null, null, null, null, null);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(owner));
+
+            // when
+            challengeService.updateChallenge(50L, 1L, request);
+
+            // then
+            assertThat(challenge.getEndDate()).isEqualTo(endDate);
+            assertThat(challenge.getRequiredDayCount()).isEqualTo(10);
+        }
+
+        @Test
         @DisplayName("기존 요일 반복 설정을 유지해서 수정한다")
         void updatesWithExistingDaysOfWeekSetting() {
             // given
-            LocalDate monday = LocalDate.of(2026, 9, 7);
+            LocalDate monday =
+                    LocalDate.now().with(java.time.temporal.TemporalAdjusters.next(java.time.DayOfWeek.MONDAY));
             Challenge challenge = challenge(50L, ChallengeStatus.READY);
             ReflectionTestUtils.setField(challenge, "startDate", monday);
             ReflectionTestUtils.setField(challenge, "endDate", monday.plusDays(6));

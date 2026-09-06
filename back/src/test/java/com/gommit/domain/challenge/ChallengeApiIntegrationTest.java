@@ -195,6 +195,9 @@ class ChallengeApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(jsonPath("$.frequencyType").value("EVERY_N_DAYS"))
                     .andExpect(jsonPath("$.frequencyValue").value(2))
                     .andExpect(jsonPath("$.dailyCheckInCount").value(3));
+            org.assertj.core.api.Assertions.assertThat(jdbcTemplate.queryForObject(
+                            "select required_day_count from challenges where id = ?", Integer.class, challengeId))
+                    .isEqualTo(5);
         }
 
         @Test

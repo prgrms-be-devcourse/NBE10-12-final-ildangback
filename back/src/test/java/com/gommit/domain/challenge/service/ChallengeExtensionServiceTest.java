@@ -3,7 +3,6 @@ package com.gommit.domain.challenge.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,6 +38,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -58,6 +58,9 @@ class ChallengeExtensionServiceTest {
 
     @Mock
     private ChallengeMemberService challengeMemberService;
+
+    @Spy
+    private ChallengeProgressCalculator challengeProgressCalculator = new ChallengeProgressCalculator();
 
     @InjectMocks
     private ChallengeExtensionService challengeExtensionService;
@@ -225,7 +228,8 @@ class ChallengeExtensionServiceTest {
         void throwsWhenChoicePeriodClosed() {
             // given
             Challenge challenge = challenge(50L, ChallengeStatus.ACTIVE);
-            ReflectionTestUtils.setField(challenge, "endDate", LocalDate.now(KST).plusDays(1));
+            ReflectionTestUtils.setField(
+                    challenge, "endDate", LocalDate.now(KST).plusDays(1));
             ChallengeMember member = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
             when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(member));
@@ -321,7 +325,8 @@ class ChallengeExtensionServiceTest {
             ArgumentCaptor<Challenge> captor = ArgumentCaptor.forClass(Challenge.class);
             verify(challengeRepository).save(captor.capture());
             assertThat(captor.getValue().getSeqNo()).isEqualTo(2);
-            assertThat(captor.getValue().getStartDate()).isEqualTo(challenge.getEndDate().plusDays(1));
+            assertThat(captor.getValue().getStartDate())
+                    .isEqualTo(challenge.getEndDate().plusDays(1));
             verify(challengeMemberService).createChallengeMember(savedNextChallenge, 1L, ChallengeMemberRole.OWNER);
             verify(challengeMemberService).createChallengeMember(savedNextChallenge, 2L, ChallengeMemberRole.MEMBER);
         }
@@ -365,7 +370,8 @@ class ChallengeExtensionServiceTest {
             when(challengeRepository.findById(999L)).thenReturn(Optional.empty());
 
             // when & then
-            assertBusinessException(() -> challengeExtensionService.finalizeExtension(999L), ErrorCode.CHALLENGE_NOT_FOUND);
+            assertBusinessException(
+                    () -> challengeExtensionService.finalizeExtension(999L), ErrorCode.CHALLENGE_NOT_FOUND);
         }
 
         @Test
@@ -386,7 +392,8 @@ class ChallengeExtensionServiceTest {
                     .thenReturn(Optional.empty());
 
             // when & then
-            assertBusinessException(() -> challengeExtensionService.finalizeExtension(50L), ErrorCode.CHALLENGE_NOT_OWNER);
+            assertBusinessException(
+                    () -> challengeExtensionService.finalizeExtension(50L), ErrorCode.CHALLENGE_NOT_OWNER);
         }
     }
 
