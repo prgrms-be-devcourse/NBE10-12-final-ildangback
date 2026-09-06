@@ -61,6 +61,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    # OIDC sub 클레임을 repo:<repo>:environment:production 으로 고정 →
+    # deploy-role 의 신뢰 정책(infra/terraform/iam.tf)이 이 환경에서 온 토큰만 허용.
+    environment: production
     steps:
       - uses: aws-actions/configure-aws-credentials@v4
         with:

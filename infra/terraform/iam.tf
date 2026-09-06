@@ -52,9 +52,14 @@ resource "aws_iam_role" "deploy" {
       Action    = "sts:AssumeRoleWithWebIdentity"
       Principal = { Federated = aws_iam_openid_connect_provider.github.arn }
       Condition = {
-        StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }
-        # 이 리포지토리에서 온 OIDC 토큰만. 없으면 아무 GitHub 리포나 이 역할을 탈취.
-        StringLike = { "token.actions.githubusercontent.com:sub" = "repo:${var.github_repo}:*" }
+        # aud + sub 둘 다 정확히 일치해야 함.
+        #   - sub 를 이 리포의 특정 GitHub Environment 로 한정 → 아무 브랜치/태그/PR 워크플로가
+        #     이 역할을 못 씀. deploy.yml 의 deploy job 은 environment: ${var.deploy_environment} 로 돈다.
+        #   - repo:*:* 로 넓히면 리포 write 권한자가 임의 브랜치에 워크플로를 올려 ssm:SendCommand 실행 가능.
+        StringEquals = {
+          "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repo}:environment:${var.deploy_environment}"
+        }
       }
     }]
   })

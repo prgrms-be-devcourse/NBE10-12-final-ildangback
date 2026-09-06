@@ -94,3 +94,9 @@ variable "github_repo" {
   type        = string
   default     = "prgrms-be-devcourse/NBE10-12-final-ildangback"
 }
+
+variable "deploy_environment" {
+  description = "deploy.yml 의 deploy job 이 도는 GitHub Environment 이름. OIDC sub 를 이 환경으로 한정한다."
+  type        = string
+  default     = "production"
+}
