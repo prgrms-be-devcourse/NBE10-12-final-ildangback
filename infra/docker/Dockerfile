@@ -9,15 +9,19 @@ WORKDIR /app
 # 의존성 레이어 캐시 (소스보다 먼저)
 COPY gradlew build.gradle settings.gradle lombok.config ./
 COPY gradle ./gradle
-RUN chmod +x gradlew && ./gradlew --no-daemon -q dependencies || true
+RUN chmod +x gradlew && (./gradlew --no-daemon -q dependencies || true)
 
 COPY config ./config
 COPY src ./src
 
 # 테스트/검증은 CI(backend-ci.yml)에서 이미 돌았으므로 여기선 제외.
-# bootJar 산출물만 취함(-plain.jar 이 있으면 제외).
+# bootJar 산출물만 취함(-plain.jar 은 제외).
 RUN ./gradlew --no-daemon clean bootJar -x test -x check \
- && cp "$(ls build/libs/*.jar | grep -v -- '-plain' | head -1)" app.jar
+ && for jar in build/libs/*.jar; do \
+        case "$jar" in *-plain.jar) continue ;; esac; \
+        cp "$jar" app.jar; \
+        break; \
+    done
 
 # ---- runtime -------------------------------------------------------------
 FROM eclipse-temurin:25-jre AS runtime
