@@ -148,7 +148,8 @@ public class GroupService {
                 summaries.stream()
                         .sorted(Comparator.comparingInt(GroupSummaryResponse::currentMembers)
                                 .reversed()
-                                .thenComparing(Comparator.comparing(GroupSummaryResponse::id).reversed()))
+                                .thenComparing(Comparator.comparing(GroupSummaryResponse::id)
+                                        .reversed()))
                         .toList();
             case START_SOON ->
                 summaries.stream()
@@ -158,15 +159,12 @@ public class GroupService {
         };
     }
 
-    private List<GroupSummaryResponse> applyCursor(
-        List<GroupSummaryResponse> summaries,
-            Long cursor
-    ) {
+    private List<GroupSummaryResponse> applyCursor(List<GroupSummaryResponse> summaries, Long cursor) {
         if (cursor == null) {
             return summaries;
         }
-        for(int i = 0; i < summaries.size(); i++) {
-            if(summaries.get(i).id().equals(cursor)) {
+        for (int i = 0; i < summaries.size(); i++) {
+            if (summaries.get(i).id().equals(cursor)) {
                 return summaries.subList(i + 1, summaries.size());
             }
         }
@@ -224,7 +222,8 @@ public class GroupService {
         if (currentMembers >= group.getMaxMembers()) {
             throw new BusinessException(ErrorCode.GROUP_FULL);
         }
-        GroupMember groupMember = GroupMember.builder().group(group).userId(userId).build();
+        GroupMember groupMember =
+                GroupMember.builder().group(group).userId(userId).build();
         GroupMember savedGroupMember = groupMemberRepository.save(groupMember);
         ChallengeMember challengeMember =
                 challengeMemberService.createChallengeMember(challenge, userId, ChallengeMemberRole.MEMBER);

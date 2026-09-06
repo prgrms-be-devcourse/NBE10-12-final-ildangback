@@ -119,8 +119,18 @@ public class ChallengeExtensionService {
         LocalDate nextStartDate = currentChallenge.getEndDate().plusDays(1);
         // 기본 기간은 현재 시즌과 동일
         LocalDate nextEndDate = nextStartDate.plusDays(periodDays);
-        List<DaysOfWeek> daysOfWeek = currentChallenge.getDaysOfWeek() == null ? null : Arrays.stream(currentChallenge.getDaysOfWeek().split(",")).map(String::trim).map(DaysOfWeek::valueOf).toList();
-        int requiredDayCount = challengeProgressCalculator.calculateRequiredDayCount(nextStartDate, nextEndDate, currentChallenge.getFrequencyType(), currentChallenge.getFrequencyValue(), daysOfWeek);
+        List<DaysOfWeek> daysOfWeek = currentChallenge.getDaysOfWeek() == null
+                ? null
+                : Arrays.stream(currentChallenge.getDaysOfWeek().split(","))
+                        .map(String::trim)
+                        .map(DaysOfWeek::valueOf)
+                        .toList();
+        int requiredDayCount = challengeProgressCalculator.calculateRequiredDayCount(
+                nextStartDate,
+                nextEndDate,
+                currentChallenge.getFrequencyType(),
+                currentChallenge.getFrequencyValue(),
+                daysOfWeek);
 
         Challenge nextChallenge = Challenge.builder()
                 .groupId(currentChallenge.getGroupId())

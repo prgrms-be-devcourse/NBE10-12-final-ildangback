@@ -200,7 +200,8 @@ public class ChallengeService {
             throw new BusinessException(ErrorCode.NO_CHECK_IN_METHOD);
         }
         boolean allowPhoto = allowedTypes.contains(CheckInType.PHOTO);
-        int requiredDayCount = challengeProgressCalculator.calculateRequiredDayCount(startDate, endDate, frequencyType, frequencyValue, daysOfWeek);
+        int requiredDayCount = challengeProgressCalculator.calculateRequiredDayCount(
+                startDate, endDate, frequencyType, frequencyValue, daysOfWeek);
         String dayOfWeekValue = convertDaysOfWeek(daysOfWeek);
         challenge.updateSettings(
                 startDate,

@@ -3,12 +3,11 @@ package com.gommit.domain.challenge.service;
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.ChallengeStatus;
 import com.gommit.domain.challenge.entity.DaysOfWeek;
+import com.gommit.domain.challenge.entity.FrequencyType;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
-
-import com.gommit.domain.challenge.entity.FrequencyType;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -70,20 +69,21 @@ public class ChallengeProgressCalculator {
         int currentDay = (int) (days / challenge.getFrequencyValue()) + 1;
         return Math.min(currentDay, challenge.getRequiredDayCount());
     }
+
     public int calculateRequiredDayCount(
-        LocalDate startDate,
-        LocalDate endDate,
-        FrequencyType frequencyType,
-        Integer frequencyValue,
-        List<DaysOfWeek> daysOfWeek) {
+            LocalDate startDate,
+            LocalDate endDate,
+            FrequencyType frequencyType,
+            Integer frequencyValue,
+            List<DaysOfWeek> daysOfWeek) {
         return switch (frequencyType) {
             case DAILY -> (int) ChronoUnit.DAYS.between(startDate, endDate) + 1;
             case DAYS_OF_WEEK -> {
                 int count = 0;
                 LocalDate date = startDate;
-                while(!date.isAfter(endDate)) {
+                while (!date.isAfter(endDate)) {
                     DaysOfWeek currentDay = DaysOfWeek.getDaysOfWeek(date.getDayOfWeek());
-                    if(daysOfWeek.contains(currentDay)) {
+                    if (daysOfWeek.contains(currentDay)) {
                         count++;
                     }
                     date = date.plusDays(1);
@@ -96,5 +96,4 @@ public class ChallengeProgressCalculator {
             }
         };
     }
-
 }
