@@ -150,10 +150,10 @@ public class GroupService {
                                 .reversed()
                                 .thenComparing(Comparator.comparing(GroupSummaryResponse::id).reversed()))
                         .toList();
-            case DEADLINE_SOON ->
+            case START_SOON ->
                 summaries.stream()
-                        .sorted(Comparator.comparing(GroupSummaryResponse::endDate)
-                                .thenComparing(GroupSummaryResponse::id))
+                        .sorted(Comparator.comparing(GroupSummaryResponse::startDate)
+                                .thenComparing(GroupSummaryResponse::id, Comparator.reverseOrder()))
                         .toList();
         };
     }
