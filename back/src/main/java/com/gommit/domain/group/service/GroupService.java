@@ -1,5 +1,6 @@
 package com.gommit.domain.group.service;
 
+import com.gommit.domain.background.service.BackgroundPurchaseService;
 import com.gommit.domain.challenge.dto.request.InitialChallengeSettingRequest;
 import com.gommit.domain.challenge.dto.response.ChallengeSummaryResponse;
 import com.gommit.domain.challenge.entity.*;
@@ -45,6 +46,7 @@ public class GroupService {
     private final ChallengeMemberService challengeMemberService;
     private final ChallengeProgressCalculator challengeProgressCalculator;
     private final BusinessClock businessClock;
+    private final BackgroundPurchaseService backgroundPurchaseService;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final String INVITE_CODE_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final int INVITE_CODE_LENGTH = 6;
@@ -295,6 +297,8 @@ public class GroupService {
         challengeRepository
                 .findFirstByGroupIdAndStatus(groupId, ChallengeStatus.READY)
                 .ifPresent(challenge -> leaveChallengeMember(challenge.getId(), userId));
+
+        backgroundPurchaseService.recountVotes(groupId);
     }
 
     private void leaveChallengeMember(Long challengeId, Long userId) {
