@@ -63,6 +63,10 @@ app:
   dailylog:
     ffmpeg-path: ${DAILYLOG_FFMPEG_PATH:ffmpeg} # 배포 이미지에 ffmpeg 없으면 몽타주 생성만 건너뛴다(graceful degrade)
     montage-fallback-cron: "0 0 9 * * *" # 몽타주 폴백 배치 — 다음날 09:00 KST(EC2 18:00 정지 창과 안 겹치는 시간대)
+    montage-executor: # 몽타주(ffmpeg) 전용 스레드풀 — 마감 무렵 이벤트가 몰려도 ffmpeg 동시 실행 수를 제한
+      core-size: 1
+      max-size: 2
+      queue-capacity: 50
 
 media:
   storage:
