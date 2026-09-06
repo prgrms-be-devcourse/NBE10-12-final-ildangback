@@ -5,7 +5,7 @@ import com.gommit.domain.point.dto.request.PointChangeType;
 import com.gommit.domain.point.dto.response.PointBalanceResponse;
 import com.gommit.domain.point.dto.response.UserPointHistoryResponse;
 import com.gommit.domain.point.entity.UserPointReason;
-import com.gommit.domain.point.service.PointService;
+import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.security.CurrentUser;
 import com.gommit.global.security.SecurityUser;
@@ -33,12 +33,12 @@ public class PersonalPointController {
 
     private static final int DEFAULT_SIZE = 20;
 
-    private final PointService pointService;
+    private final PersonalPointService personalPointService;
 
     @Operation(summary = "개인 포인트 잔액 조회", description = "현재 잔액, 이번 달 적립/사용, 누적 적립을 함께 반환한다.")
     @GetMapping
     public PointBalanceResponse getMyPointBalance(@CurrentUser SecurityUser user) {
-        return pointService.getMyBalance(user.getId());
+        return personalPointService.getMyBalance(user.getId());
     }
 
     @Operation(
@@ -61,13 +61,13 @@ public class PersonalPointController {
             @Parameter(description = "이전 응답의 nextCursor 값. 첫 페이지는 생략") @RequestParam(required = false) Long cursor,
             @Parameter(description = "한 번에 가져올 개수") @RequestParam(defaultValue = "" + DEFAULT_SIZE) @Min(1) @Max(100)
                     int size) {
-        return pointService.getMyHistories(user.getId(), period, type, reason, from, to, cursor, size);
+        return personalPointService.getMyHistories(user.getId(), period, type, reason, from, to, cursor, size);
     }
 
     @Operation(summary = "개인 포인트 이력 상세 조회", description = "이력 목록에서 항목을 눌렀을 때 보여주는 상세 화면용 API.")
     @GetMapping("/histories/{historyId}")
     public UserPointHistoryResponse getMyPointHistoryDetail(
             @CurrentUser SecurityUser user, @Parameter(description = "조회할 개인 포인트 이력 ID") @PathVariable Long historyId) {
-        return pointService.getMyHistoryDetail(user.getId(), historyId);
+        return personalPointService.getMyHistoryDetail(user.getId(), historyId);
     }
 }

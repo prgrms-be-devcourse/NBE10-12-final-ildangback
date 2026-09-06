@@ -7,7 +7,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.gommit.domain.point.entity.GroupPointReason;
 import com.gommit.domain.point.entity.UserPointReason;
-import com.gommit.domain.point.service.PointService;
+import com.gommit.domain.point.service.GroupPointService;
+import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.support.IntegrationTestSupport;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -29,7 +30,10 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
     private static final String NICKNAME = "꼬밋러";
 
     @Autowired
-    private PointService pointService;
+    private PersonalPointService personalPointService;
+
+    @Autowired
+    private GroupPointService groupPointService;
 
     private ResultActions getMyBalance(String accessToken) throws Exception {
         return mockMvc.perform(withToken(get("/api/users/me/points"), accessToken));
@@ -101,8 +105,8 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
             var tokens = loginAs(EMAIL, NICKNAME);
             Long userId = userIdOf(EMAIL);
 
-            pointService.reward(userId, null, 100, UserPointReason.CHECK_IN, "오운완");
-            pointService.deduct(userId, 30, UserPointReason.ITEM_PURCHASE, "핑크 왕리본");
+            personalPointService.reward(userId, null, 100, UserPointReason.CHECK_IN, "오운완");
+            personalPointService.deduct(userId, 30, UserPointReason.ITEM_PURCHASE, "핑크 왕리본");
 
             getMyBalance(tokens.accessToken())
                     .andExpect(status().isOk())
@@ -143,7 +147,7 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
             Long userId = userIdOf(EMAIL);
 
             for (int i = 0; i < 3; i++) {
-                pointService.reward(userId, null, 10, UserPointReason.CHECK_IN, "오운완");
+                personalPointService.reward(userId, null, 10, UserPointReason.CHECK_IN, "오운완");
             }
 
             getMyHistories(tokens.accessToken(), "?size=2")
@@ -159,8 +163,8 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
             var tokens = loginAs(EMAIL, NICKNAME);
             Long userId = userIdOf(EMAIL);
 
-            pointService.reward(userId, null, 40, UserPointReason.CHECK_IN, "오운완");
-            pointService.deduct(userId, 10, UserPointReason.ITEM_PURCHASE, "핑크 왕리본");
+            personalPointService.reward(userId, null, 40, UserPointReason.CHECK_IN, "오운완");
+            personalPointService.deduct(userId, 10, UserPointReason.ITEM_PURCHASE, "핑크 왕리본");
 
             getMyHistories(tokens.accessToken(), "?reason=ITEM_PURCHASE")
                     .andExpect(status().isOk())
@@ -195,7 +199,7 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
         void filtersByFromAndTo() throws Exception {
             var tokens = loginAs(EMAIL, NICKNAME);
             Long userId = userIdOf(EMAIL);
-            pointService.reward(userId, null, 40, UserPointReason.CHECK_IN, "오운완");
+            personalPointService.reward(userId, null, 40, UserPointReason.CHECK_IN, "오운완");
 
             getMyHistories(tokens.accessToken(), "?from=2020-01-01&to=2099-12-31")
                     .andExpect(status().isOk())
@@ -222,7 +226,7 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
         void returnsOwnHistory() throws Exception {
             var tokens = loginAs(EMAIL, NICKNAME);
             Long userId = userIdOf(EMAIL);
-            pointService.reward(userId, null, 40, UserPointReason.CHECK_IN, "오운완");
+            personalPointService.reward(userId, null, 40, UserPointReason.CHECK_IN, "오운완");
             Long historyId = jdbcTemplate.queryForObject("select max(id) from user_point_histories", Long.class);
 
             getMyHistoryDetail(tokens.accessToken(), historyId)
@@ -236,7 +240,7 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
         void returns404ForOthersHistory() throws Exception {
             loginAs(EMAIL, NICKNAME);
             Long ownerId = userIdOf(EMAIL);
-            pointService.reward(ownerId, null, 40, UserPointReason.CHECK_IN, "오운완");
+            personalPointService.reward(ownerId, null, 40, UserPointReason.CHECK_IN, "오운완");
             Long historyId = jdbcTemplate.queryForObject("select max(id) from user_point_histories", Long.class);
 
             var otherTokens = loginAs("other@example.com", "다른유저");
@@ -275,8 +279,8 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
             var tokens = loginAs(EMAIL, NICKNAME);
             Long groupId = insertTestGroup(userIdOf(EMAIL));
 
-            pointService.rewardGroup(groupId, 500, GroupPointReason.DAILY_ALL_COMPLETE, "오운완");
-            pointService.deductGroup(groupId, 200, GroupPointReason.BACKGROUND_PURCHASE, "루프탑 운동장");
+            groupPointService.reward(groupId, 500, GroupPointReason.DAILY_ALL_COMPLETE, "오운완");
+            groupPointService.deduct(groupId, 200, GroupPointReason.BACKGROUND_PURCHASE, "루프탑 운동장");
 
             getGroupBalance(tokens.accessToken(), groupId)
                     .andExpect(status().isOk())
@@ -306,8 +310,8 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
             var tokens = loginAs(EMAIL, NICKNAME);
             Long groupId = insertTestGroup(userIdOf(EMAIL));
 
-            pointService.rewardGroup(groupId, 100, GroupPointReason.DAILY_ALL_COMPLETE, "1번째");
-            pointService.rewardGroup(groupId, 200, GroupPointReason.DAILY_ALL_COMPLETE, "2번째");
+            groupPointService.reward(groupId, 100, GroupPointReason.DAILY_ALL_COMPLETE, "1번째");
+            groupPointService.reward(groupId, 200, GroupPointReason.DAILY_ALL_COMPLETE, "2번째");
 
             getGroupHistories(tokens.accessToken(), groupId)
                     .andExpect(status().isOk())
@@ -337,7 +341,7 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
             var tokens = loginAs(EMAIL, NICKNAME);
             Long groupId = insertTestGroup(userIdOf(EMAIL));
 
-            pointService.rewardGroup(groupId, 100, GroupPointReason.DAILY_ALL_COMPLETE, "오운완");
+            groupPointService.reward(groupId, 100, GroupPointReason.DAILY_ALL_COMPLETE, "오운완");
             Long historyId = jdbcTemplate.queryForObject("select max(id) from group_point_histories", Long.class);
 
             getGroupHistoryDetail(tokens.accessToken(), groupId, historyId)
@@ -353,7 +357,7 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
             Long groupId = insertTestGroup(userIdOf(EMAIL));
             Long otherGroupId = insertTestGroup(userIdOf(EMAIL));
 
-            pointService.rewardGroup(groupId, 100, GroupPointReason.DAILY_ALL_COMPLETE, "오운완");
+            groupPointService.reward(groupId, 100, GroupPointReason.DAILY_ALL_COMPLETE, "오운완");
             Long historyId = jdbcTemplate.queryForObject("select max(id) from group_point_histories", Long.class);
 
             getGroupHistoryDetail(tokens.accessToken(), otherGroupId, historyId)
@@ -378,7 +382,7 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
             ExecutorService pool = Executors.newFixedThreadPool(threadCount);
             List<Callable<Void>> tasks = IntStream.range(0, threadCount)
                     .<Callable<Void>>mapToObj(i -> () -> {
-                        pointService.reward(userId, null, amountEach, UserPointReason.CHECK_IN, "동시성 테스트");
+                        personalPointService.reward(userId, null, amountEach, UserPointReason.CHECK_IN, "동시성 테스트");
                         return null;
                     })
                     .toList();
@@ -410,7 +414,7 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
             ExecutorService pool = Executors.newFixedThreadPool(threadCount);
             List<Callable<Void>> tasks = IntStream.range(0, threadCount)
                     .<Callable<Void>>mapToObj(i -> () -> {
-                        pointService.rewardGroup(groupId, amountEach, GroupPointReason.DAILY_ALL_COMPLETE, "동시성 테스트");
+                        groupPointService.reward(groupId, amountEach, GroupPointReason.DAILY_ALL_COMPLETE, "동시성 테스트");
                         return null;
                     })
                     .toList();
