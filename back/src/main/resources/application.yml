@@ -60,6 +60,9 @@ app:
   time-zone: Asia/Seoul # 인증 businessDate('오늘') 판정에 쓰는 Clock 빈의 기준 타임존
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
   api-base-url: ${API_BASE_URL:http://localhost:8080}
+  dailylog:
+    ffmpeg-path: ${DAILYLOG_FFMPEG_PATH:ffmpeg} # 배포 이미지에 ffmpeg 없으면 몽타주 생성만 건너뛴다(graceful degrade)
+    montage-fallback-cron: "0 0 9 * * *" # 몽타주 폴백 배치 — 다음날 09:00 KST(EC2 18:00 정지 창과 안 겹치는 시간대)
 
 media:
   storage:
