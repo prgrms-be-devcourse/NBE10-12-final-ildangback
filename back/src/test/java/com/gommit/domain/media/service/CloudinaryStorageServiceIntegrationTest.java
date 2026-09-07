@@ -13,6 +13,7 @@ import com.gommit.domain.media.dto.StorageResult;
 import com.gommit.domain.media.entity.MediaRole;
 import com.gommit.domain.media.policy.StoragePolicy;
 import com.gommit.domain.media.policy.StoragePolicy.Visibility;
+import com.gommit.domain.media.support.MediaContentType;
 import java.util.Base64;
 import java.util.Map;
 import java.util.Set;
@@ -35,6 +36,11 @@ class CloudinaryStorageServiceIntegrationTest {
     private static final byte[] PNG_1X1 = Base64.getDecoder()
             .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
 
+    // 16x16 · 1프레임 · H.264 mp4 (825B). DailyLog 몽타주처럼 서버가 만든 video 바이트를 대신한다.
+    private static final byte[] MP4_TINY = Base64.getDecoder()
+            .decode(
+                    "AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAALwbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAAMgAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAj90cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAAMgAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAABAAAAAQAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAADIAAAAAAABAAAAAAG3bWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAAAoAAAACABVxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAABYm1pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAASJzdGJsAAAAvnN0c2QAAAAAAAAAAQAAAK5hdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAABAAEABIAAAASAAAAAAAAAABDExhdmMgbGlieDI2NAAAAAAAAAAAAAAAAAAAAAAAAAAAGP//AAAANGF2Y0MBZAAK/+EAF2dkAAqs2V7ARAAAAwAEAAADACg8SJZYAQAGaOvjyyLA/fj4AAAAABBwYXNwAAAAAQAAAAEAAAAUYnRydAAAAAAAAAPoAAAAAAAAABhzdHRzAAAAAAAAAAEAAAABAAAIAAAAABxzdHNjAAAAAAAAAAEAAAABAAAAAQAAAAEAAAAUc3RzegAAAAAAAAAZAAAAAQAAABRzdGNvAAAAAAAAAAEAAAMgAAAAPXVkdGEAAAA1bWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAbWRpcmFwcGwAAAAAAAAAAAAAAAAIaWxzdAAAAAhmcmVlAAAAIW1kYXQAAAAVZYiEAD///uZ1+BTTCBpJMvxDzj+B");
+
     private final CloudinaryAccount account = new CloudinaryAccount(
             System.getenv("CLOUDINARY_CLOUD_NAME"),
             System.getenv("CLOUDINARY_API_KEY"),
@@ -56,7 +62,13 @@ class CloudinaryStorageServiceIntegrationTest {
                                     "integration-test/check-ins",
                                     DataSize.ofMegabytes(5),
                                     Visibility.PRIVATE,
-                                    Set.of("image/png")))));
+                                    Set.of("image/png")),
+                            MediaRole.DAILYLOG,
+                            new StoragePolicy(
+                                    "gommit-it-test/daily-check-ins",
+                                    DataSize.ofMegabytes(40),
+                                    Visibility.PRIVATE,
+                                    Set.of("video/mp4")))));
 
     @Test
     @DisplayName("PRIVATE 이미지 store -> load -> delete 왕복")
@@ -83,6 +95,32 @@ class CloudinaryStorageServiceIntegrationTest {
         assertThatThrownBy(() -> cloudinary
                         .api()
                         .resource(publicId, ObjectUtils.asMap("resource_type", "image", "type", "authenticated")))
+                .isInstanceOf(NotFound.class);
+    }
+
+    @Test
+    @DisplayName("서버 생성 mp4(몽타주) storeGenerated -> load -> delete 왕복 (video 리소스)")
+    void generatedVideoRoundTrip() throws Exception {
+        StorageResult stored = service.storeGenerated(MP4_TINY, MediaContentType.MP4, MediaRole.DAILYLOG);
+        assertThat(stored.storageKey())
+                .startsWith("gommit-it-test/daily-check-ins/")
+                .endsWith(".mp4");
+
+        // 서명 URL 로 다시 받아 온다. Cloudinary video 배달은 리먹싱될 수 있어 바이트 일치 대신
+        // mp4 컨테이너 시그니처(ftyp)와 비어 있지 않음만 확인한다.
+        Resource loaded = service.load(stored.storageKey(), MediaRole.DAILYLOG);
+        byte[] bytes = loaded.getContentAsByteArray();
+        assertThat(bytes.length).isGreaterThan(100);
+        assertThat(new String(bytes, 4, 4, java.nio.charset.StandardCharsets.US_ASCII))
+                .isEqualTo("ftyp");
+
+        service.delete(stored.storageKey(), MediaRole.DAILYLOG);
+
+        String key = stored.storageKey();
+        String publicId = key.substring(0, key.lastIndexOf('.'));
+        assertThatThrownBy(() -> cloudinary
+                        .api()
+                        .resource(publicId, ObjectUtils.asMap("resource_type", "video", "type", "authenticated")))
                 .isInstanceOf(NotFound.class);
     }
 }
