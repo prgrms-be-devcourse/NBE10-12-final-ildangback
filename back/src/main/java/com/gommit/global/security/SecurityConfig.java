@@ -32,9 +32,11 @@ public class SecurityConfig {
         "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**",
     };
 
-    // 컨테이너/nginx 헬스체크. 상세 정보는 노출하지 않음(application.yml: exposure.include=health).
+    // 인프라(nginx / Docker HEALTHCHECK / deploy.sh / deploy.yml)는 전부 GET /actuator/health 만
+    // 호출한다. health 그룹 하위 경로(liveness 등)는 아무도 안 쓰므로 와일드카드를 배제하고
+    // 정확히 한 경로만 공개한다(심층방어 — exposure.include=health 와 이중).
     private static final String[] MONITORING_ENDPOINTS = {
-        "/actuator/health", "/actuator/health/**",
+        "/actuator/health",
     };
 
     private static final String H2_CONSOLE = "/h2-console/**";

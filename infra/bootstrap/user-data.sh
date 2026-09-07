@@ -6,6 +6,8 @@ set -euxo pipefail
 APP_DIR=/opt/team1-app
 
 # ---- swap 2GiB (2GB RAM 박스, ffmpeg 인코딩 대비 안전망) --------------------
+# dd 유지: AL2023 루트 파일시스템은 XFS 라 `fallocate /swapfile` 은 unwritten 익스텐트가 되어
+# `swapon` 이 "swapfile has holes" 로 거부한다 (fallocate 는 ext4 에서만 통함).
 if ! swapon --show | grep -q /swapfile; then
   dd if=/dev/zero of=/swapfile bs=1M count=2048
   chmod 600 /swapfile

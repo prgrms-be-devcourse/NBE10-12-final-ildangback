@@ -2,6 +2,9 @@
 # SSH(22): 기본은 열지 않는다(배포·디버그 = SSM). 단 IAM 을 나눠줄 수 없어 SSM 을 못 쓰는
 # 운영자 1인이 있으면 var.ssh_allowed_cidrs 에 그 사람 /32 만 넣어 예외로 연다 (Q14 추가결정).
 
+# IPv4 대역만. 오리진(EC2)이 IPv4-only(VPC/서브넷/인스턴스에 IPv6 미구성, api 레코드도 EIP A 뿐)라
+# Cloudflare 는 IPv4 로만 오리진에 접속한다. EC2 에 IPv6(AAAA)를 붙이는 날 ips-v6 대역을
+# 이 블록과 대칭으로 추가할 것.
 data "http" "cloudflare_ipv4" {
   url = "https://www.cloudflare.com/ips-v4"
 }
