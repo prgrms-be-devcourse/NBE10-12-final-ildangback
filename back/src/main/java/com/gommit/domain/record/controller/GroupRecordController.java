@@ -17,9 +17,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/challenges/{challengeId}")
-@Tag(name = "Merge", description = "챌린지 월간/최종 머지 조회")
+@Tag(name = "Group Record", description = "챌린지 월간/최종 머지 조회")
 @RequiredArgsConstructor
-public class MergeController {
+public class GroupRecordController {
 
     private final RecordQueryService recordQueryService;
 

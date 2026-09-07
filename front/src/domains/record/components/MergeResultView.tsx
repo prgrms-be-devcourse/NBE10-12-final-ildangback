@@ -17,6 +17,15 @@ function formatDateDot(localDate: string): string {
   return localDate.replaceAll("-", ".");
 }
 
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+}
+
 interface MergeResultViewProps {
   /** 챌린지/그룹 이름. 카드 맨 위에 픽셀 폰트로 표시된다. */
   groupName: string;
@@ -71,17 +80,31 @@ export function MergeResultView({
     if (!resultCardRef.current || saving) return;
     setSaving(true);
     try {
-      const dataUrl = await toPng(resultCardRef.current, {
-        pixelRatio: 2,
+      // html-to-image는 toPng()의 style 옵션으로 padding을 주더라도 캔버스
+      // 크기는 원본 노드 크기 그대로 잡아서, 늘어난 여백만큼 오른쪽/아래가
+      // 잘린다. 그래서 원본을 먼저 그대로 캡처한 뒤, 여백이 있는 더 큰
+      // 캔버스에 중앙 배치하듯 그려 넣는 방식으로 우회한다.
+      const pixelRatio = 2;
+      const padding = 20 * pixelRatio;
+      const rawDataUrl = await toPng(resultCardRef.current, {
+        pixelRatio,
         backgroundColor: "#ffffff",
-        // 화면에는 여백을 안 주고, 캡처될 이미지에만 사방 여백을 준다 -
-        // style은 캡처용 복제 노드에만 적용돼서 실제 화면 레이아웃엔 영향 없다.
-        style: { padding: "20px" },
       });
+      const rawImage = await loadImage(rawDataUrl);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = rawImage.width + padding * 2;
+      canvas.height = rawImage.height + padding * 2;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("canvas context 생성 실패");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(rawImage, padding, padding);
+
       const link = document.createElement("a");
       link.download =
         `${groupName}_${badgeLabel}`.replaceAll(" ", "_") + ".png";
-      link.href = dataUrl;
+      link.href = canvas.toDataURL("image/png");
       link.click();
     } catch {
       showToast("이미지 저장에 실패했어요. 다시 시도해 주세요.");
