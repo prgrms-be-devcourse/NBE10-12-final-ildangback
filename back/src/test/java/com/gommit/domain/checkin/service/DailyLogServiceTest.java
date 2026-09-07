@@ -71,7 +71,12 @@ class DailyLogServiceTest {
     @BeforeEach
     void setUp() {
         service = new DailyLogService(
-                dailyLogRepository, checkInRepository, challengeMemberRepository, preconditions, mediaStore, eventPublisher);
+                dailyLogRepository,
+                checkInRepository,
+                challengeMemberRepository,
+                preconditions,
+                mediaStore,
+                eventPublisher);
     }
 
     private static DailyLog logWithId(Long id, Long challengeId, LocalDate date) {
@@ -95,7 +100,8 @@ class DailyLogServiceTest {
         @DisplayName("row 를 커서 응답으로 매핑하고 completedCount/totalCount 를 계산한다")
         void mapsToResponse() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 2);
-            when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID)).thenReturn(new ReadDateAccess(challenge, null));
+            when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID))
+                    .thenReturn(new ReadDateAccess(challenge, null));
             when(dailyLogRepository.findLogs(eq(CHALLENGE_ID), isNull(), isNull(), any()))
                     .thenReturn(List.of(logWithId(2L, CHALLENGE_ID, DATE)));
             givenSnapshotTotal(2, List.of(10L, 11L), 2L);
@@ -116,7 +122,8 @@ class DailyLogServiceTest {
         @DisplayName("videoKey 가 있으면 videoUrl 을 채운다")
         void includesVideoUrlWhenPresent() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
-            when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID)).thenReturn(new ReadDateAccess(challenge, null));
+            when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID))
+                    .thenReturn(new ReadDateAccess(challenge, null));
             DailyLog log = logWithId(5L, CHALLENGE_ID, DATE);
             log.attachVideo("daily-check-ins/2026/09/uuid.mp4");
             when(dailyLogRepository.findLogs(eq(CHALLENGE_ID), isNull(), isNull(), any()))
@@ -139,7 +146,8 @@ class DailyLogServiceTest {
         @DisplayName("row 없으면 DAILY_LOG_NOT_FOUND")
         void notFound() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
-            when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID)).thenReturn(new ReadDateAccess(challenge, null));
+            when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID))
+                    .thenReturn(new ReadDateAccess(challenge, null));
             when(dailyLogRepository.findByChallengeIdAndLogDate(CHALLENGE_ID, DATE))
                     .thenReturn(Optional.empty());
 
@@ -160,7 +168,8 @@ class DailyLogServiceTest {
         @DisplayName("성공")
         void succeeds() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
-            when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID)).thenReturn(new ReadDateAccess(challenge, null));
+            when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID))
+                    .thenReturn(new ReadDateAccess(challenge, null));
             when(dailyLogRepository.findByChallengeIdAndLogDate(CHALLENGE_ID, DATE))
                     .thenReturn(Optional.of(logWithId(3L, CHALLENGE_ID, DATE)));
             givenSnapshotTotal(1, List.of(), 3L);
@@ -284,7 +293,8 @@ class DailyLogServiceTest {
         void noVideoYet() {
             when(dailyLogRepository.findById(7L)).thenReturn(Optional.of(logWithId(7L, CHALLENGE_ID, DATE)));
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
-            when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID)).thenReturn(new ReadDateAccess(challenge, null));
+            when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID))
+                    .thenReturn(new ReadDateAccess(challenge, null));
 
             assertBusiness(() -> service.loadMedia(USER_ID, 7L), ErrorCode.MEDIA_NOT_FOUND);
         }
@@ -296,7 +306,8 @@ class DailyLogServiceTest {
             log.attachVideo("daily-check-ins/2026/09/uuid.mp4");
             when(dailyLogRepository.findById(7L)).thenReturn(Optional.of(log));
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
-            when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID)).thenReturn(new ReadDateAccess(challenge, null));
+            when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID))
+                    .thenReturn(new ReadDateAccess(challenge, null));
             Resource resource = new ByteArrayResource(new byte[] {1, 2, 3});
             when(mediaStore.load("daily-check-ins/2026/09/uuid.mp4")).thenReturn(resource);
 

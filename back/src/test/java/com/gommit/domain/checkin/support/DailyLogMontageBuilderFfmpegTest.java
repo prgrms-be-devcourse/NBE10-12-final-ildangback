@@ -23,7 +23,11 @@ class DailyLogMontageBuilderFfmpegTest {
 
     static boolean ffmpegAvailable() {
         try {
-            return new ProcessBuilder("ffmpeg", "-version").redirectErrorStream(true).start().waitFor() == 0;
+            return new ProcessBuilder("ffmpeg", "-version")
+                            .redirectErrorStream(true)
+                            .start()
+                            .waitFor()
+                    == 0;
         } catch (Exception e) {
             return false;
         }
@@ -32,8 +36,15 @@ class DailyLogMontageBuilderFfmpegTest {
     private static Resource png(int w, int h, String color) throws Exception {
         Path tmp = Files.createTempFile("montage-test-", ".png");
         new ProcessBuilder(
-                        "ffmpeg", "-y", "-f", "lavfi", "-i",
-                        "color=c=%s:s=%dx%d".formatted(color, w, h), "-frames:v", "1", tmp.toString())
+                        "ffmpeg",
+                        "-y",
+                        "-f",
+                        "lavfi",
+                        "-i",
+                        "color=c=%s:s=%dx%d".formatted(color, w, h),
+                        "-frames:v",
+                        "1",
+                        tmp.toString())
                 .redirectErrorStream(true)
                 .start()
                 .waitFor();
