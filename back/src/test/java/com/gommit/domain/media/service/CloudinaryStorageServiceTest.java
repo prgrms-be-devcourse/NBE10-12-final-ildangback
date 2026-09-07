@@ -218,4 +218,24 @@ class CloudinaryStorageServiceTest {
                             assertThat(((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.MEDIA_NOT_FOUND));
         }
     }
+
+    @Nested
+    @DisplayName("filenameOf — load 가 반환하는 resource 의 파일명 (#51, Content-Type 판정용)")
+    class FilenameOf {
+
+        @Test
+        @DisplayName("storageKey 의 마지막 경로 조각을 돌려준다")
+        void lastSegment() {
+            assertThat(CloudinaryStorageService.filenameOf("check-ins/2026/09/abc.jpg"))
+                    .isEqualTo("abc.jpg");
+            assertThat(CloudinaryStorageService.filenameOf("daily-check-ins/xyz.mp4"))
+                    .isEqualTo("xyz.mp4");
+        }
+
+        @Test
+        @DisplayName("경로 구분자가 없으면 키 전체가 파일명")
+        void noSlash() {
+            assertThat(CloudinaryStorageService.filenameOf("abc.jpg")).isEqualTo("abc.jpg");
+        }
+    }
 }

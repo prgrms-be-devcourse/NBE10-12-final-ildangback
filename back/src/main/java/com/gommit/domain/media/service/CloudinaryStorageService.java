@@ -88,7 +88,13 @@ public class CloudinaryStorageService implements StorageService {
             if (response.statusCode() != 200) {
                 throw new BusinessException(ErrorCode.MEDIA_NOT_FOUND);
             }
-            return new ByteArrayResource(response.body());
+            String filename = filenameOf(storageKey);
+            return new ByteArrayResource(response.body()) {
+                @Override
+                public String getFilename() {
+                    return filename;
+                }
+            };
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.MEDIA_STORAGE_FAILED);
         } catch (InterruptedException e) {
@@ -136,6 +142,11 @@ public class CloudinaryStorageService implements StorageService {
 
     private static String deliveryType(StoragePolicy policy) {
         return policy.isPublic() ? TYPE_PUBLIC : TYPE_PRIVATE;
+    }
+
+    // "check-ins/2026/09/abc.jpg" -> "abc.jpg".
+    static String filenameOf(String storageKey) {
+        return storageKey.substring(storageKey.lastIndexOf('/') + 1);
     }
 
     // "{publicId}.{format}" -> [publicId, format]

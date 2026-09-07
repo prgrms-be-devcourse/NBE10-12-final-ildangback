@@ -20,6 +20,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.util.unit.DataSize;
 
@@ -64,6 +66,9 @@ class CloudinaryStorageServiceIntegrationTest {
 
         Resource loaded = service.load(stored.storageKey(), MediaRole.CHECKIN);
         assertThat(loaded.getContentAsByteArray()).isEqualTo(PNG_1X1);
+        // #51: 파일명을 노출해 서빙 컨트롤러가 MediaTypeFactory 로 Content-Type 을 판정할 수 있어야 한다
+        assertThat(loaded.getFilename()).endsWith(".png");
+        assertThat(MediaTypeFactory.getMediaType(loaded.getFilename())).contains(MediaType.IMAGE_PNG);
 
         service.delete(stored.storageKey(), MediaRole.CHECKIN);
 
