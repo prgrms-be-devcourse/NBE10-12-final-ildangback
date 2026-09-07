@@ -15,8 +15,8 @@ public interface DailyLogRepository extends JpaRepository<DailyLog, Long> {
 
     Optional<DailyLog> findByChallengeIdAndLogDate(Long challengeId, LocalDate logDate);
 
-    // 몽타주 폴백 배치 대상 — 영상 없는 지난 로그(오늘 이전) 전부. 서버 재시작/ffmpeg 일시 실패로 밀린 날을 훑는다.
-    List<DailyLog> findByVideoKeyIsNullAndLogDateBefore(LocalDate date);
+    // 몽타주 마감 배치 대상 — 영상 없는 지난 로그. 생성이 매번 실패하는 경우 대비를 위해 시간 범위 지정.
+    List<DailyLog> findByVideoKeyIsNullAndLogDateBetween(LocalDate from, LocalDate to);
 
     // 목록 조회 — 활동 있던 날(row 존재)만 id 커서(내림차순). maxBusinessDate: 이탈 멤버 상한(null = 제한 없음).
     @Query("""

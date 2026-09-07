@@ -62,10 +62,12 @@ app:
   api-base-url: ${API_BASE_URL:http://localhost:8080}
   dailylog:
     ffmpeg-path: ${DAILYLOG_FFMPEG_PATH:ffmpeg} # 배포 이미지에 ffmpeg 없으면 몽타주 생성만 건너뛴다(graceful degrade)
-    montage-fallback-cron: "0 0 9 * * *" # 몽타주 폴백 배치 — 다음날 09:00 KST(EC2 18:00 정지 창과 안 겹치는 시간대)
+    montage-sweep-cron: "0 0 4 * * *" # 몽타주 마감 배치 — 다음날 04:00 KST(EC2 18:00 정지 관련, infra 기동 계획에 따라 변경 가능)
+    montage-sweep-lookback-days: 7 # 마감 배치가 거슬러 훑는 최대 일수 — 이보다 오래된 미생성 날은 재시도 포기(좀비 row 누적 방지)
+    montage-sweep-max-per-run: 20 # sweep 1회 처리 상한 — ffmpeg CPU 버스트로 EC2 크레딧을 한 번에 소모하지 않도록. 초과분은 다음 회차
     montage-executor: # 몽타주(ffmpeg) 전용 스레드풀 — 마감 무렵 이벤트가 몰려도 ffmpeg 동시 실행 수를 제한
       core-size: 1
-      max-size: 2
+      max-size: 1 # ffmpeg 인코딩은 CPU 100% — 버스터블 인스턴스에서 앱용 vCPU 를 남기려 동시 1개로 직렬화
       queue-capacity: 50
 
 media:
