@@ -58,7 +58,7 @@ public class CloudinaryStorageService implements StorageService {
                             file.getBytes(),
                             ObjectUtils.asMap(
                                     "folder",
-                                    policy.folder(),
+                                    uploadFolderFor(policy),
                                     "resource_type",
                                     contentType.isVideo() ? "video" : "image",
                                     "type",
@@ -144,7 +144,13 @@ public class CloudinaryStorageService implements StorageService {
         return policy.isPublic() ? TYPE_PUBLIC : TYPE_PRIVATE;
     }
 
-    // "check-ins/2026/09/abc.jpg" -> "abc.jpg".
+    // 업로드 시 Cloudinary 에 넘길 folder 파라미터 = rootFolder + "/" + policy.folder (rootFolder 비면 policy.folder 그대로)
+    private String uploadFolderFor(StoragePolicy policy) {
+        String root = properties.cloudinary().rootFolder();
+        return (root == null || root.isBlank()) ? policy.folder() : root + "/" + policy.folder();
+    }
+
+    // "go-mmit/check-ins/abc.jpg" -> "abc.jpg".
     static String filenameOf(String storageKey) {
         return storageKey.substring(storageKey.lastIndexOf('/') + 1);
     }

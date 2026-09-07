@@ -51,6 +51,7 @@ media:
       cloud-name: ${CLOUDINARY_CLOUD_NAME:}
       api-key: ${CLOUDINARY_API_KEY:}
       api-secret: ${CLOUDINARY_API_SECRET:}
+      root-folder: ${MEDIA_CLOUDINARY_ROOT_FOLDER:test-go-mmit}   # 계정 안 최상위 폴더. prod 는 go-mmit 로 오버라이드
     policies:
       CHECKIN:  { folder: check-ins,       max-size: 5MB,  visibility: PRIVATE, allowed-content-types: [image/png, image/jpeg, image/webp] }
       DAILYLOG: { folder: daily-check-ins, max-size: 40MB, visibility: PRIVATE, allowed-content-types: [video/mp4] }

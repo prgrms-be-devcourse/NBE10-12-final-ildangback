@@ -38,7 +38,8 @@ class CloudinaryStorageServiceIntegrationTest {
     private final CloudinaryAccount account = new CloudinaryAccount(
             System.getenv("CLOUDINARY_CLOUD_NAME"),
             System.getenv("CLOUDINARY_API_KEY"),
-            System.getenv("CLOUDINARY_API_SECRET"));
+            System.getenv("CLOUDINARY_API_SECRET"),
+            "gommit-it-test"); // 테스트 리소스는 이 폴더 아래로 (정리 스코프)
 
     private final Cloudinary cloudinary = CloudinaryClientFactory.create(account);
 
@@ -48,13 +49,11 @@ class CloudinaryStorageServiceIntegrationTest {
                     "cloudinary",
                     null,
                     account,
+                    // account.rootFolder("gommit-it-test") 가 앞에 붙어 실제 폴더는 gommit-it-test/check-ins
                     Map.of(
                             MediaRole.CHECKIN,
                             new StoragePolicy(
-                                    "gommit-it-test/check-ins",
-                                    DataSize.ofMegabytes(5),
-                                    Visibility.PRIVATE,
-                                    Set.of("image/png")))));
+                                    "check-ins", DataSize.ofMegabytes(5), Visibility.PRIVATE, Set.of("image/png")))));
 
     @Test
     @DisplayName("PRIVATE 이미지 store -> load -> delete 왕복")

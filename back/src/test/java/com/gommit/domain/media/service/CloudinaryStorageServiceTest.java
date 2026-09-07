@@ -38,7 +38,7 @@ class CloudinaryStorageServiceTest {
     private static final MediaStorageProperties PROPERTIES = new MediaStorageProperties(
             "cloudinary",
             null,
-            new CloudinaryAccount("democloud", "k", "s"),
+            new CloudinaryAccount("democloud", "k", "s", "test-go-mmit"),
             Map.of(
                     MediaRole.ITEM,
                     new StoragePolicy(
@@ -76,9 +76,33 @@ class CloudinaryStorageServiceTest {
             ArgumentCaptor<Map<String, Object>> options = ArgumentCaptor.forClass(Map.class);
             verify(uploader).upload(any(), options.capture());
             assertThat(options.getValue())
-                    .containsEntry("folder", "check-ins")
+                    .containsEntry("folder", "test-go-mmit/check-ins") // root-folder + policy.folder
                     .containsEntry("resource_type", "image")
                     .containsEntry("type", "authenticated"); // CHECKIN 은 PRIVATE
+        }
+
+        @Test
+        @DisplayName("root-folder 가 비면 policy.folder 를 그대로 업로드 폴더로 쓴다")
+        void noRootFolder() throws Exception {
+            given(cloudinary.uploader()).willReturn(uploader);
+            given(uploader.upload(any(), anyMap()))
+                    .willReturn(Map.of("public_id", "check-ins/abc123", "format", "jpg"));
+
+            MediaStorageProperties noRoot = new MediaStorageProperties(
+                    "cloudinary",
+                    null,
+                    new CloudinaryAccount("democloud", "k", "s", ""),
+                    Map.of(
+                            MediaRole.CHECKIN,
+                            new StoragePolicy(
+                                    "check-ins", DataSize.ofMegabytes(5), Visibility.PRIVATE, Set.of("image/png"))));
+            CloudinaryStorageService service = new CloudinaryStorageService(cloudinary, noRoot);
+
+            service.store(new MockMultipartFile("f", "x", "image/png", new byte[] {1}), MediaRole.CHECKIN);
+
+            ArgumentCaptor<Map<String, Object>> options = ArgumentCaptor.forClass(Map.class);
+            verify(uploader).upload(any(), options.capture());
+            assertThat(options.getValue()).containsEntry("folder", "check-ins");
         }
 
         @Test
@@ -197,7 +221,7 @@ class CloudinaryStorageServiceTest {
 
         // URL 생성은 순수 계산이므로 실제 Cloudinary 클라이언트(운영과 동일 설정)를 쓴다.
         private final CloudinaryStorageService service = new CloudinaryStorageService(
-                CloudinaryClientFactory.create(new CloudinaryAccount("democloud", "k", "s")), PROPERTIES);
+                CloudinaryClientFactory.create(new CloudinaryAccount("democloud", "k", "s", null)), PROPERTIES);
 
         @Test
         @DisplayName("PUBLIC 이미지는 image/upload 배달 URL (서명·분석 파라미터 없음)")
