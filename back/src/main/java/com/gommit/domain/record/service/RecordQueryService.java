@@ -2,6 +2,7 @@ package com.gommit.domain.record.service;
 
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.ChallengeMember;
+import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.group.entity.ChallengeGroup;
@@ -55,7 +56,8 @@ public class RecordQueryService {
 
     // 챌린지 화면의 "월간 머지 목록"에 최종 머지가 있으면 맨 위에 함께 보여준다
     // (발행 시점상 최종 머지가 항상 가장 나중이라 이 순서로 충분하다).
-    public List<MergeSummaryResponse> getMergeList(Long challengeId) {
+    public List<MergeSummaryResponse> getMergeList(Long challengeId, Long requesterId) {
+        requireActiveMember(challengeId, requesterId);
         List<MergeSummaryResponse> summaries = new ArrayList<>();
         finalMergeRepository
                 .findByChallengeId(challengeId)
@@ -67,7 +69,8 @@ public class RecordQueryService {
         return summaries;
     }
 
-    public MonthlyMergeDetailResponse getMonthlyMergeDetail(Long challengeId, int seqNo) {
+    public MonthlyMergeDetailResponse getMonthlyMergeDetail(Long challengeId, int seqNo, Long requesterId) {
+        requireActiveMember(challengeId, requesterId);
         MonthlyMerge merge = monthlyMergeRepository
                 .findByChallengeIdAndSeqNo(challengeId, seqNo)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MONTHLY_MERGE_NOT_FOUND));
@@ -81,7 +84,8 @@ public class RecordQueryService {
         return MonthlyMergeDetailResponse.of(merge, participants);
     }
 
-    public FinalMergeDetailResponse getFinalMergeDetail(Long challengeId) {
+    public FinalMergeDetailResponse getFinalMergeDetail(Long challengeId, Long requesterId) {
+        requireActiveMember(challengeId, requesterId);
         FinalMerge merge = finalMergeRepository
                 .findByChallengeId(challengeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FINAL_MERGE_NOT_FOUND));
@@ -92,6 +96,16 @@ public class RecordQueryService {
                 .map(result -> MergeParticipantResponse.from(result, nicknamesById.get(result.getUserId())))
                 .toList();
         return FinalMergeDetailResponse.of(merge, participants);
+    }
+
+    // 그룹 머지 결과는 "그룹 한정 공개"라 그 챌린지의 ACTIVE 멤버만 볼 수 있다 -
+    // challengeId만 알면 아무나 열람 가능한 BOLA를 막는다.
+    private void requireActiveMember(Long challengeId, Long requesterId) {
+        boolean isActiveMember =
+                challengeMemberRepository.existsActiveMember(challengeId, requesterId, ChallengeMemberStatus.ACTIVE);
+        if (!isActiveMember) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED);
+        }
     }
 
     // 참여자 목록에 표시할 닉네임을 한 번에 조회한다(참여자 수만큼 User를 따로 조회하지 않도록).
@@ -118,7 +132,8 @@ public class RecordQueryService {
     }
 
     // 챌린지 하나의 머지 진행 현황. "월간 머지 목록" 화면 상단 요약 카드에서 쓴다.
-    public ChallengeMergeOverviewResponse getChallengeMergeOverview(Long challengeId) {
+    public ChallengeMergeOverviewResponse getChallengeMergeOverview(Long challengeId, Long requesterId) {
+        requireActiveMember(challengeId, requesterId);
         Challenge challenge = challengeRepository
                 .findById(challengeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));

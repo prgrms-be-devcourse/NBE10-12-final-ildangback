@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.ChallengeMember;
+import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.group.entity.ChallengeGroup;
@@ -185,11 +186,13 @@ class RecordQueryServiceTest {
         @Test
         @DisplayName("최종 머지가 있으면 맨 위에, 그 뒤로 월간 머지가 최신 회차 순으로 온다")
         void returnsFinalMergeFirstThenMonthlyMergesDesc() {
+            when(challengeMemberRepository.existsActiveMember(1L, 1L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(true);
             when(finalMergeRepository.findByChallengeId(1L)).thenReturn(Optional.of(finalMerge(100L, 1L)));
             when(monthlyMergeRepository.findByChallengeIdOrderBySeqNoDesc(1L))
                     .thenReturn(List.of(monthlyMerge(4L, 1L, 4), monthlyMerge(3L, 1L, 3)));
 
-            List<MergeSummaryResponse> result = recordQueryService.getMergeList(1L);
+            List<MergeSummaryResponse> result = recordQueryService.getMergeList(1L, 1L);
 
             assertThat(result).hasSize(3);
             assertThat(result.get(0).type()).isEqualTo(MergeType.FINAL);
@@ -201,14 +204,28 @@ class RecordQueryServiceTest {
         @Test
         @DisplayName("최종 머지가 없으면 월간 머지만 반환한다")
         void returnsOnlyMonthlyMergesWhenNoFinalMerge() {
+            when(challengeMemberRepository.existsActiveMember(1L, 1L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(true);
             when(finalMergeRepository.findByChallengeId(1L)).thenReturn(Optional.empty());
             when(monthlyMergeRepository.findByChallengeIdOrderBySeqNoDesc(1L))
                     .thenReturn(List.of(monthlyMerge(1L, 1L, 1)));
 
-            List<MergeSummaryResponse> result = recordQueryService.getMergeList(1L);
+            List<MergeSummaryResponse> result = recordQueryService.getMergeList(1L, 1L);
 
             assertThat(result).hasSize(1);
             assertThat(result.get(0).type()).isEqualTo(MergeType.MONTHLY);
+        }
+
+        @Test
+        @DisplayName("그 챌린지의 ACTIVE 멤버가 아니면 ACCESS_DENIED")
+        void throwsWhenNotActiveMember() {
+            when(challengeMemberRepository.existsActiveMember(1L, 99L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(false);
+
+            assertThatThrownBy(() -> recordQueryService.getMergeList(1L, 99L))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.ACCESS_DENIED);
         }
     }
 
@@ -219,13 +236,15 @@ class RecordQueryServiceTest {
         @Test
         @DisplayName("참여자 결과를 순위순으로 포함해서 반환한다")
         void returnsDetailWithParticipants() {
+            when(challengeMemberRepository.existsActiveMember(1L, 1L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(true);
             MonthlyMerge merge = monthlyMerge(10L, 1L, 4);
             when(monthlyMergeRepository.findByChallengeIdAndSeqNo(1L, 4)).thenReturn(Optional.of(merge));
             when(monthlyMergeResultRepository.findByMonthlyMergeIdOrderByRanking(10L))
                     .thenReturn(List.of(monthlyMergeResult(1L, 10L, 5L)));
             when(userRepository.findAllById(List.of(5L))).thenReturn(List.of(user(5L, "라니")));
 
-            MonthlyMergeDetailResponse response = recordQueryService.getMonthlyMergeDetail(1L, 4);
+            MonthlyMergeDetailResponse response = recordQueryService.getMonthlyMergeDetail(1L, 4, 1L);
 
             assertThat(response.seqNo()).isEqualTo(4);
             assertThat(response.participants()).hasSize(1);
@@ -236,12 +255,26 @@ class RecordQueryServiceTest {
         @Test
         @DisplayName("존재하지 않으면 MONTHLY_MERGE_NOT_FOUND")
         void throwsWhenNotFound() {
+            when(challengeMemberRepository.existsActiveMember(1L, 1L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(true);
             when(monthlyMergeRepository.findByChallengeIdAndSeqNo(1L, 99)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> recordQueryService.getMonthlyMergeDetail(1L, 99))
+            assertThatThrownBy(() -> recordQueryService.getMonthlyMergeDetail(1L, 99, 1L))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.MONTHLY_MERGE_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("그 챌린지의 ACTIVE 멤버가 아니면 ACCESS_DENIED")
+        void throwsWhenNotActiveMember() {
+            when(challengeMemberRepository.existsActiveMember(1L, 99L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(false);
+
+            assertThatThrownBy(() -> recordQueryService.getMonthlyMergeDetail(1L, 4, 99L))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.ACCESS_DENIED);
         }
     }
 
@@ -252,13 +285,15 @@ class RecordQueryServiceTest {
         @Test
         @DisplayName("참여자 결과를 순위순으로 포함해서 반환한다")
         void returnsDetailWithParticipants() {
+            when(challengeMemberRepository.existsActiveMember(1L, 1L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(true);
             FinalMerge merge = finalMerge(100L, 1L);
             when(finalMergeRepository.findByChallengeId(1L)).thenReturn(Optional.of(merge));
             when(finalMergeResultRepository.findByFinalMergeIdOrderByRanking(100L))
                     .thenReturn(List.of(finalMergeResult(1L, 100L, 5L)));
             when(userRepository.findAllById(List.of(5L))).thenReturn(List.of(user(5L, "라니")));
 
-            FinalMergeDetailResponse response = recordQueryService.getFinalMergeDetail(1L);
+            FinalMergeDetailResponse response = recordQueryService.getFinalMergeDetail(1L, 1L);
 
             assertThat(response.challengeId()).isEqualTo(1L);
             assertThat(response.participants()).hasSize(1);
@@ -268,12 +303,26 @@ class RecordQueryServiceTest {
         @Test
         @DisplayName("존재하지 않으면 FINAL_MERGE_NOT_FOUND")
         void throwsWhenNotFound() {
+            when(challengeMemberRepository.existsActiveMember(1L, 1L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(true);
             when(finalMergeRepository.findByChallengeId(1L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> recordQueryService.getFinalMergeDetail(1L))
+            assertThatThrownBy(() -> recordQueryService.getFinalMergeDetail(1L, 1L))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.FINAL_MERGE_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("그 챌린지의 ACTIVE 멤버가 아니면 ACCESS_DENIED")
+        void throwsWhenNotActiveMember() {
+            when(challengeMemberRepository.existsActiveMember(1L, 99L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(false);
+
+            assertThatThrownBy(() -> recordQueryService.getFinalMergeDetail(1L, 99L))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.ACCESS_DENIED);
         }
     }
 
@@ -306,6 +355,8 @@ class RecordQueryServiceTest {
         @Test
         @DisplayName("완료된 회차가 있고 아직 안 끝났으면 진행 중인 회차 번호/날짜를 계산해서 채운다")
         void fillsCurrentCycleWhenInProgress() {
+            when(challengeMemberRepository.existsActiveMember(1L, 1L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(true);
             LocalDate today = LocalDate.now();
             LocalDate start = today.minusDays(19); // 지금이 1회차 20일째가 되도록(경과일 19 + 1)
             when(challengeRepository.findById(1L))
@@ -315,7 +366,7 @@ class RecordQueryServiceTest {
             when(monthlyMergeRepository.countByChallengeId(1L)).thenReturn(0);
             when(finalMergeRepository.existsByChallengeId(1L)).thenReturn(false);
 
-            ChallengeMergeOverviewResponse response = recordQueryService.getChallengeMergeOverview(1L);
+            ChallengeMergeOverviewResponse response = recordQueryService.getChallengeMergeOverview(1L, 1L);
 
             assertThat(response.groupName()).isEqualTo("오운완");
             assertThat(response.category()).isEqualTo("EXERCISE");
@@ -329,6 +380,8 @@ class RecordQueryServiceTest {
         @Test
         @DisplayName("최종 머지가 이미 있으면 진행 중인 회차는 null이다")
         void noCurrentCycleWhenFinalMergeExists() {
+            when(challengeMemberRepository.existsActiveMember(1L, 1L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(true);
             LocalDate start = LocalDate.of(2026, 3, 1);
             when(challengeRepository.findById(1L))
                     .thenReturn(Optional.of(challenge(1L, 10L, start, start.plusDays(179))));
@@ -337,7 +390,7 @@ class RecordQueryServiceTest {
             when(monthlyMergeRepository.countByChallengeId(1L)).thenReturn(5);
             when(finalMergeRepository.existsByChallengeId(1L)).thenReturn(true);
 
-            ChallengeMergeOverviewResponse response = recordQueryService.getChallengeMergeOverview(1L);
+            ChallengeMergeOverviewResponse response = recordQueryService.getChallengeMergeOverview(1L, 1L);
 
             assertThat(response.hasFinalMerge()).isTrue();
             assertThat(response.currentSeqNo()).isNull();
@@ -347,12 +400,26 @@ class RecordQueryServiceTest {
         @Test
         @DisplayName("존재하지 않으면 RESOURCE_NOT_FOUND")
         void throwsWhenNotFound() {
+            when(challengeMemberRepository.existsActiveMember(999L, 1L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(true);
             when(challengeRepository.findById(999L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> recordQueryService.getChallengeMergeOverview(999L))
+            assertThatThrownBy(() -> recordQueryService.getChallengeMergeOverview(999L, 1L))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("그 챌린지의 ACTIVE 멤버가 아니면 ACCESS_DENIED")
+        void throwsWhenNotActiveMember() {
+            when(challengeMemberRepository.existsActiveMember(1L, 99L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(false);
+
+            assertThatThrownBy(() -> recordQueryService.getChallengeMergeOverview(1L, 99L))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.ACCESS_DENIED);
         }
     }
 
