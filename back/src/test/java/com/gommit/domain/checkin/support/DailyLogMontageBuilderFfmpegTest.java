@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.gommit.domain.checkin.support.DailyLogMontageBuilder.Frame;
 import com.gommit.domain.checkin.support.DailyLogMontageBuilder.Kind;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -12,7 +15,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 
@@ -54,9 +57,9 @@ class DailyLogMontageBuilderFfmpegTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {1, 2, 3, 4, 5, 6})
-    @DisplayName("N칸 × 2회차 그리드가 1080×1920 mp4 로 인코딩된다(빈 칸 포함)")
-    void gridEncodes(int cellCount) throws Exception {
+    @CsvSource({"1, 2160, 2160", "2, 2160, 1080", "3, 2160, 720", "4, 2160, 2160", "5, 2160, 1440", "6, 2160, 1440"})
+    @DisplayName("N칸 × 2회차 그리드가 지정 해상도 mp4 로 인코딩된다(방향 섞인 입력 + 빈 칸)")
+    void gridEncodesAtExpectedResolution(int cellCount, int expectedWidth, int expectedHeight) throws Exception {
         DailyLogMontageBuilder builder = new DailyLogMontageBuilder("ffmpeg");
 
         String[] colors = {"red", "green", "blue", "yellow", "cyan", "magenta"};
@@ -75,6 +78,37 @@ class DailyLogMontageBuilderFfmpegTest {
         Optional<byte[]> out = builder.build(cellCount, rounds);
 
         assertThat(out).isPresent();
-        assertThat(new String(out.get(), 4, 4)).isEqualTo("ftyp"); // mp4 시그니처
+        assertThat(new String(out.get(), 4, 4, StandardCharsets.US_ASCII)).isEqualTo("ftyp"); // mp4 시그니처
+        assertThat(probeResolution(out.get())).isEqualTo(expectedWidth + "x" + expectedHeight);
+    }
+
+    // 인코딩된 mp4 바이트를 임시 파일로 떨궈 ffprobe 로 해상도(WxH)를 읽는다.
+    private static String probeResolution(byte[] mp4) throws Exception {
+        Path tmp = Files.createTempFile("montage-probe-", ".mp4");
+        try {
+            Files.write(tmp, mp4);
+            Process p = new ProcessBuilder(
+                            "ffprobe",
+                            "-v",
+                            "error",
+                            "-select_streams",
+                            "v:0",
+                            "-show_entries",
+                            "stream=width,height",
+                            "-of",
+                            "csv=s=x:p=0",
+                            tmp.toString())
+                    .redirectErrorStream(true)
+                    .start();
+            String line;
+            try (BufferedReader r =
+                    new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
+                line = r.readLine();
+            }
+            p.waitFor();
+            return line == null ? "" : line.trim();
+        } finally {
+            Files.deleteIfExists(tmp);
+        }
     }
 }

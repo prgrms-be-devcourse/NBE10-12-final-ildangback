@@ -66,14 +66,31 @@ class DailyLogMontageBuilderTest {
 
         @ParameterizedTest
         @ValueSource(ints = {1, 2, 3, 4, 5, 6})
-        @DisplayName("어떤 칸 수든 셀 합계는 1080×1920, 모든 셀 치수는 짝수다")
-        void layoutFillsCanvasWithEvenCells(int cellCount) {
+        @DisplayName("캔버스 가로는 항상 2160, 칸은 정사각(짝수)이고 가로를 열수로 나눈 값이다")
+        void squareCellsFillFixedWidth(int cellCount) {
             Layout layout = Layout.forCells(cellCount);
 
-            assertThat(layout.cols() * layout.cellWidth()).isEqualTo(1080);
-            assertThat(layout.rows() * layout.cellHeight()).isEqualTo(1920);
-            assertThat(layout.cellWidth() % 2).isZero();
-            assertThat(layout.cellHeight() % 2).isZero();
+            assertThat(layout.cols() * layout.cellSize()).isEqualTo(2160);
+            assertThat(layout.cellSize()).isEqualTo(2160 / layout.cols());
+            assertThat(layout.canvasHeight()).isEqualTo(layout.rows() * layout.cellSize());
+            assertThat(layout.cellSize() % 2).isZero();
+        }
+
+        @ParameterizedTest
+        @org.junit.jupiter.params.provider.CsvSource({
+            "1, 2160, 2160",
+            "2, 2160, 1080",
+            "3, 2160, 720",
+            "4, 2160, 2160",
+            "5, 2160, 1440",
+            "6, 2160, 1440"
+        })
+        @DisplayName("N칸별 캔버스 해상도")
+        void canvasSizePerCellCount(int cellCount, int width, int height) {
+            Layout layout = Layout.forCells(cellCount);
+
+            assertThat(layout.cols() * layout.cellSize()).isEqualTo(width);
+            assertThat(layout.canvasHeight()).isEqualTo(height);
         }
 
         @Test
@@ -84,14 +101,16 @@ class DailyLogMontageBuilderTest {
         }
 
         @Test
-        @DisplayName("2·3은 가로 분할(1행), 4는 2×2, 6은 2열 3행")
+        @DisplayName("2·3은 가로 한 줄, 4는 2×2, 5·6은 3열 2행")
         void gridShapes() {
+            assertThat(Layout.forCells(2).cols()).isEqualTo(2);
             assertThat(Layout.forCells(2).rows()).isEqualTo(1);
+            assertThat(Layout.forCells(3).cols()).isEqualTo(3);
             assertThat(Layout.forCells(3).rows()).isEqualTo(1);
             assertThat(Layout.forCells(4).cols()).isEqualTo(2);
             assertThat(Layout.forCells(4).rows()).isEqualTo(2);
-            assertThat(Layout.forCells(6).cols()).isEqualTo(2);
-            assertThat(Layout.forCells(6).rows()).isEqualTo(3);
+            assertThat(Layout.forCells(6).cols()).isEqualTo(3);
+            assertThat(Layout.forCells(6).rows()).isEqualTo(2);
         }
 
         @Test

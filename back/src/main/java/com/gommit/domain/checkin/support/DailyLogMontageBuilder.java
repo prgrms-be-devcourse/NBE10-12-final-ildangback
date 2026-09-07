@@ -24,8 +24,7 @@ public class DailyLogMontageBuilder {
     public static final int MAX_CELLS = 6;
 
     private static final int ROUND_SECONDS = 2; // 회차 1개 노출 시간
-    private static final int CANVAS_WIDTH = 1080; // 9:16 세로 — 모바일 풀스크린
-    private static final int CANVAS_HEIGHT = 1920;
+    private static final int CANVAS_WIDTH = 2160; // 캔버스 가로 고정 — 칸 = CANVAS_WIDTH / 열수 (정사각). 세로는 행수에 따라 달라짐
     private static final int FPS = 30; // 동영상 인증 대비해 30fps 로 통일
     private static final String PRESET = "veryfast";
     private static final long TIMEOUT_SECONDS = 120;
@@ -44,21 +43,25 @@ public class DailyLogMontageBuilder {
     // 그리드 한 칸에 들어갈 미디어. extension 은 ffmpeg 이 디코더를 고르는 데 쓰인다(원본 확장자 그대로 넘긴다).
     public record Frame(Resource resource, String extension, Kind kind) {}
 
-    // 캔버스를 N칸으로 나누는 레이아웃. 합계는 항상 CANVAS_WIDTH×CANVAS_HEIGHT.
+    // 캔버스 가로 = CANVAS_WIDTH(2160) 고정. 칸은 정사각(cellSize = CANVAS_WIDTH / cols), 세로 = rows * cellSize.
     // N=5 는 6칸 레이아웃을 쓰고 마지막 1칸은 항상 검정(gridCells > cellCount).
-    record Layout(int cols, int rows, int cellWidth, int cellHeight) {
+    record Layout(int cols, int rows, int cellSize) {
 
         int gridCells() {
             return cols * rows;
         }
 
+        int canvasHeight() {
+            return rows * cellSize;
+        }
+
         static Layout forCells(int cellCount) {
             return switch (cellCount) {
-                case 1 -> new Layout(1, 1, 1080, 1920);
-                case 2 -> new Layout(2, 1, 540, 1920); // 가로 2분할
-                case 3 -> new Layout(3, 1, 360, 1920); // 가로 3분할
-                case 4 -> new Layout(2, 2, 540, 960); // 2×2
-                case 5, 6 -> new Layout(2, 3, 540, 640); // 2열 3행 (5는 마지막 칸 검정)
+                case 1 -> new Layout(1, 1, CANVAS_WIDTH); // 2160×2160
+                case 2 -> new Layout(2, 1, CANVAS_WIDTH / 2); // 2160×1080
+                case 3 -> new Layout(3, 1, CANVAS_WIDTH / 3); // 2160×720
+                case 4 -> new Layout(2, 2, CANVAS_WIDTH / 2); // 2160×2160
+                case 5, 6 -> new Layout(3, 2, CANVAS_WIDTH / 3); // 2160×1440 (5는 마지막 칸 검정)
                 default -> throw new IllegalArgumentException("지원하지 않는 그리드 칸 수: " + cellCount);
             };
         }
@@ -140,7 +143,7 @@ public class DailyLogMontageBuilder {
                 command.add("-t");
                 command.add(String.valueOf(ROUND_SECONDS));
                 command.add("-i");
-                command.add("color=c=black:s=%dx%d:r=%d".formatted(layout.cellWidth(), layout.cellHeight(), FPS));
+                command.add("color=c=black:s=%dx%d:r=%d".formatted(layout.cellSize(), layout.cellSize(), FPS));
             } else if (frame.kind() == Kind.VIDEO) {
                 // 동영상 칸: 긴 클립은 -t 로 앞 ROUND_SECONDS 초만 디코드. 짧은 클립은 buildFilter 의 tpad 로 보정.
                 // NOTE: 현재 MediaType 에 VIDEO 가 없어 이 경로는 미사용 — 동영상 인증 도입 시 실제 클립으로 검증 필요.
@@ -186,29 +189,29 @@ public class DailyLogMontageBuilder {
         return process.exitValue();
     }
 
-    // 칸별 정규화(scale+pad+fps, 동영상은 tpad 로 길이 보정) → 회차별 xstack 그리드 → 회차 concat.
+    // 칸별 cover 정규화(짧은 변을 셀에 맞춰 스케일 후 중앙 crop, 동영상은 tpad 로 길이 보정) → 회차별 xstack 그리드 → 회차 concat.
     private static String buildFilter(Layout layout, int roundCount, List<Frame> flat) {
         int grid = layout.gridCells();
-        int cw = layout.cellWidth();
-        int ch = layout.cellHeight();
+        int s = layout.cellSize();
         String cellLayout = xstackLayout(layout);
         StringBuilder sb = new StringBuilder();
 
-        // 모든 입력을 셀 크기로 정규화. 사진 전체가 보이게 축소(decrease) 후 칸 안쪽만 검정 pad.
+        // 모든 입력을 정사각 셀에 cover: 짧은 변이 셀에 꽉 차도록 확대/축소(increase) 후 넘치는 긴 변을 중앙 기준 crop.
+        // 검정 여백 없음. 대신 긴 변 양끝이 일부 잘린다.
         for (int i = 0; i < flat.size(); i++) {
             sb.append('[')
                     .append(i)
                     .append(":v]")
                     .append("scale=")
-                    .append(cw)
+                    .append(s)
                     .append(':')
-                    .append(ch)
-                    .append(":force_original_aspect_ratio=decrease,")
-                    .append("pad=")
-                    .append(cw)
+                    .append(s)
+                    .append(":force_original_aspect_ratio=increase,")
+                    .append("crop=")
+                    .append(s)
                     .append(':')
-                    .append(ch)
-                    .append(":-1:-1:color=black,setsar=1,fps=")
+                    .append(s)
+                    .append(",setsar=1,fps=")
                     .append(FPS);
             Frame frame = flat.get(i);
             if (frame != null && frame.kind() == Kind.VIDEO) {
@@ -249,16 +252,16 @@ public class DailyLogMontageBuilder {
         return sb.toString();
     }
 
-    // 균일한 칸 그리드를 xstack layout 픽셀 오프셋으로 나열. 예: 2×3 → "0_0|540_0|0_640|540_640|0_1280|540_1280".
-    // 칸 순서는 행 우선(row-major) — flatten() 이 채우는 순서와 같다.
+    // 균일한 정사각 칸 그리드를 xstack layout 픽셀 오프셋으로 나열. 예: 3×2, cellSize 720 →
+    // "0_0|720_0|1440_0|0_720|720_720|1440_720". 칸 순서는 행 우선(row-major) — flatten() 이 채우는 순서와 같다.
     private static String xstackLayout(Layout layout) {
         StringBuilder sb = new StringBuilder();
         for (int k = 0; k < layout.gridCells(); k++) {
             if (k > 0) {
                 sb.append('|');
             }
-            int x = (k % layout.cols()) * layout.cellWidth();
-            int y = (k / layout.cols()) * layout.cellHeight();
+            int x = (k % layout.cols()) * layout.cellSize();
+            int y = (k / layout.cols()) * layout.cellSize();
             sb.append(x).append('_').append(y);
         }
         return sb.toString();
