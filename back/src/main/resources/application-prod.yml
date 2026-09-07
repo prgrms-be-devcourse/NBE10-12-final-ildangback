@@ -18,6 +18,10 @@ logging:
   level:
     root: info
 
+media:
+  storage:
+    provider: ${MEDIA_STORAGE_PROVIDER:cloudinary}
+
 auth-token:
   secret-key: ${JWT_SECRET_KEY}
 

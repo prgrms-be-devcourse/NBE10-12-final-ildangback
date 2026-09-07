@@ -30,8 +30,8 @@ public class CheckIn extends BaseEntity {
     @Column(nullable = false, length = 20)
     private CheckInType checkInType;
 
-    @Column(nullable = false, length = 500)
-    private String mediaUrl;
+    @Column(nullable = false, length = 255)
+    private String mediaKey;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
