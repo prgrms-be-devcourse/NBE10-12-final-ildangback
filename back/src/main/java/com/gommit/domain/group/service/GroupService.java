@@ -485,4 +485,12 @@ public class GroupService {
         }
         return new InviteCodeResponse(group.getInviteCode());
     }
+
+    @Transactional(readOnly = true)
+    public boolean isActiveMember(Long groupId, Long userId) {
+        return groupMemberRepository
+                .findByGroupIdAndUserId(groupId, userId)
+                .filter(member -> member.getStatus() == GroupMemberStatus.ACTIVE)
+                .isPresent();
+    }
 }
