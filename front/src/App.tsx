@@ -10,6 +10,10 @@ import { DeleteAccountPage } from "./domains/user/pages/DeleteAccountPage";
 import { EditProfilePage } from "./domains/user/pages/EditProfilePage";
 import { PointHistoryDetailPage } from "./domains/point/pages/PointHistoryDetailPage";
 import { PointHistoryPage } from "./domains/point/pages/PointHistoryPage";
+import { FinalMergeResultPage } from "./domains/record/pages/FinalMergeResultPage";
+import { MergeListPage } from "./domains/record/pages/MergeListPage";
+import { MonthlyMergeResultPage } from "./domains/record/pages/MonthlyMergeResultPage";
+import { MyMonthlyMergeArchivePage } from "./domains/record/pages/MyMonthlyMergeArchivePage";
 import { ProfilePage } from "./domains/user/pages/ProfilePage";
 import { SettingsPage } from "./domains/user/pages/SettingsPage";
 import { ChallengeTabPlaceholder } from "./pages/ChallengeTabPlaceholder";
@@ -49,6 +53,22 @@ export function App() {
           <Route
             path="profile/points/:historyId"
             element={<PointHistoryDetailPage />}
+          />
+          <Route
+            path="profile/monthly-merges"
+            element={<MyMonthlyMergeArchivePage />}
+          />
+          <Route
+            path="challenges/:challengeId/merges"
+            element={<MergeListPage />}
+          />
+          <Route
+            path="challenges/:challengeId/monthly-merges/:seqNo"
+            element={<MonthlyMergeResultPage />}
+          />
+          <Route
+            path="challenges/:challengeId/final-merge"
+            element={<FinalMergeResultPage />}
           />
         </Route>
       </Route>
