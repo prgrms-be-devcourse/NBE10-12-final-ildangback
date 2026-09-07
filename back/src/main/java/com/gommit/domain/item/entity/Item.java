@@ -23,8 +23,8 @@ public class Item extends BaseEntity {
     @Column(nullable = false, length = 50)
     private String name;
 
-    @Column(nullable = false, length = 500)
-    private String imageUrl;
+    @Column(nullable = false, length = 255)
+    private String imageKey;
 
     @Column(nullable = false)
     private int price;
