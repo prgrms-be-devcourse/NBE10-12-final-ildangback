@@ -72,4 +72,9 @@ public class ChallengeMember extends BaseEntity {
         this.status = ChallengeMemberStatus.LEFT;
         this.leftAt = LocalDateTime.now();
     }
+
+    public void kick() {
+        this.status = ChallengeMemberStatus.KICKED;
+        this.leftAt = LocalDateTime.now();
+    }
 }

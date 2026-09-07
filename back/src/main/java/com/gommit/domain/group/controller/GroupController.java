@@ -1,6 +1,7 @@
 package com.gommit.domain.group.controller;
 
 import com.gommit.domain.group.dto.request.GroupCreateRequest;
+import com.gommit.domain.group.dto.request.GroupJoinRequest;
 import com.gommit.domain.group.dto.response.*;
 import com.gommit.domain.group.entity.GroupCategory;
 import com.gommit.domain.group.entity.GroupSort;
@@ -37,6 +38,22 @@ public class GroupController {
         return ResponseEntity.status(HttpStatus.CREATED).body(groupService.createGroup(userId, request));
     }
 
+    @Operation(summary = "초대코드로 그룹 참여", description = "초대코드를 사용하여 모집 중인 CODE_ONLY 그룹에 참여, 최초 시즌 시작 이후에는 참여 불가")
+    @PostMapping("/join")
+    public ResponseEntity<GroupJoinResponse> joinGroupByInviteCode(
+            @Valid @RequestBody GroupJoinRequest request, @CurrentUser SecurityUser user) {
+        GroupJoinResponse response = groupService.joinGroupByInviteCode(request.inviteCode(), user.getId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @Operation(summary = "그룹 초대코드 조회", description = "그룹장이 초대코드를 조회합니다.")
+    @GetMapping("/{groupId}/inviteCode")
+    public ResponseEntity<InviteCodeResponse> getInviteCode(
+            @PathVariable Long groupId, @CurrentUser SecurityUser user) {
+        InviteCodeResponse response = groupService.getInviteCode(groupId, user.getId());
+        return ResponseEntity.ok(response);
+    }
+
     @Operation(summary = "공개 그룹 목록 조회", description = "현재 참여 가능한 공개 그룹 목록을 조회")
     @GetMapping
     public ResponseEntity<SliceResponse<GroupSummaryResponse>> getPublicGroups(
@@ -65,8 +82,9 @@ public class GroupController {
             summary = "그룹 상세 조회",
             description = "그룹 기본 정보와 현재 참여 중인 멤버, 현재 챌린지 정보를 조회. ACTIVE 챌린지를 우선 조회하며, 없으면 READY 챌린지를 조회")
     @GetMapping("/{groupId}")
-    public ResponseEntity<GroupDetailResponse> getGroupDetail(@PathVariable Long groupId) {
-        return ResponseEntity.ok(groupService.getGroupDetail(groupId));
+    public ResponseEntity<GroupDetailResponse> getGroupDetail(
+            @PathVariable Long groupId, @CurrentUser SecurityUser user) {
+        return ResponseEntity.ok(groupService.getGroupDetail(groupId, user.getId()));
     }
 
     @Operation(summary = "공개 그룹 참여", description = "현재 로그인한 사용자가 모집 중인 공개 그룹에 참여. 그룹 멤버와 현재 READY 챌린지의 챌린지 멤버로 함께 등록.")
@@ -83,6 +101,14 @@ public class GroupController {
     @DeleteMapping("/{groupId}/members/me")
     public ResponseEntity<Void> leaveGroup(@PathVariable Long groupId, @CurrentUser SecurityUser actor) {
         groupService.leaveGroup(groupId, actor.getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "그룹원 강퇴", description = "그룹 OWNER가 현재 ACTIVE 챌린지에 참여 중인 그룹원을 강퇴한다.")
+    @DeleteMapping("/{groupId}/members/{userId}")
+    public ResponseEntity<Void> kickMember(
+            @PathVariable Long groupId, @PathVariable Long userId, @CurrentUser SecurityUser actor) {
+        groupService.kickMember(groupId, actor.getId(), userId);
         return ResponseEntity.noContent().build();
     }
 }

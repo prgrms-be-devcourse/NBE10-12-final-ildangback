@@ -46,4 +46,9 @@ public class GroupMember extends BaseEntity {
         this.status = GroupMemberStatus.LEFT;
         this.leftAt = LocalDateTime.now();
     }
+
+    public void kick() {
+        this.status = GroupMemberStatus.KICKED;
+        this.leftAt = LocalDateTime.now();
+    }
 }

@@ -45,6 +45,9 @@ public class ChallengeGroup extends BaseEntity {
     @Column(nullable = false, length = 20)
     private GroupStatus status;
 
+    @Column(name = "invite_code", length = 6, unique = true)
+    private String inviteCode;
+
     @Builder
     private ChallengeGroup(
             String name,
@@ -53,7 +56,8 @@ public class ChallengeGroup extends BaseEntity {
             MapType mapType,
             Visibility visibility,
             int maxMembers,
-            Long ownerId) {
+            Long ownerId,
+            String inviteCode) {
         this.name = name;
         this.description = description;
         this.category = category;
@@ -62,6 +66,7 @@ public class ChallengeGroup extends BaseEntity {
         this.maxMembers = maxMembers;
         this.ownerId = ownerId;
         this.status = GroupStatus.READY; // 첫 생성 READY
+        this.inviteCode = inviteCode;
     }
 
     public void changeOwner(Long ownerId) {

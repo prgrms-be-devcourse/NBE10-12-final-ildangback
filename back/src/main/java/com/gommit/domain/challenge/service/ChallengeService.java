@@ -73,9 +73,7 @@ public class ChallengeService {
         Challenge challenge = challengeRepository
                 .findById(challengeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
-        challengeMemberRepository
-                .findByChallengeIdAndUserId(challengeId, userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER));
+        getActiveChallengeMember(challengeId, userId);
         ChallengeMember owner = challengeMemberRepository
                 .findByChallengeIdAndRole(challengeId, ChallengeMemberRole.OWNER)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_OWNER));
@@ -108,9 +106,7 @@ public class ChallengeService {
         challengeRepository
                 .findById(challengeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
-        challengeMemberRepository
-                .findByChallengeIdAndUserId(challengeId, userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER));
+        getActiveChallengeMember(challengeId, userId);
         List<ChallengeMember> members =
                 challengeMemberRepository.findAllByChallengeIdAndStatus(challengeId, ChallengeMemberStatus.ACTIVE);
         List<Long> userIds = members.stream().map(ChallengeMember::getUserId).toList();
@@ -138,9 +134,7 @@ public class ChallengeService {
         Challenge challenge = challengeRepository
                 .findById(challengeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
-        ChallengeMember challengeMember = challengeMemberRepository
-                .findByChallengeIdAndUserId(challengeId, userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER));
+        ChallengeMember challengeMember = getActiveChallengeMember(challengeId, userId);
         if (challengeMember.getRole() != ChallengeMemberRole.OWNER) {
             throw new BusinessException(ErrorCode.CHALLENGE_NOT_OWNER);
         }
@@ -228,9 +222,7 @@ public class ChallengeService {
         Challenge challenge = challengeRepository
                 .findById(challengeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
-        ChallengeMember currentMember = challengeMemberRepository
-                .findByChallengeIdAndUserId(challengeId, userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER));
+        ChallengeMember currentMember = getActiveChallengeMember(challengeId, userId);
         if (currentMember.getRole() != ChallengeMemberRole.OWNER) {
             throw new BusinessException(ErrorCode.CHALLENGE_NOT_OWNER);
         }
@@ -252,6 +244,16 @@ public class ChallengeService {
             group.changeOwner(request.targetUserId());
         }
         return new OwnerDelegationResponse(challengeId, userId, request.targetUserId());
+    }
+
+    private ChallengeMember getActiveChallengeMember(Long challengeId, Long userId) {
+        ChallengeMember member = challengeMemberRepository
+                .findByChallengeIdAndUserId(challengeId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER));
+        if (member.getStatus() != ChallengeMemberStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER);
+        }
+        return member;
     }
 
     // 선택된 요일 DB 저장용 문자열로 변환

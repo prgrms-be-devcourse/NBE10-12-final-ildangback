@@ -1,5 +1,6 @@
 package com.gommit.domain.challenge;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -7,11 +8,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.gommit.domain.challenge.entity.ChallengeMemberRole;
+import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.support.IntegrationTestSupport;
 import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.ResultActions;
 
 @DisplayName("챌린지 API")
@@ -301,5 +307,49 @@ class ChallengeApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.code").value("EXTENSION_CHOICE_NOT_AVAILABLE"));
         }
+    }
+
+    @Autowired
+    private ChallengeMemberRepository challengeMemberRepository;
+
+    @ParameterizedTest
+    @ValueSource(strings = {"LEFT", "KICKED"})
+    void givenInactiveSeasonOwner_whenReadUpdateOrDelegate_thenAllRejectWithoutChangingRole(String memberStatus)
+            throws Exception {
+        var owner = loginAs(EMAIL, NICKNAME);
+        Long ownerId = userIdOf(EMAIL);
+        Long challengeId = createGroupAndReturnChallengeId(owner.accessToken(), ownerId);
+        var member = loginAs("member@example.com", "멤버");
+        Long memberId = userIdOf("member@example.com");
+        joinGroup(member.accessToken(), latestGroupIdOf(ownerId)).andExpect(status().isCreated());
+        jdbcTemplate.update(
+                "update challenge_members set status = ? where challenge_id = ? and user_id = ?",
+                memberStatus,
+                challengeId,
+                ownerId);
+
+        getChallengeStatus(owner.accessToken(), challengeId)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("CHALLENGE_NOT_MEMBER"));
+        getMemberTodayStatuses(owner.accessToken(), challengeId)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("CHALLENGE_NOT_MEMBER"));
+        updateChallenge(owner.accessToken(), challengeId, updateBody())
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("CHALLENGE_NOT_MEMBER"));
+        delegateOwner(owner.accessToken(), challengeId, memberId)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("CHALLENGE_NOT_MEMBER"));
+
+        var unchanged = challengeMemberRepository
+                .findByChallengeIdAndUserId(challengeId, ownerId)
+                .orElseThrow();
+        assertThat(unchanged.getStatus().name()).isEqualTo(memberStatus);
+        assertThat(unchanged.getRole()).isEqualTo(ChallengeMemberRole.OWNER);
+        assertThat(challengeMemberRepository
+                        .findByChallengeIdAndUserId(challengeId, memberId)
+                        .orElseThrow()
+                        .getRole())
+                .isEqualTo(ChallengeMemberRole.MEMBER);
     }
 }

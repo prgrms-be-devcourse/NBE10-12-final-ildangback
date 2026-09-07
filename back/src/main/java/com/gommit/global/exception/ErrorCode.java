@@ -42,7 +42,10 @@ public enum ErrorCode {
     ALREADY_JOINED(HttpStatus.CONFLICT, "이미 참여한 그룹입니다."),
     GROUP_FULL(HttpStatus.CONFLICT, "그룹 정원이 가득 찼습니다."),
     GROUP_OWNER_CANNOT_LEAVE(HttpStatus.CONFLICT, "그룹 OWNER는 위임 후 퇴장할 수 있습니다."),
-
+    GROUP_OWNER_ONLY(HttpStatus.FORBIDDEN, "그룹 OWNER만 그룹원을 강퇴할 수 있습니다."),
+    GROUP_OWNER_CANNOT_BE_KICKED(HttpStatus.BAD_REQUEST, "그룹 OWNER는 강퇴할 수 없습니다."),
+    GROUP_MEMBER_KICK_NOT_ALLOWED(HttpStatus.CONFLICT, "ACTIVE 챌린지에서만 그룹원을 강퇴할 수 있습니다."),
+    INVITE_CODE_NOT_FOUND(HttpStatus.NOT_FOUND, "유효한 초대코드를 찾을 수 없습니다."),
     // ===== item =====
 
     // ===== media =====

@@ -20,6 +20,7 @@ import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
@@ -42,6 +43,9 @@ public class GroupService {
     private final CheckInRepository checkInRepository;
     private final ChallengeMemberService challengeMemberService;
     private final ChallengeProgressCalculator challengeProgressCalculator;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final String INVITE_CODE_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    private static final int INVITE_CODE_LENGTH = 6;
 
     @Transactional
     public GroupDetailResponse createGroup(Long userId, GroupCreateRequest request) {
@@ -57,6 +61,10 @@ public class GroupService {
     }
 
     private ChallengeGroup createGroupEntity(Long userId, GroupCreateRequest request) {
+        String inviteCode = null;
+        if (request.visibility() == Visibility.CODE_ONLY) {
+            inviteCode = generateUniqueInviteCode();
+        }
         // 그룹 생성 시 그룹 상태는 READY로 설정
         ChallengeGroup group = ChallengeGroup.builder()
                 .name(request.name())
@@ -66,8 +74,26 @@ public class GroupService {
                 .visibility(request.visibility())
                 .maxMembers(request.maxMembers())
                 .ownerId(userId)
+                .inviteCode(inviteCode)
                 .build();
         return challengeGroupRepository.save(group);
+    }
+
+    private String generateInviteCode() {
+        StringBuilder code = new StringBuilder();
+        for (int i = 0; i < INVITE_CODE_LENGTH; i++) {
+            int index = SECURE_RANDOM.nextInt(INVITE_CODE_CHARACTERS.length());
+            code.append(INVITE_CODE_CHARACTERS.charAt(index));
+        }
+        return code.toString();
+    }
+
+    private String generateUniqueInviteCode() {
+        String inviteCode;
+        do {
+            inviteCode = generateInviteCode();
+        } while (challengeGroupRepository.existsByInviteCode(inviteCode));
+        return inviteCode;
     }
 
     // 그룹 생성자 첫 번째 그룹 멤버로 지정(초기 상태는 ACTIVE)
@@ -172,10 +198,11 @@ public class GroupService {
     }
 
     @Transactional(readOnly = true)
-    public GroupDetailResponse getGroupDetail(Long groupId) {
+    public GroupDetailResponse getGroupDetail(Long groupId, Long userId) {
         ChallengeGroup group = challengeGroupRepository
                 .findById(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+        validateGroupDetailAccess(group, userId);
         Challenge currentChallenge = challengeRepository
                 .findFirstByGroupIdAndStatus(groupId, ChallengeStatus.ACTIVE)
                 .orElseGet(() -> challengeRepository
@@ -198,6 +225,19 @@ public class GroupService {
                 new GroupResponse(group, members.size()),
                 currentChallenge == null ? null : new ChallengeSummaryResponse(currentChallenge),
                 memberResponses);
+    }
+
+    private void validateGroupDetailAccess(ChallengeGroup group, Long userId) {
+        // 공개 모집 중인 그룹은 가입 전에도 상세 조회 가능
+        if (group.getVisibility() == Visibility.PUBLIC && group.getStatus() == GroupStatus.READY) {
+            return;
+        }
+        GroupMember member = groupMemberRepository
+                .findByGroupIdAndUserId(group.getId(), userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_GROUP_MEMBER));
+        if (member.getStatus() != GroupMemberStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.NOT_GROUP_MEMBER);
+        }
     }
 
     @Transactional
@@ -368,5 +408,81 @@ public class GroupService {
                 todayCheckInCount,
                 challenge.getDailyCheckInCount(),
                 todayCompleted);
+    }
+
+    @Transactional
+    public void kickMember(Long groupId, Long userId, Long targetUserId) {
+        ChallengeGroup group = challengeGroupRepository
+                .findById(groupId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+        if (!group.getOwnerId().equals(userId)) {
+            throw new BusinessException(ErrorCode.GROUP_OWNER_ONLY);
+        }
+        if (group.getOwnerId().equals(targetUserId)) {
+            throw new BusinessException(ErrorCode.GROUP_OWNER_CANNOT_BE_KICKED);
+        }
+        Challenge activeChallenge = challengeRepository
+                .findFirstByGroupIdAndStatus(groupId, ChallengeStatus.ACTIVE)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_MEMBER_KICK_NOT_ALLOWED));
+        GroupMember targetMember = groupMemberRepository
+                .findByGroupIdAndUserId(groupId, targetUserId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_GROUP_MEMBER));
+        if (targetMember.getStatus() != GroupMemberStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.NOT_GROUP_MEMBER);
+        }
+        targetMember.kick();
+        kickChallengeMember(activeChallenge.getId(), targetUserId);
+    }
+
+    private void kickChallengeMember(Long challengeId, Long userId) {
+        challengeMemberRepository
+                .findByChallengeIdAndUserId(challengeId, userId)
+                .filter(member -> member.getStatus() == ChallengeMemberStatus.ACTIVE)
+                .ifPresent(ChallengeMember::kick);
+    }
+
+    @Transactional
+    public GroupJoinResponse joinGroupByInviteCode(String inviteCode, Long userId) {
+        ChallengeGroup group = challengeGroupRepository
+                .findByInviteCodeWithLock(inviteCode)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVITE_CODE_NOT_FOUND));
+        if (group.getStatus() != GroupStatus.READY) {
+            throw new BusinessException(ErrorCode.GROUP_NOT_JOINABLE);
+        }
+        if (group.getVisibility() != Visibility.CODE_ONLY) {
+            throw new BusinessException(ErrorCode.GROUP_NOT_JOINABLE);
+        }
+        Challenge challenge = challengeRepository
+                .findFirstByGroupIdAndStatus(group.getId(), ChallengeStatus.READY)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_JOINABLE));
+        if (groupMemberRepository.existsByGroupIdAndUserId(group.getId(), userId)) {
+            throw new BusinessException(ErrorCode.ALREADY_JOINED);
+        }
+        long currentMembers = groupMemberRepository.countByGroupIdAndStatus(group.getId(), GroupMemberStatus.ACTIVE);
+        if (currentMembers >= group.getMaxMembers()) {
+            throw new BusinessException(ErrorCode.GROUP_FULL);
+        }
+        GroupMember groupMember =
+                GroupMember.builder().group(group).userId(userId).build();
+        GroupMember savedGroupMember = groupMemberRepository.save(groupMember);
+        ChallengeMember challengeMember =
+                challengeMemberService.createChallengeMember(challenge, userId, ChallengeMemberRole.MEMBER);
+        User user = userRepository.findById(userId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        return new GroupJoinResponse(
+                new GroupMemberResponse(savedGroupMember, user), challenge.getId(), challengeMember.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public InviteCodeResponse getInviteCode(Long groupId, Long userId) {
+        ChallengeGroup group = challengeGroupRepository
+                .findById(groupId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+        if (!group.getOwnerId().equals(userId)) {
+            throw new BusinessException(ErrorCode.GROUP_OWNER_ONLY);
+        }
+        if (group.getVisibility() != Visibility.CODE_ONLY) {
+            throw new BusinessException(ErrorCode.INVITE_CODE_NOT_FOUND);
+        }
+        return new InviteCodeResponse(group.getInviteCode());
     }
 }

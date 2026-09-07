@@ -40,6 +40,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -912,5 +914,81 @@ class ChallengeServiceTest {
                     () -> challengeService.delegateOwner(50L, 1L, new OwnerDelegationRequest(2L)),
                     ErrorCode.GROUP_NOT_FOUND);
         }
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = ChallengeMemberStatus.class,
+            names = {"LEFT", "KICKED"})
+    void givenInactiveOwner_whenStatus_thenChallengeNotMember(ChallengeMemberStatus status) {
+        Challenge challenge = challenge(50L, ChallengeStatus.READY);
+        ChallengeMember member = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
+        ReflectionTestUtils.setField(member, "status", status);
+        when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+        when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(member));
+        assertBusinessException(() -> challengeService.getChallengeStatus(50L, 1L), ErrorCode.CHALLENGE_NOT_MEMBER);
+        assertThat(member.getStatus()).isEqualTo(status);
+        assertThat(member.getRole()).isEqualTo(ChallengeMemberRole.OWNER);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = ChallengeMemberStatus.class,
+            names = {"LEFT", "KICKED"})
+    void givenInactiveOwner_whenTodayStatuses_thenChallengeNotMember(ChallengeMemberStatus status) {
+        Challenge challenge = challenge(50L, ChallengeStatus.READY);
+        ChallengeMember member = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
+        ReflectionTestUtils.setField(member, "status", status);
+        when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+        when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(member));
+        assertBusinessException(() -> challengeService.getMemberTodayStatuses(50L, 1L), ErrorCode.CHALLENGE_NOT_MEMBER);
+        assertThat(member.getStatus()).isEqualTo(status);
+        assertThat(member.getRole()).isEqualTo(ChallengeMemberRole.OWNER);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = ChallengeMemberStatus.class,
+            names = {"LEFT", "KICKED"})
+    void givenInactiveOwner_whenUpdate_thenChallengeNotMember(ChallengeMemberStatus status) {
+        Challenge challenge = challenge(50L, ChallengeStatus.READY);
+        ChallengeMember member = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
+        ReflectionTestUtils.setField(member, "status", status);
+        when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+        when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(member));
+        assertBusinessException(
+                () -> challengeService.updateChallenge(50L, 1L, updateRequest()), ErrorCode.CHALLENGE_NOT_MEMBER);
+        assertThat(member.getStatus()).isEqualTo(status);
+        assertThat(member.getRole()).isEqualTo(ChallengeMemberRole.OWNER);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = ChallengeMemberStatus.class,
+            names = {"LEFT", "KICKED"})
+    void givenInactiveOwner_whenDelegate_thenChallengeNotMember(ChallengeMemberStatus status) {
+        Challenge challenge = challenge(50L, ChallengeStatus.READY);
+        ChallengeMember member = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
+        ReflectionTestUtils.setField(member, "status", status);
+        when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+        when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(member));
+        assertBusinessException(
+                () -> challengeService.delegateOwner(50L, 1L, new OwnerDelegationRequest(2L)),
+                ErrorCode.CHALLENGE_NOT_MEMBER);
+        assertThat(member.getStatus()).isEqualTo(status);
+        assertThat(member.getRole()).isEqualTo(ChallengeMemberRole.OWNER);
+    }
+
+    @Test
+    void givenEndedSeasonWithActiveMember_whenRead_thenStatusAndTodayStatusesAccessible() {
+        Challenge challenge = challenge(50L, ChallengeStatus.ENDED);
+        ChallengeMember member = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
+        when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+        when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(member));
+        when(challengeMemberRepository.findByChallengeIdAndRole(50L, ChallengeMemberRole.OWNER))
+                .thenReturn(Optional.of(member));
+        assertThat(challengeService.getChallengeStatus(50L, 1L).challenge().id())
+                .isEqualTo(50L);
+        assertThat(challengeService.getMemberTodayStatuses(50L, 1L)).isEmpty();
     }
 }

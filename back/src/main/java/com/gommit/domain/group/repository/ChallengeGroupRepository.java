@@ -17,4 +17,14 @@ public interface ChallengeGroupRepository extends JpaRepository<ChallengeGroup, 
     Optional<ChallengeGroup> findByIdWithLock(@Param("groupId") Long groupId);
 
     List<ChallengeGroup> findAllByVisibilityAndStatus(Visibility visibility, GroupStatus status);
+
+    boolean existsByInviteCode(String inviteCode);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        select g
+        from ChallengeGroup g
+        where g.inviteCode = :inviteCode
+    """)
+    Optional<ChallengeGroup> findByInviteCodeWithLock(@Param("inviteCode") String inviteCode);
 }

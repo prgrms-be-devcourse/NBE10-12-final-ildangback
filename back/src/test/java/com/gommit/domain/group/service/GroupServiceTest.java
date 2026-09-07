@@ -46,6 +46,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -214,6 +216,7 @@ class GroupServiceTest {
             verify(challengeGroupRepository).save(groupCaptor.capture());
             assertThat(groupCaptor.getValue().getName()).isEqualTo("오운완 모임");
             assertThat(groupCaptor.getValue().getStatus()).isEqualTo(GroupStatus.READY);
+            assertThat(groupCaptor.getValue().getInviteCode()).isNull();
             verify(groupMemberRepository).save(any(GroupMember.class));
             verify(challengeService).createInitialChallenge(12L, 1L, request.challenge());
             assertThat(response.group().id()).isEqualTo(12L);
@@ -469,7 +472,7 @@ class GroupServiceTest {
             when(userRepository.findAllById(List.of(1L))).thenReturn(List.of(user(1L, "꼬밋러")));
 
             // when
-            var response = groupService.getGroupDetail(12L);
+            var response = groupService.getGroupDetail(12L, 1L);
 
             // then
             assertThat(response.group().id()).isEqualTo(12L);
@@ -485,7 +488,7 @@ class GroupServiceTest {
             when(challengeGroupRepository.findById(999L)).thenReturn(Optional.empty());
 
             // when & then
-            assertBusinessException(() -> groupService.getGroupDetail(999L), ErrorCode.GROUP_NOT_FOUND);
+            assertBusinessException(() -> groupService.getGroupDetail(999L, 1L), ErrorCode.GROUP_NOT_FOUND);
         }
 
         @Test
@@ -504,7 +507,7 @@ class GroupServiceTest {
             when(userRepository.findAllById(List.of(1L))).thenReturn(List.of());
 
             // when & then
-            assertBusinessException(() -> groupService.getGroupDetail(12L), ErrorCode.USER_NOT_FOUND);
+            assertBusinessException(() -> groupService.getGroupDetail(12L, 1L), ErrorCode.USER_NOT_FOUND);
         }
     }
 
@@ -903,5 +906,264 @@ class GroupServiceTest {
             assertBusinessException(
                     () -> groupService.getMyGroups(2L, GroupStatus.ACTIVE, null, 20), ErrorCode.GROUP_NOT_FOUND);
         }
+    }
+
+    @Nested
+    @DisplayName("변경된 그룹 접근 정책")
+    class AccessPolicy {
+        @ParameterizedTest
+        @EnumSource(GroupMemberStatus.class)
+        void givenMemberStatus_whenActiveGroupDetail_thenOnlyActiveCanRead(GroupMemberStatus status) {
+            ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            ReflectionTestUtils.setField(group, "status", GroupStatus.ACTIVE);
+            GroupMember member = groupMember(30L, group, 2L);
+            ReflectionTestUtils.setField(member, "status", status);
+            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(groupMemberRepository.findByGroupIdAndUserId(12L, 2L)).thenReturn(Optional.of(member));
+            if (status == GroupMemberStatus.ACTIVE) {
+                assertThat(groupService.getGroupDetail(12L, 2L).group().id()).isEqualTo(12L);
+            } else {
+                assertBusinessException(() -> groupService.getGroupDetail(12L, 2L), ErrorCode.NOT_GROUP_MEMBER);
+            }
+        }
+
+        @ParameterizedTest
+        @EnumSource(Visibility.class)
+        void givenReadyGroupWithoutMembership_whenDetail_thenOnlyPublicCanRead(Visibility visibility) {
+            ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, visibility, 6);
+            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            if (visibility == Visibility.PUBLIC) {
+                assertThat(groupService.getGroupDetail(12L, 2L).group().id()).isEqualTo(12L);
+                verify(groupMemberRepository, never()).findByGroupIdAndUserId(any(), any());
+            } else {
+                assertBusinessException(() -> groupService.getGroupDetail(12L, 2L), ErrorCode.NOT_GROUP_MEMBER);
+            }
+        }
+
+        @Test
+        void givenActiveGroupWithoutMembership_whenDetail_thenNotGroupMember() {
+            ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            ReflectionTestUtils.setField(group, "status", GroupStatus.ACTIVE);
+            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            assertBusinessException(() -> groupService.getGroupDetail(12L, 2L), ErrorCode.NOT_GROUP_MEMBER);
+        }
+    }
+
+    @Nested
+    @DisplayName("kickMember - 그룹원 강퇴")
+    class KickMember {
+        @ParameterizedTest
+        @EnumSource(GroupStatus.class)
+        @DisplayName("현재 구현은 그룹 상태와 무관하게 ACTIVE 챌린지가 있으면 강퇴한다")
+        void givenActiveChallenge_whenOwnerKicks_thenBothMembersKicked(GroupStatus status) {
+            ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            ReflectionTestUtils.setField(group, "status", status);
+            Challenge challenge = challenge(50L, 12L, ChallengeStatus.ACTIVE);
+            GroupMember member = groupMember(30L, group, 2L);
+            ChallengeMember seasonMember = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
+            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.ACTIVE))
+                    .thenReturn(Optional.of(challenge));
+            when(groupMemberRepository.findByGroupIdAndUserId(12L, 2L)).thenReturn(Optional.of(member));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(seasonMember));
+            groupService.kickMember(12L, 1L, 2L);
+            assertThat(member.getStatus()).isEqualTo(GroupMemberStatus.KICKED);
+            assertThat(seasonMember.getStatus()).isEqualTo(ChallengeMemberStatus.KICKED);
+            org.mockito.Mockito.verifyNoInteractions(checkInRepository);
+        }
+
+        @ParameterizedTest
+        @EnumSource(
+                value = GroupMemberStatus.class,
+                names = {"LEFT", "KICKED"})
+        void givenInactiveTarget_whenOwnerKicks_thenNotGroupMember(GroupMemberStatus status) {
+            ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            ReflectionTestUtils.setField(group, "status", GroupStatus.ACTIVE);
+            GroupMember member = groupMember(30L, group, 2L);
+            ReflectionTestUtils.setField(member, "status", status);
+            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.ACTIVE))
+                    .thenReturn(Optional.of(challenge(50L, 12L, ChallengeStatus.ACTIVE)));
+            when(groupMemberRepository.findByGroupIdAndUserId(12L, 2L)).thenReturn(Optional.of(member));
+            assertBusinessException(() -> groupService.kickMember(12L, 1L, 2L), ErrorCode.NOT_GROUP_MEMBER);
+            assertThat(member.getStatus()).isEqualTo(status);
+            org.mockito.Mockito.verifyNoInteractions(challengeMemberRepository);
+        }
+
+        @Test
+        void givenNonOwner_whenKick_thenGROUP_OWNER_ONLY() {
+            ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            ReflectionTestUtils.setField(group, "status", GroupStatus.ACTIVE);
+            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            assertBusinessException(() -> groupService.kickMember(12L, 2L, 3L), ErrorCode.GROUP_OWNER_ONLY);
+            org.mockito.Mockito.verifyNoInteractions(groupMemberRepository, challengeMemberRepository);
+        }
+
+        @Test
+        void givenOwnerSelf_whenKick_thenGROUP_OWNER_CANNOT_BE_KICKED() {
+            ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            ReflectionTestUtils.setField(group, "status", GroupStatus.ACTIVE);
+            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            assertBusinessException(() -> groupService.kickMember(12L, 1L, 1L), ErrorCode.GROUP_OWNER_CANNOT_BE_KICKED);
+            org.mockito.Mockito.verifyNoInteractions(groupMemberRepository, challengeMemberRepository);
+        }
+
+        @Test
+        void givenNoActiveChallenge_whenKick_thenGROUP_MEMBER_KICK_NOT_ALLOWED() {
+            ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            ReflectionTestUtils.setField(group, "status", GroupStatus.ACTIVE);
+            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            assertBusinessException(
+                    () -> groupService.kickMember(12L, 1L, 2L), ErrorCode.GROUP_MEMBER_KICK_NOT_ALLOWED);
+            org.mockito.Mockito.verifyNoInteractions(groupMemberRepository, challengeMemberRepository);
+        }
+    }
+
+    @Nested
+    @DisplayName("초대코드 참여 및 조회")
+    class InviteCode {
+        @Test
+        @DisplayName("참여 가능하면 그룹 멤버와 챌린지 멤버를 만들고 응답한다")
+        void givenValidInviteCode_whenJoinReadyGroup_thenCreatesBothMembers() {
+            // given
+            ChallengeGroup group = group(12L, "오운완 모임", GroupCategory.EXERCISE, Visibility.CODE_ONLY, 6);
+            Challenge challenge = challenge(50L, 12L, ChallengeStatus.READY);
+            GroupMember savedGroupMember = groupMember(30L, group, 2L);
+            ChallengeMember savedChallengeMember = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
+            when(challengeGroupRepository.findByInviteCodeWithLock("ABC123")).thenReturn(Optional.of(group));
+            when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.READY))
+                    .thenReturn(Optional.of(challenge));
+            when(groupMemberRepository.existsByGroupIdAndUserId(12L, 2L)).thenReturn(false);
+            when(groupMemberRepository.countByGroupIdAndStatus(12L, GroupMemberStatus.ACTIVE))
+                    .thenReturn(1L);
+            when(groupMemberRepository.save(any())).thenReturn(savedGroupMember);
+            when(challengeMemberService.createChallengeMember(challenge, 2L, ChallengeMemberRole.MEMBER))
+                    .thenReturn(savedChallengeMember);
+            when(userRepository.findById(2L)).thenReturn(Optional.of(user(2L, "새멤버")));
+
+            // when
+            var response = groupService.joinGroupByInviteCode("ABC123", 2L);
+
+            // then
+            verify(groupMemberRepository).save(any(GroupMember.class));
+            verify(challengeMemberService).createChallengeMember(challenge, 2L, ChallengeMemberRole.MEMBER);
+            assertThat(response.groupMember().userId()).isEqualTo(2L);
+            assertThat(response.challengeId()).isEqualTo(50L);
+            assertThat(response.challengeMemberId()).isEqualTo(70L);
+        }
+
+        @Test
+        void givenUnknown_whenJoinByCode_thenINVITE_CODE_NOT_FOUND() {
+
+            assertBusinessException(
+                    () -> groupService.joinGroupByInviteCode("ABC123", 2L), ErrorCode.INVITE_CODE_NOT_FOUND);
+            verify(groupMemberRepository, never()).save(any());
+            org.mockito.Mockito.verifyNoInteractions(challengeMemberService);
+        }
+
+        @Test
+        void givenActive_whenJoinByCode_thenGROUP_NOT_JOINABLE() {
+            ChallengeGroup group = group(12L, "초대방", GroupCategory.EXERCISE, Visibility.CODE_ONLY, 6);
+            ReflectionTestUtils.setField(group, "status", GroupStatus.ACTIVE);
+            when(challengeGroupRepository.findByInviteCodeWithLock("ABC123")).thenReturn(Optional.of(group));
+
+            assertBusinessException(
+                    () -> groupService.joinGroupByInviteCode("ABC123", 2L), ErrorCode.GROUP_NOT_JOINABLE);
+            verify(groupMemberRepository, never()).save(any());
+            org.mockito.Mockito.verifyNoInteractions(challengeMemberService);
+        }
+
+        @Test
+        void givenPublic_whenJoinByCode_thenGROUP_NOT_JOINABLE() {
+            ChallengeGroup group = group(12L, "초대방", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            when(challengeGroupRepository.findByInviteCodeWithLock("ABC123")).thenReturn(Optional.of(group));
+
+            assertBusinessException(
+                    () -> groupService.joinGroupByInviteCode("ABC123", 2L), ErrorCode.GROUP_NOT_JOINABLE);
+            verify(groupMemberRepository, never()).save(any());
+            org.mockito.Mockito.verifyNoInteractions(challengeMemberService);
+        }
+
+        @Test
+        void givenAlreadyJoined_whenJoinByCode_thenALREADY_JOINED() {
+            ChallengeGroup group = group(12L, "초대방", GroupCategory.EXERCISE, Visibility.CODE_ONLY, 6);
+            when(challengeGroupRepository.findByInviteCodeWithLock("ABC123")).thenReturn(Optional.of(group));
+            when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.READY))
+                    .thenReturn(Optional.of(challenge(50L, 12L, ChallengeStatus.READY)));
+            when(groupMemberRepository.existsByGroupIdAndUserId(12L, 2L)).thenReturn(true);
+
+            assertBusinessException(() -> groupService.joinGroupByInviteCode("ABC123", 2L), ErrorCode.ALREADY_JOINED);
+            verify(groupMemberRepository, never()).save(any());
+            org.mockito.Mockito.verifyNoInteractions(challengeMemberService);
+        }
+
+        @Test
+        void givenFull_whenJoinByCode_thenGROUP_FULL() {
+            ChallengeGroup group = group(12L, "초대방", GroupCategory.EXERCISE, Visibility.CODE_ONLY, 6);
+            when(challengeGroupRepository.findByInviteCodeWithLock("ABC123")).thenReturn(Optional.of(group));
+            when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.READY))
+                    .thenReturn(Optional.of(challenge(50L, 12L, ChallengeStatus.READY)));
+            when(groupMemberRepository.countByGroupIdAndStatus(12L, GroupMemberStatus.ACTIVE))
+                    .thenReturn(6L);
+
+            assertBusinessException(() -> groupService.joinGroupByInviteCode("ABC123", 2L), ErrorCode.GROUP_FULL);
+            verify(groupMemberRepository, never()).save(any());
+            org.mockito.Mockito.verifyNoInteractions(challengeMemberService);
+        }
+
+        @Test
+        void givenOwner_whenGetInviteCode_thenExpectedAccess() {
+            ChallengeGroup group = group(12L, "초대방", GroupCategory.EXERCISE, Visibility.CODE_ONLY, 6);
+            ReflectionTestUtils.setField(group, "inviteCode", "ABC123");
+            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            assertThat(groupService.getInviteCode(12L, 1L).inviteCode()).isEqualTo("ABC123");
+        }
+
+        @Test
+        void givenMember_whenGetInviteCode_thenExpectedAccess() {
+            ChallengeGroup group = group(12L, "초대방", GroupCategory.EXERCISE, Visibility.CODE_ONLY, 6);
+            ReflectionTestUtils.setField(group, "inviteCode", "ABC123");
+            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            assertBusinessException(() -> groupService.getInviteCode(12L, 2L), ErrorCode.GROUP_OWNER_ONLY);
+        }
+
+        @Test
+        void givenPublic_whenGetInviteCode_thenExpectedAccess() {
+            ChallengeGroup group = group(12L, "초대방", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            ReflectionTestUtils.setField(group, "inviteCode", "ABC123");
+            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            assertBusinessException(() -> groupService.getInviteCode(12L, 1L), ErrorCode.INVITE_CODE_NOT_FOUND);
+        }
+    }
+
+    @Test
+    @DisplayName("그룹과 생성자 멤버를 저장하고 첫 챌린지를 만든다")
+    void givenCodeOnly_whenCreate_thenSixUppercaseAlphanumericCode() {
+        // given
+        GroupCreateRequest request = new GroupCreateRequest(
+                "오운완 모임", "매일 운동 인증", GroupCategory.EXERCISE, MapType.GYM, Visibility.CODE_ONLY, 6, initialSetting());
+        ChallengeGroup savedGroup = group(12L, "오운완 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+        GroupMember savedMember = groupMember(30L, savedGroup, 1L);
+        Challenge savedChallenge = challenge(50L, 12L, ChallengeStatus.READY);
+        when(challengeGroupRepository.save(any())).thenReturn(savedGroup);
+        when(groupMemberRepository.save(any())).thenReturn(savedMember);
+        when(challengeService.createInitialChallenge(12L, 1L, request.challenge()))
+                .thenReturn(savedChallenge);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user(1L, "꼬밋러")));
+
+        // when
+        var response = groupService.createGroup(1L, request);
+
+        // then
+        ArgumentCaptor<ChallengeGroup> groupCaptor = ArgumentCaptor.forClass(ChallengeGroup.class);
+        verify(challengeGroupRepository).save(groupCaptor.capture());
+        assertThat(groupCaptor.getValue().getName()).isEqualTo("오운완 모임");
+        assertThat(groupCaptor.getValue().getStatus()).isEqualTo(GroupStatus.READY);
+        assertThat(groupCaptor.getValue().getInviteCode()).matches("[A-Z0-9]{6}");
+        verify(groupMemberRepository).save(any(GroupMember.class));
+        verify(challengeService).createInitialChallenge(12L, 1L, request.challenge());
+        assertThat(response.group().id()).isEqualTo(12L);
+        assertThat(response.currentChallenge().id()).isEqualTo(50L);
+        assertThat(response.members()).hasSize(1);
     }
 }
