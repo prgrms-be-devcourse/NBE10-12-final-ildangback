@@ -1,33 +1,103 @@
 package com.gommit.domain.checkin.support;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.gommit.domain.checkin.support.DailyLogMontageBuilder.Frame;
+import com.gommit.domain.checkin.support.DailyLogMontageBuilder.Kind;
+import com.gommit.domain.checkin.support.DailyLogMontageBuilder.Layout;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.core.io.ByteArrayResource;
 
 @DisplayName("DailyLogMontageBuilder")
 class DailyLogMontageBuilderTest {
 
-    @Test
-    @DisplayName("프레임이 없으면 서브프로세스를 띄우지 않고 즉시 빈 값을 반환한다")
-    void emptyFramesReturnsEmpty() {
-        DailyLogMontageBuilder builder = new DailyLogMontageBuilder("ffmpeg");
-
-        assertThat(builder.build(List.of())).isEmpty();
+    private static Frame image() {
+        return new Frame(new ByteArrayResource(new byte[] {1, 2, 3}), "png", Kind.IMAGE);
     }
 
-    @Test
-    @DisplayName("ffmpeg 실행 파일이 없으면 예외 없이 빈 값으로 graceful degrade 한다")
-    void missingFfmpegGracefullyDegrades() {
-        DailyLogMontageBuilder builder = new DailyLogMontageBuilder("/no/such/ffmpeg-binary-xyz");
-        Frame frame = new Frame(new ByteArrayResource(new byte[] {1, 2, 3}), "png");
+    private static List<Frame> slots(Frame... frames) {
+        return new ArrayList<>(Arrays.asList(frames));
+    }
 
-        Optional<byte[]> result = builder.build(List.of(frame));
+    @Nested
+    @DisplayName("입력 검증")
+    class Validation {
 
-        assertThat(result).isEmpty();
+        @Test
+        @DisplayName("회차가 없으면 서브프로세스를 띄우지 않고 즉시 빈 값을 반환한다")
+        void emptyRoundsReturnsEmpty() {
+            DailyLogMontageBuilder builder = new DailyLogMontageBuilder("ffmpeg");
+
+            assertThat(builder.build(2, List.of())).isEmpty();
+        }
+
+        @ParameterizedTest
+        @ValueSource(ints = {0, 7})
+        @DisplayName("칸 수가 1~6 밖이면 빈 값을 반환한다")
+        void cellCountOutOfRangeReturnsEmpty(int cellCount) {
+            DailyLogMontageBuilder builder = new DailyLogMontageBuilder("ffmpeg");
+
+            assertThat(builder.build(cellCount, List.of(slots(image())))).isEmpty();
+        }
+
+        @Test
+        @DisplayName("ffmpeg 실행 파일이 없으면 예외 없이 빈 값으로 graceful degrade 한다")
+        void missingFfmpegGracefullyDegrades() {
+            DailyLogMontageBuilder builder = new DailyLogMontageBuilder("/no/such/ffmpeg-binary-xyz");
+
+            Optional<byte[]> result = builder.build(2, List.of(slots(image(), null)));
+
+            assertThat(result).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("레이아웃 테이블")
+    class Layouts {
+
+        @ParameterizedTest
+        @ValueSource(ints = {1, 2, 3, 4, 5, 6})
+        @DisplayName("어떤 칸 수든 셀 합계는 1080×1920, 모든 셀 치수는 짝수다")
+        void layoutFillsCanvasWithEvenCells(int cellCount) {
+            Layout layout = Layout.forCells(cellCount);
+
+            assertThat(layout.cols() * layout.cellWidth()).isEqualTo(1080);
+            assertThat(layout.rows() * layout.cellHeight()).isEqualTo(1920);
+            assertThat(layout.cellWidth() % 2).isZero();
+            assertThat(layout.cellHeight() % 2).isZero();
+        }
+
+        @Test
+        @DisplayName("5는 6칸 레이아웃을 쓴다(마지막 칸은 검정)")
+        void fiveUsesSixCellGrid() {
+            assertThat(Layout.forCells(5).gridCells()).isEqualTo(6);
+            assertThat(Layout.forCells(5)).isEqualTo(Layout.forCells(6));
+        }
+
+        @Test
+        @DisplayName("2·3은 가로 분할(1행), 4는 2×2, 6은 2열 3행")
+        void gridShapes() {
+            assertThat(Layout.forCells(2).rows()).isEqualTo(1);
+            assertThat(Layout.forCells(3).rows()).isEqualTo(1);
+            assertThat(Layout.forCells(4).cols()).isEqualTo(2);
+            assertThat(Layout.forCells(4).rows()).isEqualTo(2);
+            assertThat(Layout.forCells(6).cols()).isEqualTo(2);
+            assertThat(Layout.forCells(6).rows()).isEqualTo(3);
+        }
+
+        @Test
+        @DisplayName("7칸 이상은 지원하지 않는다")
+        void sevenCellsUnsupported() {
+            assertThatThrownBy(() -> Layout.forCells(7)).isInstanceOf(IllegalArgumentException.class);
+        }
     }
 }
