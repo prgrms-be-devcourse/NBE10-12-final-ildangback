@@ -1,3 +1,5 @@
 package com.gommit.domain.challenge.dto.request;
 
-public record OwnerDelegationRequest(Long targetUserId) {}
+import jakarta.validation.constraints.NotNull;
+
+public record OwnerDelegationRequest(@NotNull Long targetUserId) {}

@@ -16,7 +16,7 @@ public enum ErrorCode {
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
 
     // ===== challenge =====
-    INVALID_START_DATE(HttpStatus.BAD_REQUEST, "챌린지 시작일은 내일 이후여야 합니다."),
+    START_DATE_INVALID(HttpStatus.BAD_REQUEST, "챌린지 시작일은 내일 이후여야 합니다."),
     INVALID_PERIOD(HttpStatus.BAD_REQUEST, "챌린지 종료일은 시작일보다 빠를 수 없습니다."),
     INVALID_FREQUENCY(HttpStatus.BAD_REQUEST, "인증 주기 설정이 올바르지 않습니다."),
     NO_CHECK_IN_METHOD(HttpStatus.BAD_REQUEST, "인증 방식은 최소 1개 이상 선택해야 합니다."),

@@ -6,6 +6,7 @@ import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.entity.ExtensionChoice;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ChallengeMemberRepository extends JpaRepository<ChallengeMember, Long> {
@@ -20,6 +21,7 @@ public interface ChallengeMemberRepository extends JpaRepository<ChallengeMember
 
     List<ChallengeMember> findAllByChallengeIdAndStatus(Long challengeId, ChallengeMemberStatus status);
 
+    @EntityGraph(attributePaths = "challenge")
     List<ChallengeMember> findAllByUserIdAndStatus(Long userId, ChallengeMemberStatus status);
 
     List<ChallengeMember> findAllByChallengeIdAndStatusAndExtensionChoice(

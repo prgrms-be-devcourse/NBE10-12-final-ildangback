@@ -147,7 +147,7 @@ public class ChallengeService {
         LocalDate startDate = request.startDate() != null ? request.startDate() : challenge.getStartDate();
         LocalDate endDate = request.endDate() != null ? request.endDate() : challenge.getEndDate();
         if (!startDate.isAfter(LocalDate.now())) {
-            throw new BusinessException(ErrorCode.INVALID_START_DATE);
+            throw new BusinessException(ErrorCode.START_DATE_INVALID);
         }
         if (endDate.isBefore(startDate)) {
             throw new BusinessException(ErrorCode.INVALID_PERIOD);
@@ -274,7 +274,7 @@ public class ChallengeService {
 
     private void validateStartDate(LocalDate startDate) {
         if (!startDate.isAfter(LocalDate.now())) {
-            throw new BusinessException(ErrorCode.INVALID_START_DATE);
+            throw new BusinessException(ErrorCode.START_DATE_INVALID);
         }
     }
 

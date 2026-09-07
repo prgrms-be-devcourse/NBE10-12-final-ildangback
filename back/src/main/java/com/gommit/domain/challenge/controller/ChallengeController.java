@@ -45,7 +45,7 @@ public class ChallengeController {
     public ResponseEntity<ChallengeUpdateResponse> updateChallenge(
             @PathVariable Long challengeId,
             @CurrentUser SecurityUser actor,
-            @RequestBody ChallengeUpdateRequest request) {
+            @Valid @RequestBody ChallengeUpdateRequest request) {
         ChallengeUpdateResponse response = challengeService.updateChallenge(challengeId, actor.getId(), request);
 
         return ResponseEntity.ok(response);
@@ -56,7 +56,7 @@ public class ChallengeController {
     public ResponseEntity<OwnerDelegationResponse> delegateOwner(
             @PathVariable Long challengeId,
             @CurrentUser SecurityUser actor,
-            @RequestBody OwnerDelegationRequest request) {
+            @Valid @RequestBody OwnerDelegationRequest request) {
         OwnerDelegationResponse response = challengeService.delegateOwner(challengeId, actor.getId(), request);
 
         return ResponseEntity.ok(response);

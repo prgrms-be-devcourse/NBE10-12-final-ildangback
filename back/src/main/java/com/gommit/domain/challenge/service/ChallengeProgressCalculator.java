@@ -47,6 +47,9 @@ public class ChallengeProgressCalculator {
         if (today.isBefore(challenge.getStartDate())) {
             return 0;
         }
+        if (challenge.getDaysOfWeek() == null || challenge.getDaysOfWeek().isBlank()) {
+            return 0;
+        }
         List<DaysOfWeek> scheduledDays = Arrays.stream(challenge.getDaysOfWeek().split(","))
                 .map(DaysOfWeek::valueOf)
                 .toList();
@@ -79,6 +82,9 @@ public class ChallengeProgressCalculator {
         return switch (frequencyType) {
             case DAILY -> (int) ChronoUnit.DAYS.between(startDate, endDate) + 1;
             case DAYS_OF_WEEK -> {
+                if (daysOfWeek == null || daysOfWeek.isEmpty()) {
+                    yield 0;
+                }
                 int count = 0;
                 LocalDate date = startDate;
                 while (!date.isAfter(endDate)) {

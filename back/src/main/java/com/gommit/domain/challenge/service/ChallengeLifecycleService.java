@@ -11,8 +11,9 @@ import com.gommit.domain.group.repository.ChallengeGroupRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,16 +29,19 @@ public class ChallengeLifecycleService {
     public void activateChallengesDueToday() {
         LocalDate today = LocalDate.now();
         List<Challenge> readyChallenges = challengeRepository.findAllByStatus(ChallengeStatus.READY);
-        for (Challenge challenge : readyChallenges) {
-            if (!challenge.getStartDate().equals(today)) {
-                continue;
-            }
-            // Challenge READY -> ACTIVE
+        List<Challenge> challengesDueToday = readyChallenges.stream()
+                .filter(challenge -> challenge.getStartDate().equals(today))
+                .toList();
+        Set<Long> groupIds =
+                challengesDueToday.stream().map(Challenge::getGroupId).collect(Collectors.toSet());
+        Map<Long, ChallengeGroup> groupMap = challengeGroupRepository.findAllById(groupIds).stream()
+                .collect(Collectors.toMap(ChallengeGroup::getId, Function.identity()));
+        for (Challenge challenge : challengesDueToday) {
             challenge.activate();
-            ChallengeGroup group = challengeGroupRepository
-                    .findById(challenge.getGroupId())
-                    .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
-            // 첫 시즌이 시작되는 경우 그룹도 READY -> ACTIVE
+            ChallengeGroup group = groupMap.get(challenge.getGroupId());
+            if (group == null) {
+                throw new BusinessException(ErrorCode.GROUP_NOT_FOUND);
+            }
             if (challenge.getSeqNo() == 1) {
                 group.activate();
                 continue;
@@ -54,20 +58,26 @@ public class ChallengeLifecycleService {
     public void endChallengesDueToday() {
         LocalDate today = LocalDate.now();
         List<Challenge> activeChallenges = challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE);
-        for (Challenge challenge : activeChallenges) {
-            // endDate의 다음날 04:00에 종료
-            if (!challenge.getEndDate().plusDays(1).equals(today)) {
-                continue;
-            }
+        List<Challenge> challengesDueToday = activeChallenges.stream()
+                .filter(challenge -> challenge.getEndDate().plusDays(1).equals(today))
+                .toList();
+        Set<Long> groupIdsToEnd = new HashSet<>();
+        for (Challenge challenge : challengesDueToday) {
             challenge.end();
             Optional<Challenge> nextChallenge =
                     challengeRepository.findByGroupIdAndSeqNo(challenge.getGroupId(), challenge.getSeqNo() + 1);
             if (nextChallenge.isPresent()) {
                 continue;
             }
-            ChallengeGroup group = challengeGroupRepository
-                    .findById(challenge.getGroupId())
-                    .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+            groupIdsToEnd.add(challenge.getGroupId());
+        }
+        Map<Long, ChallengeGroup> groupMap = challengeGroupRepository.findAllById(groupIdsToEnd).stream()
+                .collect(Collectors.toMap(ChallengeGroup::getId, Function.identity()));
+        for (Long groupId : groupIdsToEnd) {
+            ChallengeGroup group = groupMap.get(groupId);
+            if (group == null) {
+                throw new BusinessException(ErrorCode.GROUP_NOT_FOUND);
+            }
             group.end();
         }
     }

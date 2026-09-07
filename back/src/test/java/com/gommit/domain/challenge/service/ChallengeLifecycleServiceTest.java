@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -126,7 +127,7 @@ class ChallengeLifecycleServiceTest {
             Challenge challenge = challenge(50L, 1, ChallengeStatus.READY, today, today.plusDays(6));
             ChallengeGroup group = group(12L, 1L);
             when(challengeRepository.findAllByStatus(ChallengeStatus.READY)).thenReturn(List.of(challenge));
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeGroupRepository.findAllById(Set.of(12L))).thenReturn(List.of(group));
 
             // when
             challengeLifecycleService.activateChallengesDueToday();
@@ -135,6 +136,7 @@ class ChallengeLifecycleServiceTest {
             assertThat(challenge.getStatus()).isEqualTo(ChallengeStatus.ACTIVE);
             assertThat(group.getStatus()).isEqualTo(GroupStatus.ACTIVE);
             verify(challengeMemberRepository, never()).findByChallengeIdAndRole(50L, ChallengeMemberRole.OWNER);
+            verify(challengeGroupRepository).findAllById(Set.of(12L));
         }
 
         @Test
@@ -162,7 +164,7 @@ class ChallengeLifecycleServiceTest {
             ChallengeGroup group = group(12L, 1L);
             ChallengeMember owner = challengeMember(70L, challenge, 2L, ChallengeMemberRole.OWNER);
             when(challengeRepository.findAllByStatus(ChallengeStatus.READY)).thenReturn(List.of(challenge));
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeGroupRepository.findAllById(Set.of(12L))).thenReturn(List.of(group));
             when(challengeMemberRepository.findByChallengeIdAndRole(50L, ChallengeMemberRole.OWNER))
                     .thenReturn(Optional.of(owner));
 
@@ -172,6 +174,7 @@ class ChallengeLifecycleServiceTest {
             // then
             assertThat(challenge.getStatus()).isEqualTo(ChallengeStatus.ACTIVE);
             assertThat(group.getOwnerId()).isEqualTo(2L);
+            verify(challengeGroupRepository).findAllById(Set.of(12L));
         }
 
         @Test
@@ -181,10 +184,11 @@ class ChallengeLifecycleServiceTest {
             LocalDate today = LocalDate.now(KST);
             Challenge challenge = challenge(50L, 1, ChallengeStatus.READY, today, today.plusDays(6));
             when(challengeRepository.findAllByStatus(ChallengeStatus.READY)).thenReturn(List.of(challenge));
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.empty());
+            when(challengeGroupRepository.findAllById(Set.of(12L))).thenReturn(List.of());
 
             // when & then
             assertBusinessException(challengeLifecycleService::activateChallengesDueToday, ErrorCode.GROUP_NOT_FOUND);
+            verify(challengeGroupRepository).findAllById(Set.of(12L));
         }
 
         @Test
@@ -195,13 +199,14 @@ class ChallengeLifecycleServiceTest {
             Challenge challenge = challenge(50L, 2, ChallengeStatus.READY, today, today.plusDays(6));
             ChallengeGroup group = group(12L, 1L);
             when(challengeRepository.findAllByStatus(ChallengeStatus.READY)).thenReturn(List.of(challenge));
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeGroupRepository.findAllById(Set.of(12L))).thenReturn(List.of(group));
             when(challengeMemberRepository.findByChallengeIdAndRole(50L, ChallengeMemberRole.OWNER))
                     .thenReturn(Optional.empty());
 
             // when & then
             assertBusinessException(
                     challengeLifecycleService::activateChallengesDueToday, ErrorCode.CHALLENGE_NOT_OWNER);
+            verify(challengeGroupRepository).findAllById(Set.of(12L));
         }
     }
 
@@ -219,7 +224,7 @@ class ChallengeLifecycleServiceTest {
             group.activate();
             when(challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE)).thenReturn(List.of(challenge));
             when(challengeRepository.findByGroupIdAndSeqNo(12L, 2)).thenReturn(Optional.empty());
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeGroupRepository.findAllById(Set.of(12L))).thenReturn(List.of(group));
 
             // when
             challengeLifecycleService.endChallengesDueToday();
@@ -227,6 +232,7 @@ class ChallengeLifecycleServiceTest {
             // then
             assertThat(challenge.getStatus()).isEqualTo(ChallengeStatus.ENDED);
             assertThat(group.getStatus()).isEqualTo(GroupStatus.ENDED);
+            verify(challengeGroupRepository).findAllById(Set.of(12L));
         }
 
         @Test
@@ -271,10 +277,11 @@ class ChallengeLifecycleServiceTest {
             Challenge challenge = challenge(50L, 1, ChallengeStatus.ACTIVE, today.minusDays(7), today.minusDays(1));
             when(challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE)).thenReturn(List.of(challenge));
             when(challengeRepository.findByGroupIdAndSeqNo(12L, 2)).thenReturn(Optional.empty());
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.empty());
+            when(challengeGroupRepository.findAllById(Set.of(12L))).thenReturn(List.of());
 
             // when & then
             assertBusinessException(challengeLifecycleService::endChallengesDueToday, ErrorCode.GROUP_NOT_FOUND);
+            verify(challengeGroupRepository).findAllById(Set.of(12L));
         }
     }
 }

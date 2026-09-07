@@ -207,7 +207,7 @@ class ChallengeServiceTest {
 
             // when & then
             assertBusinessException(
-                    () -> challengeService.createInitialChallenge(12L, 1L, setting), ErrorCode.INVALID_START_DATE);
+                    () -> challengeService.createInitialChallenge(12L, 1L, setting), ErrorCode.START_DATE_INVALID);
             verify(challengeRepository, never()).save(any());
         }
 
@@ -644,7 +644,7 @@ class ChallengeServiceTest {
 
             // when & then
             assertBusinessException(
-                    () -> challengeService.updateChallenge(50L, 1L, request), ErrorCode.INVALID_START_DATE);
+                    () -> challengeService.updateChallenge(50L, 1L, request), ErrorCode.START_DATE_INVALID);
         }
 
         @Test
