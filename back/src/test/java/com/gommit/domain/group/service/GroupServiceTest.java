@@ -913,7 +913,7 @@ class GroupServiceTest {
     class AccessPolicy {
         @ParameterizedTest
         @EnumSource(GroupMemberStatus.class)
-        void givenMemberStatus_whenActiveGroupDetail_thenOnlyActiveCanRead(GroupMemberStatus status) {
+        void givenMemberStatusWhenActiveGroupDetailThenOnlyActiveCanRead(GroupMemberStatus status) {
             ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
             ReflectionTestUtils.setField(group, "status", GroupStatus.ACTIVE);
             GroupMember member = groupMember(30L, group, 2L);
@@ -929,7 +929,7 @@ class GroupServiceTest {
 
         @ParameterizedTest
         @EnumSource(Visibility.class)
-        void givenReadyGroupWithoutMembership_whenDetail_thenOnlyPublicCanRead(Visibility visibility) {
+        void givenReadyGroupWithoutMembershipWhenDetailThenOnlyPublicCanRead(Visibility visibility) {
             ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, visibility, 6);
             when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
             if (visibility == Visibility.PUBLIC) {
@@ -941,7 +941,7 @@ class GroupServiceTest {
         }
 
         @Test
-        void givenActiveGroupWithoutMembership_whenDetail_thenNotGroupMember() {
+        void givenActiveGroupWithoutMembershipWhenDetailThenNotGroupMember() {
             ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
             ReflectionTestUtils.setField(group, "status", GroupStatus.ACTIVE);
             when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
@@ -955,7 +955,7 @@ class GroupServiceTest {
         @ParameterizedTest
         @EnumSource(GroupStatus.class)
         @DisplayName("현재 구현은 그룹 상태와 무관하게 ACTIVE 챌린지가 있으면 강퇴한다")
-        void givenActiveChallenge_whenOwnerKicks_thenBothMembersKicked(GroupStatus status) {
+        void givenActiveChallengeWhenOwnerKicksThenBothMembersKicked(GroupStatus status) {
             ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
             ReflectionTestUtils.setField(group, "status", status);
             Challenge challenge = challenge(50L, 12L, ChallengeStatus.ACTIVE);
@@ -976,7 +976,7 @@ class GroupServiceTest {
         @EnumSource(
                 value = GroupMemberStatus.class,
                 names = {"LEFT", "KICKED"})
-        void givenInactiveTarget_whenOwnerKicks_thenNotGroupMember(GroupMemberStatus status) {
+        void givenInactiveTargetWhenOwnerKicksThenNotGroupMember(GroupMemberStatus status) {
             ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
             ReflectionTestUtils.setField(group, "status", GroupStatus.ACTIVE);
             GroupMember member = groupMember(30L, group, 2L);
@@ -991,7 +991,7 @@ class GroupServiceTest {
         }
 
         @Test
-        void givenNonOwner_whenKick_thenGROUP_OWNER_ONLY() {
+        void givenNonOwnerWhenKickThenGroupOwnerOnly() {
             ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
             ReflectionTestUtils.setField(group, "status", GroupStatus.ACTIVE);
             when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
@@ -1000,7 +1000,7 @@ class GroupServiceTest {
         }
 
         @Test
-        void givenOwnerSelf_whenKick_thenGROUP_OWNER_CANNOT_BE_KICKED() {
+        void givenOwnerSelfWhenKickThenGroupOwnerCannotBeKicked() {
             ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
             ReflectionTestUtils.setField(group, "status", GroupStatus.ACTIVE);
             when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
@@ -1009,7 +1009,7 @@ class GroupServiceTest {
         }
 
         @Test
-        void givenNoActiveChallenge_whenKick_thenGROUP_MEMBER_KICK_NOT_ALLOWED() {
+        void givenNoActiveChallengeWhenKickThenGroupMemberKickNotAllowed() {
             ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
             ReflectionTestUtils.setField(group, "status", GroupStatus.ACTIVE);
             when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
@@ -1024,7 +1024,7 @@ class GroupServiceTest {
     class InviteCode {
         @Test
         @DisplayName("참여 가능하면 그룹 멤버와 챌린지 멤버를 만들고 응답한다")
-        void givenValidInviteCode_whenJoinReadyGroup_thenCreatesBothMembers() {
+        void givenValidInviteCodeWhenJoinReadyGroupThenCreatesBothMembers() {
             // given
             ChallengeGroup group = group(12L, "오운완 모임", GroupCategory.EXERCISE, Visibility.CODE_ONLY, 6);
             Challenge challenge = challenge(50L, 12L, ChallengeStatus.READY);
@@ -1053,7 +1053,7 @@ class GroupServiceTest {
         }
 
         @Test
-        void givenUnknown_whenJoinByCode_thenINVITE_CODE_NOT_FOUND() {
+        void givenUnknownWhenJoinByCodeThenInviteCodeNotFound() {
 
             assertBusinessException(
                     () -> groupService.joinGroupByInviteCode("ABC123", 2L), ErrorCode.INVITE_CODE_NOT_FOUND);
@@ -1062,7 +1062,7 @@ class GroupServiceTest {
         }
 
         @Test
-        void givenActive_whenJoinByCode_thenGROUP_NOT_JOINABLE() {
+        void givenActiveWhenJoinByCodeThenGroupNotJoinable() {
             ChallengeGroup group = group(12L, "초대방", GroupCategory.EXERCISE, Visibility.CODE_ONLY, 6);
             ReflectionTestUtils.setField(group, "status", GroupStatus.ACTIVE);
             when(challengeGroupRepository.findByInviteCodeWithLock("ABC123")).thenReturn(Optional.of(group));
@@ -1074,7 +1074,7 @@ class GroupServiceTest {
         }
 
         @Test
-        void givenPublic_whenJoinByCode_thenGROUP_NOT_JOINABLE() {
+        void givenPublicWhenJoinByCodeThenGroupNotJoinable() {
             ChallengeGroup group = group(12L, "초대방", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
             when(challengeGroupRepository.findByInviteCodeWithLock("ABC123")).thenReturn(Optional.of(group));
 
@@ -1085,7 +1085,7 @@ class GroupServiceTest {
         }
 
         @Test
-        void givenAlreadyJoined_whenJoinByCode_thenALREADY_JOINED() {
+        void givenAlreadyJoinedWhenJoinByCodeThenAlreadyJoined() {
             ChallengeGroup group = group(12L, "초대방", GroupCategory.EXERCISE, Visibility.CODE_ONLY, 6);
             when(challengeGroupRepository.findByInviteCodeWithLock("ABC123")).thenReturn(Optional.of(group));
             when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.READY))
@@ -1098,7 +1098,7 @@ class GroupServiceTest {
         }
 
         @Test
-        void givenFull_whenJoinByCode_thenGROUP_FULL() {
+        void givenFullWhenJoinByCodeThenGroupFull() {
             ChallengeGroup group = group(12L, "초대방", GroupCategory.EXERCISE, Visibility.CODE_ONLY, 6);
             when(challengeGroupRepository.findByInviteCodeWithLock("ABC123")).thenReturn(Optional.of(group));
             when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.READY))
@@ -1112,7 +1112,7 @@ class GroupServiceTest {
         }
 
         @Test
-        void givenOwner_whenGetInviteCode_thenExpectedAccess() {
+        void givenOwnerWhenGetInviteCodeThenExpectedAccess() {
             ChallengeGroup group = group(12L, "초대방", GroupCategory.EXERCISE, Visibility.CODE_ONLY, 6);
             ReflectionTestUtils.setField(group, "inviteCode", "ABC123");
             when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
@@ -1120,7 +1120,7 @@ class GroupServiceTest {
         }
 
         @Test
-        void givenMember_whenGetInviteCode_thenExpectedAccess() {
+        void givenMemberWhenGetInviteCodeThenExpectedAccess() {
             ChallengeGroup group = group(12L, "초대방", GroupCategory.EXERCISE, Visibility.CODE_ONLY, 6);
             ReflectionTestUtils.setField(group, "inviteCode", "ABC123");
             when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
@@ -1128,7 +1128,7 @@ class GroupServiceTest {
         }
 
         @Test
-        void givenPublic_whenGetInviteCode_thenExpectedAccess() {
+        void givenPublicWhenGetInviteCodeThenExpectedAccess() {
             ChallengeGroup group = group(12L, "초대방", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
             ReflectionTestUtils.setField(group, "inviteCode", "ABC123");
             when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
@@ -1138,7 +1138,7 @@ class GroupServiceTest {
 
     @Test
     @DisplayName("그룹과 생성자 멤버를 저장하고 첫 챌린지를 만든다")
-    void givenCodeOnly_whenCreate_thenSixUppercaseAlphanumericCode() {
+    void givenCodeOnlyWhenCreateThenSixUppercaseAlphanumericCode() {
         // given
         GroupCreateRequest request = new GroupCreateRequest(
                 "오운완 모임", "매일 운동 인증", GroupCategory.EXERCISE, MapType.GYM, Visibility.CODE_ONLY, 6, initialSetting());

@@ -314,7 +314,7 @@ class ChallengeApiIntegrationTest extends IntegrationTestSupport {
 
     @ParameterizedTest
     @ValueSource(strings = {"LEFT", "KICKED"})
-    void givenInactiveSeasonOwner_whenReadUpdateOrDelegate_thenAllRejectWithoutChangingRole(String memberStatus)
+    void givenInactiveSeasonOwnerWhenReadUpdateOrDelegateThenAllRejectWithoutChangingRole(String memberStatus)
             throws Exception {
         var owner = loginAs(EMAIL, NICKNAME);
         Long ownerId = userIdOf(EMAIL);

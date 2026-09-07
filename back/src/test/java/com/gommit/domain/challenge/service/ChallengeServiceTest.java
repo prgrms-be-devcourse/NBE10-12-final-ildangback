@@ -920,7 +920,7 @@ class ChallengeServiceTest {
     @EnumSource(
             value = ChallengeMemberStatus.class,
             names = {"LEFT", "KICKED"})
-    void givenInactiveOwner_whenStatus_thenChallengeNotMember(ChallengeMemberStatus status) {
+    void givenInactiveOwnerWhenStatusThenChallengeNotMember(ChallengeMemberStatus status) {
         Challenge challenge = challenge(50L, ChallengeStatus.READY);
         ChallengeMember member = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
         ReflectionTestUtils.setField(member, "status", status);
@@ -935,7 +935,7 @@ class ChallengeServiceTest {
     @EnumSource(
             value = ChallengeMemberStatus.class,
             names = {"LEFT", "KICKED"})
-    void givenInactiveOwner_whenTodayStatuses_thenChallengeNotMember(ChallengeMemberStatus status) {
+    void givenInactiveOwnerWhenTodayStatusesThenChallengeNotMember(ChallengeMemberStatus status) {
         Challenge challenge = challenge(50L, ChallengeStatus.READY);
         ChallengeMember member = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
         ReflectionTestUtils.setField(member, "status", status);
@@ -950,7 +950,7 @@ class ChallengeServiceTest {
     @EnumSource(
             value = ChallengeMemberStatus.class,
             names = {"LEFT", "KICKED"})
-    void givenInactiveOwner_whenUpdate_thenChallengeNotMember(ChallengeMemberStatus status) {
+    void givenInactiveOwnerWhenUpdateThenChallengeNotMember(ChallengeMemberStatus status) {
         Challenge challenge = challenge(50L, ChallengeStatus.READY);
         ChallengeMember member = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
         ReflectionTestUtils.setField(member, "status", status);
@@ -966,7 +966,7 @@ class ChallengeServiceTest {
     @EnumSource(
             value = ChallengeMemberStatus.class,
             names = {"LEFT", "KICKED"})
-    void givenInactiveOwner_whenDelegate_thenChallengeNotMember(ChallengeMemberStatus status) {
+    void givenInactiveOwnerWhenDelegateThenChallengeNotMember(ChallengeMemberStatus status) {
         Challenge challenge = challenge(50L, ChallengeStatus.READY);
         ChallengeMember member = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
         ReflectionTestUtils.setField(member, "status", status);
@@ -980,7 +980,7 @@ class ChallengeServiceTest {
     }
 
     @Test
-    void givenEndedSeasonWithActiveMember_whenRead_thenStatusAndTodayStatusesAccessible() {
+    void givenEndedSeasonWithActiveMemberWhenReadThenStatusAndTodayStatusesAccessible() {
         Challenge challenge = challenge(50L, ChallengeStatus.ENDED);
         ChallengeMember member = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
         when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));

@@ -332,7 +332,7 @@ class GroupApiIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void givenThreeSeasons_whenKickedInSecond_thenHistoryPreservedAndAccessIsSeasonSpecific() throws Exception {
+    void givenThreeSeasonsWhenKickedInSecondThenHistoryPreservedAndAccessIsSeasonSpecific() throws Exception {
         var owner = loginAs(EMAIL, NICKNAME);
         Long ownerId = userIdOf(EMAIL);
         Long groupId = createGroupAndReturnId(owner.accessToken(), ownerId, "시즌별 접근");
@@ -418,7 +418,7 @@ class GroupApiIntegrationTest extends IntegrationTestSupport {
 
     @ParameterizedTest
     @EnumSource(GroupMemberStatus.class)
-    void givenMembershipHistory_whenJoinByInvite_thenAlreadyJoinedEvenAfterLeaving(GroupMemberStatus memberStatus)
+    void givenMembershipHistoryWhenJoinByInviteThenAlreadyJoinedEvenAfterLeaving(GroupMemberStatus memberStatus)
             throws Exception {
         var owner = loginAs(EMAIL, NICKNAME);
         createGroup(owner.accessToken(), groupCreateBody("초대방", "EXERCISE", "GYM", "CODE_ONLY"))
@@ -446,7 +446,7 @@ class GroupApiIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void givenCodeOnlyGroup_whenOwnerReadsAndMemberJoins_thenCodeAndMembershipPersist() throws Exception {
+    void givenCodeOnlyGroupWhenOwnerReadsAndMemberJoinsThenCodeAndMembershipPersist() throws Exception {
         var owner = loginAs(EMAIL, NICKNAME);
         createGroup(owner.accessToken(), groupCreateBody("초대방", "EXERCISE", "GYM", "CODE_ONLY"))
                 .andExpect(status().isCreated());
