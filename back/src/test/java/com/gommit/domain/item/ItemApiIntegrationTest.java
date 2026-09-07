@@ -17,19 +17,21 @@ import org.springframework.mock.web.MockMultipartFile;
 class ItemApiIntegrationTest extends IntegrationTestSupport {
 
     // ─── 공통 헬퍼 ───────────────────────────────────────────────────────────
-
-    // items 테이블에 아이템을 직접 삽입하고 생성된 AUTO_INCREMENT id를 반환한다.
-    // 관리자 계정이 없어도 테스트용 데이터를 만들 수 있도록 SQL로 직접 삽입한다.
     private long insertItem(String slot, String name, int price) {
         jdbcTemplate.update(
-                "INSERT INTO items (slot, name, image_url, price, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, NOW(), NOW())",
+                "INSERT INTO items (slot, name, price, created_at, updated_at) " + "VALUES (?, ?, ?, NOW(), NOW())",
                 slot,
                 name,
-                "https://cdn.example.com/test.png",
                 price);
-        // MySQL에서 직전에 삽입된 행의 id를 가져온다.
-        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+        long itemId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+
+        jdbcTemplate.update(
+                "INSERT INTO item_images (item_id, pose, image_key, created_at, updated_at)"
+                        + " VALUES (?, 'DEFAULT', ?, NOW(), NOW())",
+                itemId,
+                "items/test-image.png");
+
+        return itemId;
     }
 
     // 일반 유저로 가입 후 DB에서 role을 ADMIN으로 변경하고 재로그인해 ADMIN 토큰을 반환한다.
@@ -109,8 +111,8 @@ class ItemApiIntegrationTest extends IntegrationTestSupport {
         @DisplayName("존재하는 아이템 구매 시 201 과 응답 필드를 확인한다")
         void t5() throws Exception {
             var tokens = loginAs();
-            // 구매할 아이템을 DB에 먼저 준비한다.
-            long itemId = insertItem("HEAD", "기본 모자", 100);
+            // 구매할 아이템을 DB에 먼저 준비한다. price=0: 신규 유저는 포인트 잔액이 0이라 유료 아이템 구매 불가
+            long itemId = insertItem("HEAD", "기본 모자", 0);
 
             mockMvc.perform(withToken(post("/api/items/" + itemId + "/purchase"), tokens.accessToken()))
                     .andExpect(status().isCreated()) // 구매 성공은 201 Created
@@ -133,7 +135,7 @@ class ItemApiIntegrationTest extends IntegrationTestSupport {
         @DisplayName("이미 보유한 아이템 재구매 시 409")
         void t7() throws Exception {
             var tokens = loginAs();
-            long itemId = insertItem("HEAD", "기본 모자", 100);
+            long itemId = insertItem("HEAD", "기본 모자", 0);
 
             // 첫 번째 구매 (성공)
             mockMvc.perform(withToken(post("/api/items/" + itemId + "/purchase"), tokens.accessToken()));
@@ -204,11 +206,14 @@ class ItemApiIntegrationTest extends IntegrationTestSupport {
             var tokens = loginAsAdmin("admin@example.com", "관리자");
 
             // withToken()이 MockMultipartHttpServletRequestBuilder를 받지 못하므로 헤더를 직접 추가한다.
+            // PNG 매직바이트(8바이트): MediaValidator가 파일 서명을 검증하므로 실제 PNG 헤더가 필요하다.
+            byte[] pngHeader = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
             mockMvc.perform(multipart("/api/admin/items")
-                            .file(new MockMultipartFile("image", "hat.png", MediaType.IMAGE_PNG_VALUE, new byte[] {1}))
+                            .file(new MockMultipartFile("images", "hat.png", MediaType.IMAGE_PNG_VALUE, pngHeader))
                             .param("slot", "HEAD")
                             .param("name", "관리자 모자")
                             .param("price", "500")
+                            .param("poses", "DEFAULT")
                             .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokens.accessToken()))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.id").exists()) // DB가 부여한 id가 응답에 있어야 한다

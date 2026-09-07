@@ -18,17 +18,20 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
     // items 테이블에 아이템을 직접 삽입하고 생성된 id를 반환한다.
     private long insertItem(String slot, String name, int price) {
         jdbcTemplate.update(
-                "INSERT INTO items (slot, name, image_url, price, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, NOW(), NOW())",
+                "INSERT INTO items (slot, name, price, created_at, updated_at) " + "VALUES (?, ?, ?, NOW(), NOW())",
                 slot,
                 name,
-                "https://cdn.phototourl.com/free/2026-09-02-404c3e23-3aa1-46f2-b0e2-4e2c239530ce.jpg",
                 price);
-        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+        long itemId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+        jdbcTemplate.update(
+                "INSERT INTO item_images (item_id, pose, image_key, created_at, updated_at) "
+                        + "VALUES (?, 'DEFAULT', ?, NOW(), NOW())",
+                itemId,
+                "items/test-image.png");
+
+        return itemId;
     }
 
-    // user_items 테이블에 미착용 상태(equipped_slot=NULL)로 직접 삽입한다.
-    // 구매 API를 거치지 않고 보유 상태를 만들어야 할 때 사용한다.
     private long insertUserItem(long userId, long itemId) {
         jdbcTemplate.update(
                 "INSERT INTO user_items (user_id, item_id, equipped_slot, created_at, updated_at) "

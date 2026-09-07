@@ -8,12 +8,14 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
+import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.item.dto.response.CharacterResponse;
 import com.gommit.domain.item.dto.response.UserItemResponse;
 import com.gommit.domain.item.entity.Item;
 import com.gommit.domain.item.entity.ItemSlot;
 import com.gommit.domain.item.entity.UserItem;
 import com.gommit.domain.item.repository.UserItemRepository;
+import com.gommit.domain.media.service.StorageService;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
@@ -33,12 +35,15 @@ import org.springframework.test.util.ReflectionTestUtils;
 // Spring Context 없이 Mockito만으로 실행하는 순수 단위 테스트
 @ExtendWith(MockitoExtension.class)
 class UserItemServiceTest {
-
-    // UserItemService가 의존하는 유일한 빈을 Mock으로 대체
     @Mock
     private UserItemRepository userItemRepository;
 
-    // @Mock 필드를 UserItemService 생성자에 주입하여 테스트 대상 인스턴스 생성
+    @Mock
+    private CheckInRepository checkInRepository;
+
+    @Mock
+    private StorageService storageService;
+
     @InjectMocks
     private UserItemService userItemService;
 
@@ -57,11 +62,7 @@ class UserItemServiceTest {
     @BeforeEach
     void setUp() {
         // DB가 없으므로 ReflectionTestUtils로 BaseEntity의 private id·createdAt 필드를 강제 주입
-        headItem = Item.of(
-                ItemSlot.HEAD,
-                "기본 모자",
-                "https://cdn.phototourl.com/free/2026-09-02-404c3e23-3aa1-46f2-b0e2-4e2c239530ce.jpg",
-                100);
+        headItem = Item.of(ItemSlot.HEAD, "기본 모자", 100);
         ReflectionTestUtils.setField(headItem, "id", 1L);
 
         // 미착용 상태: equip() 호출 없음 → equippedSlot=null
@@ -155,21 +156,14 @@ class UserItemServiceTest {
     @DisplayName("이미 착용 중인 아이템 재착용 시 ALREADY_EQUIPPED 예외가 발생한다")
     void t5() {
         // given
-        // equippedUserItem은 이미 equippedSlot=HEAD인 상태
         given(userItemRepository.findById(11L)).willReturn(Optional.of(equippedUserItem));
 
         // when & then
-        // isEquipped()가 true이므로 ALREADY_EQUIPPED 발생
         assertThatThrownBy(() -> userItemService.equipItem(USER_ID, 11L))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.ALREADY_EQUIPPED);
     }
-
-    // ─────────────────────────────────────────────────
-    // switchEquippedItem
-    // package-private이므로 같은 패키지의 테스트에서만 직접 호출 가능
-    // ─────────────────────────────────────────────────
 
     @Test
     @DisplayName("기존 착용 아이템이 있을 때 기존 아이템이 해제되고 새 아이템이 착용된다")
@@ -328,21 +322,18 @@ class UserItemServiceTest {
     @DisplayName("착용 아이템이 있을 때 해당 슬롯에 imageUrl이 채워지고 나머지 슬롯은 null로 반환된다")
     void t14() {
         // given
-        // HEAD 슬롯만 착용 중인 상태 (equippedUserItem)
-        given(userItemRepository.findByUserIdAndEquippedSlotNotNull(USER_ID)).willReturn(List.of(equippedUserItem));
+        // checkInRepository 머지 후 교체 예정
+        given(checkInRepository.existsByUserIdAndBusinessDate(eq(USER_ID), any()))
+                .willReturn(false);
 
         // when
         CharacterResponse response = userItemService.getMyCharacter(USER_ID);
 
         // then
-        // HEAD 슬롯에 headItem의 imageUrl이 채워져야 함
-        assertThat(response.slots().get(ItemSlot.HEAD))
-                .isEqualTo("https://cdn.phototourl.com/free/2026-09-02-404c3e23-3aa1-46f2-b0e2-4e2c239530ce.jpg");
-        // 나머지 슬롯(TOP, BOTTOM, SHOES)은 착용한 아이템이 없으므로 null이어야 함
+        assertThat(response.slots().get(ItemSlot.HEAD)).isNull();
         assertThat(response.slots().get(ItemSlot.TOP)).isNull();
         assertThat(response.slots().get(ItemSlot.BOTTOM)).isNull();
         assertThat(response.slots().get(ItemSlot.SHOES)).isNull();
-        // ItemSlot 열거값 4개(HEAD/TOP/BOTTOM/SHOES) 전부 키로 존재해야 함
         assertThat(response.slots()).hasSize(ItemSlot.values().length);
     }
 
@@ -350,9 +341,9 @@ class UserItemServiceTest {
     @DisplayName("착용 아이템이 없을 때 모든 슬롯이 null로 반환된다")
     void t15() {
         // given
-        // 착용 아이템이 하나도 없음
-        given(userItemRepository.findByUserIdAndEquippedSlotNotNull(USER_ID)).willReturn(List.of());
-
+        // checkInRepository 머지 후 교체 예정
+        given(checkInRepository.existsByUserIdAndBusinessDate(eq(USER_ID), any()))
+                .willReturn(false);
         // when
         CharacterResponse response = userItemService.getMyCharacter(USER_ID);
 

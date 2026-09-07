@@ -27,7 +27,6 @@ public enum ErrorCode {
     ALREADY_OWNED_ITEM(HttpStatus.CONFLICT, "이미 보유한 아이템입니다."),
     ALREADY_EQUIPPED(HttpStatus.CONFLICT, "이미 착용 중인 아이템입니다."),
     NOT_EQUIPPED(HttpStatus.BAD_REQUEST, "착용 중이 아닌 아이템입니다."),
-    ITEM_POINT_NOT_ENOUGH(HttpStatus.CONFLICT, "포인트가 부족합니다."),
     NOT_ITEM_OWNER(HttpStatus.FORBIDDEN, "본인이 보유한 아이템만 착용할 수 있습니다."),
     ITEM_IN_USE(HttpStatus.CONFLICT, "이미 보유중인 사용자가 있어 삭제할 수 없습니다."),
 
