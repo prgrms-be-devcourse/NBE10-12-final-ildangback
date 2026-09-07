@@ -15,11 +15,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
 // ffmpeg 부재/타임아웃/실패 시 예외를 삼키고 graceful degrade — 호출부가 videoKey null 을 유지한다.
-//
-// 그리드 몽타주. 하루의 인증을 회차(round)별로 묶고, 회차 1개 = 그리드 1프레임(노출 ROUND_SECONDS 초)으로
-// 순차 concat 한다. 칸(cell)은 멤버 고정 슬롯이라 회차 내내 N칸 고정 — 인증 안 한 멤버의 칸은 검정.
-// 고정 캔버스 CANVAS_WIDTH×CANVAS_HEIGHT(9:16 세로), 모든 칸 치수는 짝수라 yuv420p 안전.
-// 인코딩 비용: 칸이 거의 정지 프레임이라 낮다. 낮은 FPS + veryfast preset 으로 EC2 크레딧 소모를 억제한다.
+
 @Slf4j
 @Component
 public class DailyLogMontageBuilder {
@@ -30,7 +26,7 @@ public class DailyLogMontageBuilder {
     private static final int ROUND_SECONDS = 2; // 회차 1개 노출 시간
     private static final int CANVAS_WIDTH = 1080; // 9:16 세로 — 모바일 풀스크린
     private static final int CANVAS_HEIGHT = 1920;
-    private static final int FPS = 10; // 정지 프레임이라 낮게 — 파일 크기/인코딩 비용 절감
+    private static final int FPS = 30; // 동영상 인증 대비해 30fps 로 통일
     private static final String PRESET = "veryfast";
     private static final long TIMEOUT_SECONDS = 120;
 
@@ -100,7 +96,6 @@ public class DailyLogMontageBuilder {
         }
     }
 
-    // 회차별 슬롯(size == cellCount)을 gridCells 길이로 펼친다. cellCount..gridCells-1 칸은 항상 검정(null).
     private static List<Frame> flatten(int cellCount, Layout layout, List<List<Frame>> rounds) {
         List<Frame> flat = new ArrayList<>();
         for (List<Frame> slots : rounds) {
@@ -111,7 +106,6 @@ public class DailyLogMontageBuilder {
         return flat;
     }
 
-    // 실제 프레임만 임시 파일로 쓴다. 반환 리스트의 인덱스는 flat 과 1:1 — 검정 칸은 null.
     private List<String> writeFrames(Path workDir, List<Frame> flat) throws IOException {
         List<String> names = new ArrayList<>();
         int idx = 0;
@@ -131,12 +125,7 @@ public class DailyLogMontageBuilder {
     }
 
     private int runFfmpeg(
-            Path workDir,
-            Layout layout,
-            int roundCount,
-            List<Frame> flat,
-            List<String> inputNames,
-            Path output)
+            Path workDir, Layout layout, int roundCount, List<Frame> flat, List<String> inputNames, Path output)
             throws IOException, InterruptedException {
         List<String> command = new ArrayList<>();
         command.add(ffmpegPath);
@@ -145,7 +134,7 @@ public class DailyLogMontageBuilder {
         for (int i = 0; i < flat.size(); i++) {
             Frame frame = flat.get(i);
             if (frame == null) {
-                // 검정 칸: lavfi 로 인라인 생성(임시 파일/추가 프로세스 불필요).
+                // 검정 칸: ffmpeg의 lavfi 로 인라인 생성(임시 파일/추가 프로세스 불필요).
                 command.add("-f");
                 command.add("lavfi");
                 command.add("-t");
@@ -153,7 +142,8 @@ public class DailyLogMontageBuilder {
                 command.add("-i");
                 command.add("color=c=black:s=%dx%d:r=%d".formatted(layout.cellWidth(), layout.cellHeight(), FPS));
             } else if (frame.kind() == Kind.VIDEO) {
-                // TODO(동영상 인증): 앞 ROUND_SECONDS 초만 사용. 클립이 더 짧으면 filter 의 tpad 로 마지막 프레임을 채운다.
+                // 동영상 칸: 긴 클립은 -t 로 앞 ROUND_SECONDS 초만 디코드. 짧은 클립은 buildFilter 의 tpad 로 보정.
+                // NOTE: 현재 MediaType 에 VIDEO 가 없어 이 경로는 미사용 — 동영상 인증 도입 시 실제 클립으로 검증 필요.
                 command.add("-t");
                 command.add(String.valueOf(ROUND_SECONDS));
                 command.add("-i");
@@ -169,7 +159,7 @@ public class DailyLogMontageBuilder {
         }
 
         command.add("-filter_complex");
-        command.add(buildFilter(layout, roundCount));
+        command.add(buildFilter(layout, roundCount, flat));
         command.add("-map");
         command.add("[out]");
         command.add("-r");
@@ -196,49 +186,81 @@ public class DailyLogMontageBuilder {
         return process.exitValue();
     }
 
-    // 칸별 정규화(scale+pad+fps) → 행마다 hstack → 행들 vstack → 회차별 [round_r] → concat.
-    private static String buildFilter(Layout layout, int roundCount) {
+    // 칸별 정규화(scale+pad+fps, 동영상은 tpad 로 길이 보정) → 회차별 xstack 그리드 → 회차 concat.
+    private static String buildFilter(Layout layout, int roundCount, List<Frame> flat) {
         int grid = layout.gridCells();
+        int cw = layout.cellWidth();
+        int ch = layout.cellHeight();
+        String cellLayout = xstackLayout(layout);
         StringBuilder sb = new StringBuilder();
 
-        // 모든 입력을 정확한 셀 크기로 정규화. 사진 전체가 보이게 축소(decrease) 후 칸 안쪽만 검정 pad.
-        for (int i = 0; i < roundCount * grid; i++) {
-            sb.append('[').append(i).append(":v]")
-                    .append("scale=").append(layout.cellWidth()).append(':').append(layout.cellHeight())
+        // 모든 입력을 셀 크기로 정규화. 사진 전체가 보이게 축소(decrease) 후 칸 안쪽만 검정 pad.
+        for (int i = 0; i < flat.size(); i++) {
+            sb.append('[')
+                    .append(i)
+                    .append(":v]")
+                    .append("scale=")
+                    .append(cw)
+                    .append(':')
+                    .append(ch)
                     .append(":force_original_aspect_ratio=decrease,")
-                    .append("pad=").append(layout.cellWidth()).append(':').append(layout.cellHeight())
-                    .append(":-1:-1:color=black,setsar=1,fps=").append(FPS)
-                    .append("[c").append(i).append("];");
+                    .append("pad=")
+                    .append(cw)
+                    .append(':')
+                    .append(ch)
+                    .append(":-1:-1:color=black,setsar=1,fps=")
+                    .append(FPS);
+            Frame frame = flat.get(i);
+            if (frame != null && frame.kind() == Kind.VIDEO) {
+                // 클립이 ROUND_SECONDS 보다 짧으면 마지막 프레임을 복제해 채우고, 그다음 정확히 잘라낸다.
+                // (동영상 인증 미도입 상태 — 실제 클립으로 검증 필요)
+                sb.append(",tpad=stop_mode=clone:stop_duration=")
+                        .append(ROUND_SECONDS)
+                        .append(",trim=duration=")
+                        .append(ROUND_SECONDS)
+                        .append(",setpts=PTS-STARTPTS");
+            }
+            sb.append("[c").append(i).append("];");
         }
 
+        // 회차별로 grid 칸을 하나의 프레임으로 합친다. xstack 단일 필터가 모든 레이아웃(1~6칸)을 커버.
         for (int r = 0; r < roundCount; r++) {
             int base = r * grid;
             if (grid == 1) {
                 sb.append("[c").append(base).append("]null[round").append(r).append("];");
-            } else if (layout.rows() == 1) {
-                for (int k = 0; k < grid; k++) {
-                    sb.append("[c").append(base + k).append(']');
-                }
-                sb.append("hstack=inputs=").append(grid).append("[round").append(r).append("];");
-            } else {
-                for (int row = 0; row < layout.rows(); row++) {
-                    for (int col = 0; col < layout.cols(); col++) {
-                        sb.append("[c").append(base + row * layout.cols() + col).append(']');
-                    }
-                    sb.append("hstack=inputs=").append(layout.cols())
-                            .append("[row").append(r).append('_').append(row).append("];");
-                }
-                for (int row = 0; row < layout.rows(); row++) {
-                    sb.append("[row").append(r).append('_').append(row).append(']');
-                }
-                sb.append("vstack=inputs=").append(layout.rows()).append("[round").append(r).append("];");
+                continue;
             }
+            for (int k = 0; k < grid; k++) {
+                sb.append("[c").append(base + k).append(']');
+            }
+            sb.append("xstack=inputs=")
+                    .append(grid)
+                    .append(":layout=")
+                    .append(cellLayout)
+                    .append("[round")
+                    .append(r)
+                    .append("];");
         }
 
         for (int r = 0; r < roundCount; r++) {
             sb.append("[round").append(r).append(']');
         }
         sb.append("concat=n=").append(roundCount).append(":v=1:a=0[out]");
+        return sb.toString();
+    }
+
+    // 균일한 칸 그리드를 xstack layout 픽셀 오프셋으로 나열. 예: 2×3 → "0_0|540_0|0_640|540_640|0_1280|540_1280".
+    // 칸 순서는 행 우선(row-major) — flatten() 이 채우는 순서와 같다.
+    private static String xstackLayout(Layout layout) {
+        StringBuilder sb = new StringBuilder();
+        for (int k = 0; k < layout.gridCells(); k++) {
+            if (k > 0) {
+                sb.append('|');
+            }
+            int x = (k % layout.cols()) * layout.cellWidth();
+            int y = (k / layout.cols()) * layout.cellHeight();
+            sb.append(x).append('_').append(y);
+        }
         return sb.toString();
     }
 

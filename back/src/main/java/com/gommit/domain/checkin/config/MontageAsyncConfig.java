@@ -8,8 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-// DailyLog 몽타주 생성 전용 스레드풀.
-// 전용 풀로 동시 실행 수를 좁히고, 초과분은 큐(50)에 쌓거나 넘치면 다음 마감 배치(04:00)가 재시도.
+// DailyLog 몽타주 생성 전용 스레드풀. 동시 실행 수를 좁히고, 초과분은 큐(50)에 쌓거나 넘치면 다음 마감 배치(04:00)가 재시도.
 @Slf4j
 @Configuration
 public class MontageAsyncConfig {
@@ -26,7 +25,7 @@ public class MontageAsyncConfig {
         executor.setMaxPoolSize(maxSize);
         executor.setQueueCapacity(queueCapacity);
         executor.setThreadNamePrefix("montage-");
-        // 큐까지 가득 차면 호출 스레드에서 직접 실행하지 않고 버린다 — 유실분은 마감 배치가 재시도한다.
+        // 큐까지 가득 차면 호출 스레드에서 직접 실행하지 않고 버린다 — 유실분은 마감 배치가 재시도
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(30);

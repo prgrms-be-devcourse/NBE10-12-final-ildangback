@@ -27,6 +27,7 @@ import com.gommit.domain.checkin.repository.DailyLogRepository;
 import com.gommit.domain.checkin.support.DailyLogMontageBuilder;
 import com.gommit.domain.checkin.support.DailyLogMontageBuilder.Frame;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,14 +50,26 @@ class DailyLogMontageServiceTest {
 
     private final Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
 
-    @Mock private DailyLogRepository dailyLogRepository;
-    @Mock private CheckInRepository checkInRepository;
-    @Mock private ChallengeMemberRepository challengeMemberRepository;
-    @Mock private CheckInMediaStore checkInMediaStore;
-    @Mock private DailyLogMediaStore dailyLogMediaStore;
-    @Mock private DailyLogMontageBuilder montageBuilder;
+    @Mock
+    private DailyLogRepository dailyLogRepository;
 
-    @InjectMocks private DailyLogMontageService service;
+    @Mock
+    private CheckInRepository checkInRepository;
+
+    @Mock
+    private ChallengeMemberRepository challengeMemberRepository;
+
+    @Mock
+    private CheckInMediaStore checkInMediaStore;
+
+    @Mock
+    private DailyLogMediaStore dailyLogMediaStore;
+
+    @Mock
+    private DailyLogMontageBuilder montageBuilder;
+
+    @InjectMocks
+    private DailyLogMontageService service;
 
     private DailyLog dailyLog;
 
@@ -71,13 +84,15 @@ class DailyLogMontageServiceTest {
     }
 
     private void snapshot(ChallengeMember... members) {
-        when(challengeMemberRepository.findSnapshotMembers(
+        when(challengeMemberRepository.findSnapshotMemberUserIds(
                         eq(CHALLENGE_ID), any(), any(), eq(ChallengeMemberStatus.ACTIVE)))
-                .thenReturn(List.of(members));
+                .thenReturn(
+                        Arrays.stream(members).map(ChallengeMember::getUserId).toList());
     }
 
     private void checkIns(CheckIn... checkIns) {
-        when(checkInRepository.findByChallengeIdAndBusinessDate(CHALLENGE_ID, DATE)).thenReturn(List.of(checkIns));
+        when(checkInRepository.findByChallengeIdAndBusinessDate(CHALLENGE_ID, DATE))
+                .thenReturn(List.of(checkIns));
     }
 
     private CheckIn checkIn(long userId, int roundNo) {
@@ -85,8 +100,7 @@ class DailyLogMontageServiceTest {
     }
 
     private CheckIn checkIn(long userId, int roundNo, String mediaKey) {
-        return new CheckIn(
-                CHALLENGE_ID, userId, roundNo, CheckInType.PHOTO, mediaKey, MediaType.IMAGE, null, DATE);
+        return new CheckIn(CHALLENGE_ID, userId, roundNo, CheckInType.PHOTO, mediaKey, MediaType.IMAGE, null, DATE);
     }
 
     @SuppressWarnings("unchecked")
@@ -217,7 +231,7 @@ class DailyLogMontageServiceTest {
 
         service.generateMontage(CHALLENGE_ID, DATE);
 
-        verify(challengeMemberRepository, never()).findSnapshotMembers(any(), any(), any(), any());
+        verify(challengeMemberRepository, never()).findSnapshotMemberUserIds(any(), any(), any(), any());
         verify(montageBuilder, never()).build(anyInt(), any());
     }
 

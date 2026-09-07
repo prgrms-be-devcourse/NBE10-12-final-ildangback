@@ -1,6 +1,5 @@
 package com.gommit.domain.checkin.service;
 
-import com.gommit.domain.challenge.entity.ChallengeMember;
 import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.checkin.entity.CheckIn;
@@ -88,7 +87,7 @@ public class DailyLogMontageService {
         // TODO(feat/20): businessDate 경계가 04:00 로 바뀌면 이 창도 이동 (DailyLogService.countsFor 와 동일 규칙).
         LocalDateTime startOfDay = businessDate.atStartOfDay();
         LocalDateTime endOfDay = businessDate.plusDays(1).atStartOfDay();
-        List<ChallengeMember> snapshot = challengeMemberRepository.findSnapshotMembers(
+        List<Long> snapshot = challengeMemberRepository.findSnapshotMemberUserIds(
                 challengeId, startOfDay, endOfDay, ChallengeMemberStatus.ACTIVE);
 
         if (snapshot.size() > DailyLogMontageBuilder.MAX_CELLS) {
@@ -104,13 +103,12 @@ public class DailyLogMontageService {
         int cellCount = Math.min(snapshot.size(), DailyLogMontageBuilder.MAX_CELLS);
         Map<Long, Integer> cellByUser = new HashMap<>();
         for (int i = 0; i < cellCount; i++) {
-            cellByUser.put(snapshot.get(i).getUserId(), i);
+            cellByUser.put(snapshot.get(i), i);
         }
         return cellByUser;
     }
 
-    private List<List<Frame>> buildRounds(
-            List<CheckIn> checkIns, Map<Long, Integer> cellByUser, int cellCount) {
+    private List<List<Frame>> buildRounds(List<CheckIn> checkIns, Map<Long, Integer> cellByUser, int cellCount) {
         // roundNo 오름차순 그룹. 회차 내 같은 유저는 먼저 조회된(id asc) 것만.
         TreeMap<Integer, Map<Long, CheckIn>> byRound = new TreeMap<>();
         for (CheckIn checkIn : checkIns) {
