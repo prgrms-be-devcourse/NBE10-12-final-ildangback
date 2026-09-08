@@ -21,6 +21,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @Tag(name = "group - 그룹")
 @RestController
 @RequestMapping("/api/groups")
@@ -110,5 +112,13 @@ public class GroupController {
             @PathVariable Long groupId, @PathVariable Long userId, @CurrentUser SecurityUser actor) {
         groupService.kickMember(groupId, actor.getId(), userId);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "그룹의 챌린지(시즌) 목록 조회", description = "해당 그룹의 전체 시즌 목록을 조회")
+    @GetMapping("/{groupId}/challenges")
+    public ResponseEntity<List<SeasonSummary>> getGroupChallenges(
+        @PathVariable Long groupId, @CurrentUser SecurityUser actor
+    ) {
+        return ResponseEntity.ok(groupService.getGroupChallenges(groupId, actor.getId()));
     }
 }
