@@ -2,6 +2,8 @@ package com.gommit.domain.checkin.service;
 
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.service.ChallengeProgressCalculator;
+import com.gommit.domain.challenge.service.ChallengeStreakService;
+import com.gommit.domain.challenge.service.MemberCheckInResult;
 import com.gommit.domain.checkin.dto.request.SubmitCheckInRequest;
 import com.gommit.domain.checkin.dto.response.CheckInCursorResponse;
 import com.gommit.domain.checkin.dto.response.CheckInResponse;
@@ -55,6 +57,7 @@ public class CheckInService {
     private final CheckInMediaStore mediaStore;
     private final PersonalPointService personalPointService;
     private final UserService userService;
+    private final ChallengeStreakService challengeStreakService;
     private final BusinessClock businessClock;
 
     public TodayCheckInStatusResponse getTodayStatus(Long userId, Long challengeId) {
@@ -121,9 +124,28 @@ public class CheckInService {
 
         String nickname = nicknameOf(userId, checkIn.getId());
 
+        // 이번 인증이 그날 목표를 채운 마지막 회차면 개인/그룹/유저 스트릭을 갱신한다. 같은 트랜잭션.
         boolean dailyCompleted = roundNo >= target;
+        int currentStreak = 0;
+        int groupCompletedCount = 0;
+        int groupTotalCount = 0;
+        if (dailyCompleted) {
+            MemberCheckInResult streak =
+                    challengeStreakService.onMemberDailyComplete(challengeId, userId, businessDate);
+            currentStreak = streak.memberCurrentStreak();
+            groupCompletedCount = streak.groupCompletedCount();
+            groupTotalCount = streak.groupTotalCount();
+        }
+
         return new CheckInResultResponse(
-                CheckInResponse.of(checkIn, nickname), roundNo, target, dailyCompleted, earnedUserPoints, 0, 0, 0);
+                CheckInResponse.of(checkIn, nickname),
+                roundNo,
+                target,
+                dailyCompleted,
+                earnedUserPoints,
+                currentStreak,
+                groupCompletedCount,
+                groupTotalCount);
     }
 
     public CheckInCursorResponse getGallery(

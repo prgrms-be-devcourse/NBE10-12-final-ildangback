@@ -19,6 +19,8 @@ import static org.mockito.Mockito.when;
 
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.service.ChallengeProgressCalculator;
+import com.gommit.domain.challenge.service.ChallengeStreakService;
+import com.gommit.domain.challenge.service.MemberCheckInResult;
 import com.gommit.domain.checkin.dto.request.SubmitCheckInRequest;
 import com.gommit.domain.checkin.dto.response.CheckInCursorResponse;
 import com.gommit.domain.checkin.dto.response.CheckInResponse;
@@ -94,6 +96,9 @@ class CheckInServiceTest {
     @Mock
     private UserService userService;
 
+    @Mock
+    private ChallengeStreakService challengeStreakService;
+
     private CheckInService service;
 
     @BeforeEach
@@ -108,6 +113,7 @@ class CheckInServiceTest {
                 mediaStore,
                 personalPointService,
                 userService,
+                challengeStreakService,
                 new BusinessClock(clock));
         lenient().when(userService.findNicknames(anyList())).thenReturn(Map.of(USER_ID, "인증러"));
     }
@@ -175,10 +181,15 @@ class CheckInServiceTest {
                     .thenReturn(0);
             when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
             when(checkInRepository.saveAndFlush(any(CheckIn.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(challengeStreakService.onMemberDailyComplete(CHALLENGE_ID, USER_ID, TODAY))
+                    .thenReturn(new MemberCheckInResult(3, 2, 4, false));
 
-            assertThat(service.submit(USER_ID, CHALLENGE_ID, request(null), media())
-                            .dailyCompleted())
-                    .isTrue();
+            CheckInResultResponse result = service.submit(USER_ID, CHALLENGE_ID, request(null), media());
+
+            assertThat(result.dailyCompleted()).isTrue();
+            assertThat(result.currentStreak()).isEqualTo(3);
+            assertThat(result.groupCompletedCount()).isEqualTo(2);
+            assertThat(result.groupTotalCount()).isEqualTo(4);
         }
 
         // 챌린지 ACTIVE 여부 / 멤버 ACTIVE 여부 판정 자체는 CheckInPreconditionsTest 가 검증한다.

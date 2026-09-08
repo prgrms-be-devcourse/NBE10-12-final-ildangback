@@ -27,6 +27,19 @@ public class ChallengeProgressCalculator {
         };
     }
 
+    // businessDate 직전의 인증 대상일. 없으면(시작일 이전) null.
+    // 판정은 isCheckInDay 단일 규칙으로 — frequency 별 분기 없이 하루씩 되짚는다(범위가 작다: DAILY 1회,
+    // DAYS_OF_WEEK 최대 7회, EVERY_N_DAYS 최대 N회).
+    public LocalDate previousCheckInDay(Challenge challenge, LocalDate businessDate) {
+        LocalDate start = challenge.getStartDate();
+        for (LocalDate date = businessDate.minusDays(1); !date.isBefore(start); date = date.minusDays(1)) {
+            if (isCheckInDay(challenge, date)) {
+                return date;
+            }
+        }
+        return null;
+    }
+
     public double calculatePeriodProgressRate(int currentDay, int totalDays) {
         if (totalDays == 0) {
             return 0.0;

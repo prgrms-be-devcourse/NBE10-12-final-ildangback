@@ -216,4 +216,61 @@ class ChallengeProgressCalculatorTest {
         // then
         assertThat(requiredDayCount).isZero();
     }
+
+    @Nested
+    @DisplayName("previousCheckInDay — businessDate 직전의 인증 대상일")
+    class PreviousCheckInDay {
+
+        private Challenge challenge(FrequencyType type, Integer frequencyValue, String daysOfWeek) {
+            Challenge challenge = Challenge.builder()
+                    .groupId(1L)
+                    .seqNo(1)
+                    .startDate(LocalDate.of(2026, 9, 1))
+                    .endDate(LocalDate.of(2026, 9, 30))
+                    .frequencyType(type)
+                    .frequencyValue(frequencyValue)
+                    .daysOfWeek(daysOfWeek)
+                    .dailyCheckInCount(1)
+                    .requiredDayCount(30)
+                    .groupCurrentStreak(0)
+                    .groupBestStreak(0)
+                    .allowPhoto(true)
+                    .build();
+            challenge.activate();
+            return challenge;
+        }
+
+        @Test
+        @DisplayName("DAILY 는 전날")
+        void daily() {
+            assertThat(calculator.previousCheckInDay(
+                            challenge(FrequencyType.DAILY, null, null), LocalDate.of(2026, 9, 10)))
+                    .isEqualTo(LocalDate.of(2026, 9, 9));
+        }
+
+        @Test
+        @DisplayName("DAILY — 시작일이면 직전 대상일 없음(null)")
+        void dailyOnStart() {
+            assertThat(calculator.previousCheckInDay(
+                            challenge(FrequencyType.DAILY, null, null), LocalDate.of(2026, 9, 1)))
+                    .isNull();
+        }
+
+        @Test
+        @DisplayName("DAYS_OF_WEEK — 직전 스케줄 요일 (금 다음 인증일의 직전은 수)")
+        void daysOfWeek() {
+            // 2026-09-11(금)의 직전 스케줄일은 2026-09-09(수)
+            Challenge wedFri = challenge(FrequencyType.DAYS_OF_WEEK, null, "WED,FRI");
+            assertThat(calculator.previousCheckInDay(wedFri, LocalDate.of(2026, 9, 11)))
+                    .isEqualTo(LocalDate.of(2026, 9, 9));
+        }
+
+        @Test
+        @DisplayName("EVERY_N_DAYS 는 businessDate - N")
+        void everyNDays() {
+            assertThat(calculator.previousCheckInDay(
+                            challenge(FrequencyType.EVERY_N_DAYS, 3, null), LocalDate.of(2026, 9, 10)))
+                    .isEqualTo(LocalDate.of(2026, 9, 7));
+        }
+    }
 }
