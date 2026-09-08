@@ -20,6 +20,7 @@ import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -27,7 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -141,7 +142,12 @@ public class ItemService {
         itemRepository.flush();
 
         for (ItemImage img : images) {
-            storageService.delete(img.getImageKey(), MediaRole.ITEM);
+            try {
+                storageService.delete(img.getImageKey(), MediaRole.ITEM);
+            } catch (Exception e) {
+                log.warn("S3 파일 삭제 실패: {}", img.getImageKey(), e);
+            }
+
         }
     }
 
