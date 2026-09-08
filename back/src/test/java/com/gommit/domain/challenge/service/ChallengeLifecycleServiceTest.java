@@ -2,6 +2,7 @@ package com.gommit.domain.challenge.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -21,12 +22,14 @@ import com.gommit.domain.group.entity.Visibility;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import com.gommit.global.time.BusinessClock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -50,8 +53,16 @@ class ChallengeLifecycleServiceTest {
     @Mock
     private ChallengeGroupRepository challengeGroupRepository;
 
+    @Mock
+    private BusinessClock businessClock;
+
     @InjectMocks
     private ChallengeLifecycleService challengeLifecycleService;
+
+    @BeforeEach
+    void stubBusinessClock() {
+        lenient().when(businessClock.today()).thenReturn(LocalDate.now(KST));
+    }
 
     private Challenge challenge(Long id, int seqNo, ChallengeStatus status, LocalDate startDate, LocalDate endDate) {
         Challenge challenge = Challenge.builder()

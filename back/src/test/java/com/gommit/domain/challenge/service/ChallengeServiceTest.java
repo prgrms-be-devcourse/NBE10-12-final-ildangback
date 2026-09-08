@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -31,11 +32,13 @@ import com.gommit.domain.user.entity.User;
 import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import com.gommit.global.time.BusinessClock;
 import com.gommit.global.time.DaysOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -73,8 +76,16 @@ class ChallengeServiceTest {
     @Spy
     private ChallengeProgressCalculator challengeProgressCalculator = new ChallengeProgressCalculator();
 
+    @Mock
+    private BusinessClock businessClock;
+
     @InjectMocks
     private ChallengeService challengeService;
+
+    @BeforeEach
+    void stubBusinessClock() {
+        lenient().when(businessClock.today()).thenReturn(LocalDate.now());
+    }
 
     private InitialChallengeSettingRequest initialSetting() {
         return new InitialChallengeSettingRequest(
