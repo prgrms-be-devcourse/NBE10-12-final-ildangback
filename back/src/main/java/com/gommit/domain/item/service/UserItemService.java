@@ -1,15 +1,18 @@
 package com.gommit.domain.item.service;
 
+import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.item.dto.response.CharacterResponse;
 import com.gommit.domain.item.dto.response.ItemResponse;
 import com.gommit.domain.item.dto.response.UserItemResponse;
-import com.gommit.domain.item.entity.CheckInState;
-import com.gommit.domain.item.entity.ItemSlot;
-import com.gommit.domain.item.entity.UserItem;
+import com.gommit.domain.item.entity.*;
 import com.gommit.domain.item.repository.UserItemRepository;
+import com.gommit.domain.media.service.StorageService;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -25,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class UserItemService {
     private final UserItemRepository userItemRepository;
+    private final CheckInRepository checkInRepository;
+    private final StorageService storageService;
 
     // 아이템 착용
     @Transactional
@@ -41,8 +46,7 @@ public class UserItemService {
 
         switchEquippedItem(userId, targetUserItem);
 
-        ItemResponse itemResponse = new ItemResponse(targetUserItem.getItem());
-        return new UserItemResponse(targetUserItem, itemResponse);
+        return toUserItemResponse(targetUserItem, Pose.DEFAULT);
     }
 
     void switchEquippedItem(Long userId, UserItem targetUserItem) {
@@ -69,43 +73,41 @@ public class UserItemService {
 
         targetUserItem.unequip();
 
-        ItemResponse itemResponse = new ItemResponse(targetUserItem.getItem());
-        return new UserItemResponse(targetUserItem, itemResponse);
+        return toUserItemResponse(targetUserItem, Pose.DEFAULT);
     }
 
     // 보유 아이템 조회
-    // - cursor: 마지막으로 받은 userItemId. null이면 첫 요청.
-    // - size: 한 번에 가져올 아이템 수.
     public SliceResponse<UserItemResponse> getMyItems(Long userId, ItemSlot slot, Long cursor, int size) {
-        // cursor가 null(첫 요청)이면 0으로 처리 → WHERE id > 0 = 전체 범위
         long effectiveCursor = cursor != null ? cursor : 0L;
-
-        // size+1개를 요청해 다음 페이지 존재 여부를 판단한다.
         Pageable pageable = PageRequest.of(0, size + 1);
 
         List<UserItem> userItems;
         if (slot == null) {
-            // 슬롯 미지정: 보유 아이템 전체를 커서 기반으로 조회
             userItems = userItemRepository.findByUserIdAndIdGreaterThanOrderByIdAsc(userId, effectiveCursor, pageable);
         } else {
-            // 슬롯 지정: 해당 슬롯 아이템만 커서 기반으로 조회
             userItems = userItemRepository.findByUserIdAndItemSlotAndIdGreaterThanOrderByIdAsc(
                     userId, slot, effectiveCursor, pageable);
         }
 
         List<UserItemResponse> responseList = new ArrayList<>();
         for (UserItem userItem : userItems) {
-            ItemResponse itemResponse = new ItemResponse(userItem.getItem());
-            responseList.add(new UserItemResponse(userItem, itemResponse));
+            responseList.add(toUserItemResponse(userItem, Pose.DEFAULT));
         }
 
-        // nextCursor는 마지막 항목의 userItemId.
-        // 다음 요청 시 ?cursor={nextCursor}로 넘기면 그 이후부터 이어서 가져옴.
         return SliceResponse.ofCursor(responseList, size, UserItemResponse::id);
     }
 
     // 내 캐릭터 조회
-    public CharacterResponse getMyCharacter(Long userId) {
+    public CharacterResponse getMyCharacter(Long userId, Long challengeId) {
+        LocalDate today =
+                LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusHours(4).toLocalDate();
+        boolean checkedIn = checkInRepository.existsByUserIdAndBusinessDate(userId, today);
+        CheckInState checkInState = checkedIn ? CheckInState.DONE : CheckInState.NOT_DONE;
+
+        // TODO: 체크인 도메인 완성 후 교체
+        // 최근 체크인 챌린지 파악
+        Pose pose = Pose.DEFAULT;
+
         List<UserItem> equippedItems = userItemRepository.findByUserIdAndEquippedSlotNotNull(userId);
 
         Map<ItemSlot, String> slotMap = new HashMap<>();
@@ -113,12 +115,18 @@ public class UserItemService {
             slotMap.put(slot, null);
         }
         for (UserItem userItem : equippedItems) {
-            slotMap.put(userItem.getEquippedSlot(), userItem.getItem().getImageUrl());
+            String key = userItem.getItem().imageKeyForPose(pose);
+            String url = key != null ? storageService.publicUrl(key) : null;
+            slotMap.put(userItem.getEquippedSlot(), url);
         }
 
-        // checkInState - 임시 값
-        CheckInState checkInState = CheckInState.NOT_DONE;
-
         return new CharacterResponse(slotMap, checkInState);
+    }
+
+    private UserItemResponse toUserItemResponse(UserItem userItem, Pose pose) {
+        Item item = userItem.getItem();
+        String key = userItem.getItem().imageKeyForPose(pose);
+        String url = key != null ? storageService.publicUrl(key) : null;
+        return new UserItemResponse(userItem, new ItemResponse(item, url));
     }
 }

@@ -15,9 +15,14 @@ import com.gommit.domain.item.dto.response.ItemResponse;
 import com.gommit.domain.item.dto.response.ShopItemResponse;
 import com.gommit.domain.item.entity.Item;
 import com.gommit.domain.item.entity.ItemSlot;
+import com.gommit.domain.item.entity.Pose;
 import com.gommit.domain.item.entity.UserItem;
+import com.gommit.domain.item.repository.ItemImageRepository;
 import com.gommit.domain.item.repository.ItemRepository;
 import com.gommit.domain.item.repository.UserItemRepository;
+import com.gommit.domain.media.dto.StorageResult;
+import com.gommit.domain.media.service.StorageService;
+import com.gommit.domain.media.support.MediaValidator;
 import com.gommit.domain.point.dto.response.PointBalanceResponse;
 import com.gommit.domain.point.entity.UserPointReason;
 import com.gommit.domain.point.service.PointService;
@@ -52,6 +57,18 @@ public class ItemServiceTest {
     @Mock
     private PointService pointService;
 
+    @Mock
+    private ItemImageRepository itemImageRepository;
+
+    @Mock
+    private StorageService storageService;
+
+    @Mock
+    private MediaValidator mediaValidator;
+
+    @Mock
+    private ItemWriter itemWriter;
+
     // 위 @Mock 필드들을 생성자 주입 방식으로 ItemService에 주입
     @InjectMocks
     private ItemService itemService;
@@ -66,10 +83,10 @@ public class ItemServiceTest {
     void setUp() {
         // Item.of()로 엔티티를 생성하면 id null
         // 테스트에서는 DB가 없으므로 ReflectionTestUtils.setField로 BaseEntity의 private id 필드를 강제로 주입
-        headItem = Item.of(ItemSlot.HEAD, "기본 모자", "https://cdn.example.com/hat.png", 100);
+        headItem = Item.of(ItemSlot.HEAD, "기본 모자", 100);
         ReflectionTestUtils.setField(headItem, "id", 1L);
 
-        topItem = Item.of(ItemSlot.TOP, "기본 상의", "https://cdn.example.com/top.png", 200);
+        topItem = Item.of(ItemSlot.TOP, "기본 상의", 200);
         ReflectionTestUtils.setField(topItem, "id", 2L);
 
         // userId = 1 이 headItem을 보유하고 착용중인 UserItem (equippedSlot = HEAD)
@@ -204,34 +221,22 @@ public class ItemServiceTest {
     @DisplayName("아이템 생성 시 이미지 URL이 생성되고 Item이 저장된 후 ItemResponse가 반환된다")
     void t4() {
         // given
-        // MockMultipartFile: 실제 파일 없이 MultipartFile 인터페이스를 구현한 스프링 테스트 유틸
-        // uploadImage()가 getOriginalFilename()을 사용하므로 파일명을 실제처럼 지정한다
-        MockMultipartFile imageFile = new MockMultipartFile(
-                "image", // 폼 필드명
-                "hat.png", // 원본 파일명 (uploadImage에서 URL에 포함됨)
-                "image/png", // MIME 타입
-                "fake-image-bytes".getBytes() // 파일 바이트 (테스트이므로 더미 데이터)
-                );
+        MockMultipartFile imageFile = new MockMultipartFile("images", "hat.png", "image/png", "fake-bytes".getBytes());
+        ItemCreateRequest request =
+                new ItemCreateRequest(ItemSlot.HEAD, "새 모자", 150, List.of(Pose.DEFAULT), List.of(imageFile));
+        given(storageService.store(any(), any())).willReturn(new StorageResult("items/test.png"));
+        given(itemWriter.saveItemWithImages(any(), any()))
+                .willReturn(new ItemResponse(3L, ItemSlot.HEAD, "새 모자", "https://cdn.example.com/test.png", 150));
 
-        // record는 생성자로 직접 값을 넘긴다 (ReflectionTestUtils 불필요)
-        ItemCreateRequest request = new ItemCreateRequest(ItemSlot.HEAD, "새 모자", 150, imageFile);
-
-        // save() 호출 시 id가 부여된 Item을 반환하도록 stub
-        Item savedItem = Item.of(ItemSlot.HEAD, "새 모자", "https://example.com/images/temp-hat.png", 150);
-        ReflectionTestUtils.setField(savedItem, "id", 3L);
-        given(itemRepository.save(any(Item.class))).willReturn(savedItem);
-
-        // when
         ItemResponse response = itemService.createItem(request);
 
-        // then
         assertThat(response.id()).isEqualTo(3L);
         assertThat(response.name()).isEqualTo("새 모자");
         assertThat(response.slot()).isEqualTo(ItemSlot.HEAD);
         assertThat(response.price()).isEqualTo(150);
 
-        // itemRepository.save()가 정확히 1번 호출되어야 함
-        then(itemRepository).should(times(1)).save(any(Item.class));
+        then(storageService).should(times(1)).store(any(), any());
+        then(itemWriter).should(times(1)).saveItemWithImages(eq(request), eq(List.of("items/test.png")));
     }
 
     // ─────────────────────────────────────────────────
@@ -243,14 +248,11 @@ public class ItemServiceTest {
     void t5() {
         // given
         given(itemRepository.findById(1L)).willReturn(Optional.of(headItem));
-        // 이 아이템을 보유한 유저가 없음
         given(userItemRepository.existsByItemId(1L)).willReturn(false);
-
+        given(itemImageRepository.findByItemId(1L)).willReturn(List.of());
         // when
         itemService.deleteItem(1L);
-
         // then
-        // delete(headItem)가 정확히 1번 호출되어야 함
         then(itemRepository).should(times(1)).delete(headItem);
     }
 

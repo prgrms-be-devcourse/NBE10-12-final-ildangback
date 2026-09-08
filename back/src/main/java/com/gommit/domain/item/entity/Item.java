@@ -1,11 +1,9 @@
 package com.gommit.domain.item.entity;
 
 import com.gommit.global.base.BaseEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -23,19 +21,27 @@ public class Item extends BaseEntity {
     @Column(nullable = false, length = 50)
     private String name;
 
-    @Column(nullable = false, length = 255)
-    private String imageKey;
-
     @Column(nullable = false)
     private int price;
 
-    public static Item of(ItemSlot slot, String name, String imageUrl, int price) {
+    @OneToMany(mappedBy = "item", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ItemImage> images = new ArrayList<>();
+
+    public static Item of(ItemSlot slot, String name, int price) {
         Item item = new Item();
         item.slot = slot;
         item.name = name;
-        item.imageUrl = imageUrl;
         item.price = price;
 
         return item;
+    }
+
+    public String imageKeyForPose(Pose pose) {
+        String defaultKey = null;
+        for (ItemImage img : images) {
+            if (img.getPose() == pose) return img.getImageKey();
+            if (img.getPose() == Pose.DEFAULT) defaultKey = img.getImageKey();
+        }
+        return defaultKey;
     }
 }
