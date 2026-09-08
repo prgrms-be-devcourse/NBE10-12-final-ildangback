@@ -437,6 +437,8 @@ public class GroupService {
         }
         targetMember.kick();
         kickChallengeMember(activeChallenge.getId(), targetUserId);
+
+        backgroundPurchaseService.recountVotes(groupId);
     }
 
     private void kickChallengeMember(Long challengeId, Long userId) {

@@ -76,6 +76,10 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
         return mockMvc.perform(withToken(delete("/api/groups/" + groupId + "/members/me"), accessToken));
     }
 
+    private ResultActions kickMember(String accessToken, Long groupId, Long targetUserId) throws Exception {
+        return mockMvc.perform(withToken(delete("/api/groups/" + groupId + "/members/" + targetUserId), accessToken));
+    }
+
     // ===== 준비 =====
 
     // 판매 배경은 시드로 직접 넣는 방침이라 테스트가 자기 배경을 만든다.
@@ -88,6 +92,15 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
                 "backgrounds/" + name + ".png",
                 price);
         return jdbcTemplate.queryForObject("select max(id) from backgrounds", Long.class);
+    }
+
+    // 강퇴는 ACTIVE 챌린지가 있어야 한다.
+    private void activateChallenge(Long groupId) {
+        jdbcTemplate.update("update challenges set status = 'ACTIVE' where group_id = ?", groupId);
+    }
+
+    private Long userIdOf(String email) {
+        return jdbcTemplate.queryForObject("select id from users where email = ?", Long.class, email);
     }
 
     private void giveGroupPoints(Long groupId, int amount) {
@@ -585,6 +598,29 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
 
             // 미투표자 둘 중 하나가 나가면 3명 과반 2 가 되어 찬성 2로 가결된다.
             leaveGroup(tokens.get(2), holder[0]).andExpect(status().isNoContent());
+
+            assertThat(requestStatusOf(requestId)).isEqualTo("APPROVED");
+            assertThat(groupBalanceOf(holder[0])).isEqualTo(400);
+        }
+
+        @Test
+        @DisplayName("미투표자가 강퇴돼도 과반이 다시 계산된다")
+        void kickingShrinksDenominatorAndApproves() throws Exception {
+            Long[] holder = new Long[1];
+            List<String> tokens = createGroupWith(3, holder);
+            activateChallenge(holder[0]);
+            Long backgroundId = insertBackground("GYM", "헬스장", 100);
+            giveGroupPoints(holder[0], 500);
+
+            // 4명, 과반 3. 방장 찬성 1 + 멤버0 찬성 1 = 2 로 아직 모자라다.
+            createRequest(tokens.get(0), holder[0], backgroundId).andExpect(status().isCreated());
+            Long requestId = requestIdOf(holder[0]);
+            vote(tokens.get(1), holder[0], requestId, true)
+                    .andExpect(jsonPath("$.status").value("VOTING"));
+
+            // 미투표자 하나를 방장이 강퇴하면 3명 과반 2 가 되어 찬성 2로 가결된다.
+            kickMember(tokens.get(0), holder[0], userIdOf("member1@example.com"))
+                    .andExpect(status().isNoContent());
 
             assertThat(requestStatusOf(requestId)).isEqualTo("APPROVED");
             assertThat(groupBalanceOf(holder[0])).isEqualTo(400);
