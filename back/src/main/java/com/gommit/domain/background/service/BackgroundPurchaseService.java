@@ -229,7 +229,7 @@ public class BackgroundPurchaseService {
     // 기한 지난 제안 부결
     private void closeExpired(Long groupId, LocalDateTime now) {
         purchaseRequestRepository
-                .findByGroupIdAndStatus(groupId, PurchaseRequestStatus.VOTING)
+                .findWithLockByGroupIdAndStatus(groupId, PurchaseRequestStatus.VOTING)
                 .filter(request -> request.isExpired(now))
                 .ifPresent(BackgroundPurchaseRequest::reject);
     }
