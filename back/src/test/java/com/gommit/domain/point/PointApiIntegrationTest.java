@@ -71,7 +71,14 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
                         + " (name, category, map_type, visibility, max_members, owner_id, status, created_at, updated_at)"
                         + " values ('테스트 그룹', 'EXERCISE', 'GYM', 'PUBLIC', 6, ?, 'ACTIVE', now(), now())",
                 ownerId);
-        return jdbcTemplate.queryForObject("select max(id) from challenge_groups", Long.class);
+        Long groupId = jdbcTemplate.queryForObject("select max(id) from challenge_groups", Long.class);
+        // 그룹 포인트 조회 API는 멤버십을 검증하므로 owner를 ACTIVE 멤버로도 넣어준다.
+        jdbcTemplate.update(
+                "insert into group_members (group_id, user_id, status, created_at, updated_at)"
+                        + " values (?, ?, 'ACTIVE', now(), now())",
+                groupId,
+                ownerId);
+        return groupId;
     }
 
     @Nested
@@ -286,6 +293,18 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.balance").value(300));
         }
+
+        @Test
+        @DisplayName("그룹 멤버가 아니면 403")
+        void returns403WhenNotMember() throws Exception {
+            loginAs(EMAIL, NICKNAME);
+            Long groupId = insertTestGroup(userIdOf(EMAIL));
+            var otherTokens = loginAs("other@example.com", "다른유저");
+
+            getGroupBalance(otherTokens.accessToken(), groupId)
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("NOT_GROUP_MEMBER"));
+        }
     }
 
     @Nested
@@ -317,6 +336,18 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].sourceName").value("2번째"))
                     .andExpect(jsonPath("$.content[1].sourceName").value("1번째"));
+        }
+
+        @Test
+        @DisplayName("그룹 멤버가 아니면 403")
+        void returns403WhenNotMember() throws Exception {
+            loginAs(EMAIL, NICKNAME);
+            Long groupId = insertTestGroup(userIdOf(EMAIL));
+            var otherTokens = loginAs("other@example.com", "다른유저");
+
+            getGroupHistories(otherTokens.accessToken(), groupId)
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("NOT_GROUP_MEMBER"));
         }
     }
 
@@ -363,6 +394,20 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
             getGroupHistoryDetail(tokens.accessToken(), otherGroupId, historyId)
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.code").value("POINT_HISTORY_NOT_FOUND"));
+        }
+
+        @Test
+        @DisplayName("그룹 멤버가 아니면 403")
+        void returns403WhenNotMember() throws Exception {
+            loginAs(EMAIL, NICKNAME);
+            Long groupId = insertTestGroup(userIdOf(EMAIL));
+            groupPointService.reward(groupId, 100, GroupPointReason.DAILY_ALL_COMPLETE, "오운완");
+            Long historyId = jdbcTemplate.queryForObject("select max(id) from group_point_histories", Long.class);
+            var otherTokens = loginAs("other@example.com", "다른유저");
+
+            getGroupHistoryDetail(otherTokens.accessToken(), groupId, historyId)
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("NOT_GROUP_MEMBER"));
         }
     }
 

@@ -8,14 +8,21 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.gommit.domain.group.entity.GroupMemberStatus;
+import com.gommit.domain.group.repository.GroupMemberRepository;
+import com.gommit.domain.point.dto.request.PeriodFilter;
+import com.gommit.domain.point.dto.request.PointChangeType;
+import com.gommit.domain.point.dto.response.GroupPointBalanceResponse;
 import com.gommit.domain.point.entity.GroupPoint;
 import com.gommit.domain.point.entity.GroupPointHistory;
 import com.gommit.domain.point.entity.GroupPointReason;
 import com.gommit.domain.point.repository.GroupPointHistoryRepository;
 import com.gommit.domain.point.repository.GroupPointRepository;
+import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,12 +43,15 @@ class GroupPointServiceTest {
     @Mock
     private GroupPointRepository groupPointRepository;
 
+    @Mock
+    private GroupMemberRepository groupMemberRepository;
+
     private GroupPointService groupPointService;
 
     @BeforeEach
     void setUp() {
-        groupPointService =
-                new GroupPointService(groupPointHistoryRepository, groupPointRepository, new PointPeriodCalculator());
+        groupPointService = new GroupPointService(
+                groupPointHistoryRepository, groupPointRepository, groupMemberRepository, new PointPeriodCalculator());
     }
 
     private GroupPoint groupPoint(int balance) {
@@ -112,15 +122,116 @@ class GroupPointServiceTest {
     }
 
     @Nested
+    @DisplayName("getBalance - 그룹 포인트 잔액 조회")
+    class GetBalance {
+
+        @Test
+        @DisplayName("정상 조회하면 잔액을 반환한다")
+        void returnsBalance() {
+            when(groupMemberRepository.existsByGroupIdAndUserIdAndStatus(12L, 1L, GroupMemberStatus.ACTIVE))
+                    .thenReturn(true);
+            when(groupPointRepository.findByGroupId(12L)).thenReturn(Optional.of(groupPoint(300)));
+
+            GroupPointBalanceResponse response = groupPointService.getBalance(12L, 1L);
+
+            assertThat(response.groupId()).isEqualTo(12L);
+            assertThat(response.balance()).isEqualTo(300);
+        }
+
+        @Test
+        @DisplayName("잔액 행이 아직 없으면 0으로 반환한다")
+        void returnsZeroWhenNoBalanceRow() {
+            when(groupMemberRepository.existsByGroupIdAndUserIdAndStatus(12L, 1L, GroupMemberStatus.ACTIVE))
+                    .thenReturn(true);
+            when(groupPointRepository.findByGroupId(12L)).thenReturn(Optional.empty());
+
+            GroupPointBalanceResponse response = groupPointService.getBalance(12L, 1L);
+
+            assertThat(response.balance()).isZero();
+        }
+
+        @Test
+        @DisplayName("요청자가 그룹 멤버가 아니면 NOT_GROUP_MEMBER")
+        void throwsWhenRequesterNotMember() {
+            when(groupMemberRepository.existsByGroupIdAndUserIdAndStatus(12L, 1L, GroupMemberStatus.ACTIVE))
+                    .thenReturn(false);
+
+            assertThatThrownBy(() -> groupPointService.getBalance(12L, 1L))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.NOT_GROUP_MEMBER);
+
+            verify(groupPointRepository, never()).findByGroupId(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("getHistories - 그룹 포인트 이력 커서 조회")
+    class GetHistories {
+
+        @Test
+        @DisplayName("size보다 한 건 더 조회되면 hasNext=true, nextCursor는 잘린 마지막 항목 id다")
+        void returnsHasNextTrueWhenMoreRowsExist() {
+            when(groupMemberRepository.existsByGroupIdAndUserIdAndStatus(12L, 1L, GroupMemberStatus.ACTIVE))
+                    .thenReturn(true);
+            List<GroupPointHistory> rows = List.of(
+                    groupHistory(3L, 12L, 40, 300), groupHistory(2L, 12L, 40, 260), groupHistory(1L, 12L, 40, 220));
+            when(groupPointHistoryRepository.findHistories(any(), any(), any(), any(), any(), any(), any()))
+                    .thenReturn(rows);
+
+            SliceResponse<?> result = groupPointService.getHistories(
+                    12L, 1L, PeriodFilter.ALL, PointChangeType.ALL, null, null, null, null, 2);
+
+            assertThat(result.content()).hasSize(2);
+            assertThat(result.hasNext()).isTrue();
+            assertThat(result.nextCursor()).isEqualTo(2L);
+        }
+
+        @Test
+        @DisplayName("size만큼만 조회되면 hasNext=false, nextCursor=null이다")
+        void returnsHasNextFalseWhenNoMoreRows() {
+            when(groupMemberRepository.existsByGroupIdAndUserIdAndStatus(12L, 1L, GroupMemberStatus.ACTIVE))
+                    .thenReturn(true);
+            List<GroupPointHistory> rows = List.of(groupHistory(1L, 12L, 40, 300));
+            when(groupPointHistoryRepository.findHistories(any(), any(), any(), any(), any(), any(), any()))
+                    .thenReturn(rows);
+
+            SliceResponse<?> result = groupPointService.getHistories(
+                    12L, 1L, PeriodFilter.ALL, PointChangeType.ALL, null, null, null, null, 20);
+
+            assertThat(result.content()).hasSize(1);
+            assertThat(result.hasNext()).isFalse();
+            assertThat(result.nextCursor()).isNull();
+        }
+
+        @Test
+        @DisplayName("요청자가 그룹 멤버가 아니면 NOT_GROUP_MEMBER")
+        void throwsWhenRequesterNotMember() {
+            when(groupMemberRepository.existsByGroupIdAndUserIdAndStatus(12L, 1L, GroupMemberStatus.ACTIVE))
+                    .thenReturn(false);
+
+            assertThatThrownBy(() -> groupPointService.getHistories(
+                            12L, 1L, PeriodFilter.ALL, PointChangeType.ALL, null, null, null, null, 20))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.NOT_GROUP_MEMBER);
+
+            verify(groupPointHistoryRepository, never()).findHistories(any(), any(), any(), any(), any(), any(), any());
+        }
+    }
+
+    @Nested
     @DisplayName("getHistoryDetail - 그룹 포인트 이력 상세")
     class GetHistoryDetail {
 
         @Test
         @DisplayName("정상 조회하면 이력을 반환한다")
         void returnsHistory() {
+            when(groupMemberRepository.existsByGroupIdAndUserIdAndStatus(12L, 1L, GroupMemberStatus.ACTIVE))
+                    .thenReturn(true);
             when(groupPointHistoryRepository.findById(50L)).thenReturn(Optional.of(groupHistory(50L, 12L, 100, 500)));
 
-            var response = groupPointService.getHistoryDetail(12L, 50L);
+            var response = groupPointService.getHistoryDetail(12L, 1L, 50L);
 
             assertThat(response.amount()).isEqualTo(100);
             assertThat(response.balanceAfter()).isEqualTo(500);
@@ -129,9 +240,11 @@ class GroupPointServiceTest {
         @Test
         @DisplayName("존재하지 않으면 POINT_HISTORY_NOT_FOUND")
         void throwsWhenNotFound() {
+            when(groupMemberRepository.existsByGroupIdAndUserIdAndStatus(12L, 1L, GroupMemberStatus.ACTIVE))
+                    .thenReturn(true);
             when(groupPointHistoryRepository.findById(999L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> groupPointService.getHistoryDetail(12L, 999L))
+            assertThatThrownBy(() -> groupPointService.getHistoryDetail(12L, 1L, 999L))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.POINT_HISTORY_NOT_FOUND);
@@ -140,12 +253,28 @@ class GroupPointServiceTest {
         @Test
         @DisplayName("다른 그룹의 이력이면 존재해도 POINT_HISTORY_NOT_FOUND")
         void throwsWhenOwnedByAnotherGroup() {
+            when(groupMemberRepository.existsByGroupIdAndUserIdAndStatus(12L, 1L, GroupMemberStatus.ACTIVE))
+                    .thenReturn(true);
             when(groupPointHistoryRepository.findById(50L)).thenReturn(Optional.of(groupHistory(50L, 99L, 100, 500)));
 
-            assertThatThrownBy(() -> groupPointService.getHistoryDetail(12L, 50L))
+            assertThatThrownBy(() -> groupPointService.getHistoryDetail(12L, 1L, 50L))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.POINT_HISTORY_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("요청자가 그룹 멤버가 아니면 NOT_GROUP_MEMBER")
+        void throwsWhenRequesterNotMember() {
+            when(groupMemberRepository.existsByGroupIdAndUserIdAndStatus(12L, 1L, GroupMemberStatus.ACTIVE))
+                    .thenReturn(false);
+
+            assertThatThrownBy(() -> groupPointService.getHistoryDetail(12L, 1L, 50L))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.NOT_GROUP_MEMBER);
+
+            verify(groupPointHistoryRepository, never()).findById(any());
         }
     }
 }
