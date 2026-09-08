@@ -14,6 +14,9 @@ public interface MonthlyMergeResultRepository extends JpaRepository<MonthlyMerge
 
     Optional<MonthlyMergeResult> findByMonthlyMergeIdAndUserId(Long monthlyMergeId, Long userId);
 
+    // 개인 전체 통계(GET /users/me/stats) 집계용 - 내가 참여한 모든 월간 머지 결과.
+    List<MonthlyMergeResult> findAllByUserId(Long userId);
+
     // 내 월간 머지 아카이브(프로필) 커서 조회 - UserPointHistoryRepository.findHistories와
     // 동일한 방식(id desc + id < cursor)이다.
     @Query("select r from MonthlyMergeResult r "

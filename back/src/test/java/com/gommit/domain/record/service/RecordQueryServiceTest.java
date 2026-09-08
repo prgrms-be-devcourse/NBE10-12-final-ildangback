@@ -2,6 +2,7 @@ package com.gommit.domain.record.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -13,12 +14,16 @@ import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.group.entity.ChallengeGroup;
 import com.gommit.domain.group.entity.GroupCategory;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
+import com.gommit.domain.record.dto.response.CategoryStatResponse;
 import com.gommit.domain.record.dto.response.ChallengeMergeOverviewResponse;
 import com.gommit.domain.record.dto.response.FinalMergeDetailResponse;
+import com.gommit.domain.record.dto.response.HeatmapCellResponse;
 import com.gommit.domain.record.dto.response.MergeSummaryResponse;
 import com.gommit.domain.record.dto.response.MergeType;
 import com.gommit.domain.record.dto.response.MonthlyMergeDetailResponse;
+import com.gommit.domain.record.dto.response.MonthlyTrendItemResponse;
 import com.gommit.domain.record.dto.response.MyMonthlyMergeResponse;
+import com.gommit.domain.record.dto.response.PersonalStatsResponse;
 import com.gommit.domain.record.entity.FinalMerge;
 import com.gommit.domain.record.entity.FinalMergeResult;
 import com.gommit.domain.record.entity.MonthlyMerge;
@@ -456,6 +461,83 @@ class RecordQueryServiceTest {
                     .containsExactly(1L, 2L);
             assertThat(result.get(0).groupName()).isEqualTo("오운완");
             assertThat(result.get(1).hasFinalMerge()).isTrue();
+        }
+    }
+
+    @Nested
+    @DisplayName("getMyStats - 개인 전체 통계 조회")
+    class GetMyStats {
+
+        @Test
+        @DisplayName("월간+최종 머지 결과를 챌린지/카테고리별로 집계한다")
+        void aggregatesAcrossMonthlyAndFinalResults() {
+            // 챌린지 1(EXERCISE)의 월간 머지 결과 2건 + 챌린지 2(READING)의 최종 머지 결과 1건.
+            // 픽스처 헬퍼가 고정값을 반환한다: monthlyMergeResult -> completionRate 90,
+            // completedDayCount 27, bestStreakInPeriod 12, earnedPoints 5200.
+            // finalMergeResult -> completionRate 92, completedDayCount 169,
+            // bestStreakInPeriod 47, earnedPoints 6760.
+            when(monthlyMergeResultRepository.findAllByUserId(1L))
+                    .thenReturn(List.of(monthlyMergeResult(1L, 10L, 1L), monthlyMergeResult(2L, 11L, 1L)));
+            when(finalMergeResultRepository.findAllByUserId(1L)).thenReturn(List.of(finalMergeResult(3L, 20L, 1L)));
+            when(monthlyMergeRepository.findAllById(List.of(10L, 11L)))
+                    .thenReturn(List.of(monthlyMerge(10L, 1L, 1), monthlyMerge(11L, 1L, 2)));
+            when(finalMergeRepository.findAllById(List.of(20L))).thenReturn(List.of(finalMerge(20L, 2L)));
+            when(challengeRepository.findAllById(List.of(1L, 2L)))
+                    .thenReturn(List.of(
+                            challenge(1L, 10L, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 18)),
+                            challenge(2L, 20L, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 8, 31))));
+            when(challengeGroupRepository.findAllById(List.of(10L, 20L)))
+                    .thenReturn(List.of(
+                            challengeGroup(10L, "오운완", GroupCategory.EXERCISE),
+                            challengeGroup(20L, "매일 20분 독서", GroupCategory.READING)));
+
+            PersonalStatsResponse response = recordQueryService.getMyStats(1L);
+
+            // 챌린지 1(EXERCISE)은 최종 머지가 없어 진행 중, 챌린지 2(READING)는 최종
+            // 머지가 있어 완주로 집계된다.
+            assertThat(response.summary().completedChallengeCount()).isEqualTo(1);
+            assertThat(response.summary().inProgressChallengeCount()).isEqualTo(1);
+            assertThat(response.summary().totalCheckInCount()).isEqualTo(27 + 27 + 169);
+            assertThat(response.summary().completedDayCount()).isEqualTo(27 + 27 + 169);
+            // 월간 두 건은 totalDays 30 중 27일 완료 -> 각 3일 미인증, 최종은 184일 중
+            // 169일 완료 -> 15일 미인증.
+            assertThat(response.summary().missedDayCount()).isEqualTo(3 + 3 + 15);
+            assertThat(response.summary().bestStreakEver()).isEqualTo(47);
+            // (90 + 90 + 92) / 3 = 90.67 -> 반올림 91
+            assertThat(response.summary().averageCompletionRate()).isEqualTo(91);
+
+            // 월간 두 건은 같은 달(2026-08)로 묶이고, 최종은 2026-03 한 달로 묶인다.
+            assertThat(response.monthlyTrend())
+                    .extracting(MonthlyTrendItemResponse::month, MonthlyTrendItemResponse::checkInCount)
+                    .containsExactly(tuple("2026-03", 169), tuple("2026-08", 27 + 27));
+
+            assertThat(response.categoryBreakdown())
+                    .extracting(CategoryStatResponse::category, CategoryStatResponse::challengeCount)
+                    .containsExactlyInAnyOrder(tuple("EXERCISE", 1), tuple("READING", 1));
+
+            assertThat(response.heatmap())
+                    .extracting(HeatmapCellResponse::month)
+                    .containsExactly("2026-03", "2026-08");
+        }
+
+        @Test
+        @DisplayName("참여한 머지가 없으면 전부 0/빈 값이다")
+        void returnsEmptyStatsWhenNoParticipation() {
+            when(monthlyMergeResultRepository.findAllByUserId(1L)).thenReturn(List.of());
+            when(finalMergeResultRepository.findAllByUserId(1L)).thenReturn(List.of());
+            when(monthlyMergeRepository.findAllById(List.of())).thenReturn(List.of());
+            when(finalMergeRepository.findAllById(List.of())).thenReturn(List.of());
+            when(challengeRepository.findAllById(List.of())).thenReturn(List.of());
+            when(challengeGroupRepository.findAllById(List.of())).thenReturn(List.of());
+
+            PersonalStatsResponse response = recordQueryService.getMyStats(1L);
+
+            assertThat(response.summary().completedChallengeCount()).isZero();
+            assertThat(response.summary().inProgressChallengeCount()).isZero();
+            assertThat(response.summary().averageCompletionRate()).isZero();
+            assertThat(response.monthlyTrend()).isEmpty();
+            assertThat(response.categoryBreakdown()).isEmpty();
+            assertThat(response.heatmap()).isEmpty();
         }
     }
 }

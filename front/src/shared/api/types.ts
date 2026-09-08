@@ -173,3 +173,56 @@ export interface MyMonthlyMergeResponse {
   myEarnedPoints: number;
   groupAverageCompletionRate: number;
 }
+
+/**
+ * "개인 통계" 화면(GET /users/me/stats) 응답. 전부 이미 발행된 머지 결과(스냅샷)를
+ * 집계한 값이다 - 진행 중인 챌린지의 오늘 기록은 반영되지 않는다. "패턴"(요일별/
+ * 시간대별) 탭은 체크인 원본 날짜/시간이 있어야 해서 아직 없다.
+ */
+export interface PersonalStatsResponse {
+  summary: SummaryStatResponse;
+  monthlyTrend: MonthlyTrendItemResponse[];
+  categoryBreakdown: CategoryStatResponse[];
+  heatmap: HeatmapCellResponse[];
+}
+
+/**
+ * 요약 탭. completedDayCount/missedDayCount는 "인증 대상일 중 며칠을 채웠는지"
+ * 기준이라 totalCheckInCount(하루 여러 번 인증 가능)와는 다르다.
+ * completedChallengeCount는 최종 머지까지 발행된(끝까지 참여한) 챌린지 수,
+ * inProgressChallengeCount는 아직 최종 머지가 없는(진행 중인) 챌린지 수다.
+ */
+export interface SummaryStatResponse {
+  totalCheckInCount: number;
+  completedDayCount: number;
+  missedDayCount: number;
+  bestStreakEver: number;
+  averageCompletionRate: number;
+  completedChallengeCount: number;
+  inProgressChallengeCount: number;
+}
+
+/** 월별 탭의 막대/꺾은선 그래프용 1개월치 데이터. month는 "yyyy-MM"(달력 월 기준). */
+export interface MonthlyTrendItemResponse {
+  month: string;
+  checkInCount: number;
+  completionRate: number;
+}
+
+/** 카테고리 탭 1건. missedDayCount는 "카테고리별 놓친 인증 비율" 도넛 차트용. */
+export interface CategoryStatResponse {
+  category: GroupCategory;
+  challengeCount: number;
+  totalCheckInCount: number;
+  averageCompletionRate: number;
+  missedDayCount: number;
+}
+
+/**
+ * 요약 탭의 "누적 인증 잔디" 한 칸. 일 단위 체크인 로그가 없어서 그 달의 평균
+ * 완주율을 0~4단계 진하기로 근사한다(month는 "yyyy-MM").
+ */
+export interface HeatmapCellResponse {
+  month: string;
+  level: number;
+}

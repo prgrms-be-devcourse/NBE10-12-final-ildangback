@@ -5,8 +5,13 @@ import type {
   MergeSummaryResponse,
   MonthlyMergeDetailResponse,
   MyMonthlyMergeResponse,
+  PersonalStatsResponse,
   SliceResponse,
 } from "../../shared/api/types";
+
+export function getMyStats(): Promise<PersonalStatsResponse> {
+  return apiFetch("/api/users/me/stats");
+}
 
 export function getMyChallengeMergeOverviews(): Promise<
   ChallengeMergeOverviewResponse[]

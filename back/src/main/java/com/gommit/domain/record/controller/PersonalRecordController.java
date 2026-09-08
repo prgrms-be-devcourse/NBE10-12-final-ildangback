@@ -2,6 +2,7 @@ package com.gommit.domain.record.controller;
 
 import com.gommit.domain.record.dto.response.ChallengeMergeOverviewResponse;
 import com.gommit.domain.record.dto.response.MyMonthlyMergeResponse;
+import com.gommit.domain.record.dto.response.PersonalStatsResponse;
 import com.gommit.domain.record.service.RecordQueryService;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.security.CurrentUser;
@@ -29,6 +30,15 @@ public class PersonalRecordController {
     private static final int DEFAULT_SIZE = 20;
 
     private final RecordQueryService recordQueryService;
+
+    @Operation(
+            summary = "내 개인 전체 통계 조회",
+            description = "요약(참여 챌린지 수·완료일수·포인트·최장 연속·평균 완주율), 월별 추이, 카테고리별 집계를 반환한다. "
+                    + "이미 발행된 머지 결과(스냅샷)만 집계하므로 진행 중인 챌린지의 오늘 기록은 반영되지 않는다.")
+    @GetMapping("/stats")
+    public PersonalStatsResponse getMyStats(@CurrentUser SecurityUser user) {
+        return recordQueryService.getMyStats(user.getId());
+    }
 
     @Operation(summary = "내가 속한 챌린지별 머지 진행 현황", description = "월간 머지 아카이브 최상위 화면(챌린지 목록 + 진행률)에서 쓴다.")
     @GetMapping("/challenge-merge-overviews")
