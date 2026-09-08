@@ -32,9 +32,9 @@ class BusinessClockTest {
     }
 
     @Test
-    @DisplayName("now() 는 컷오프 보정 없이 주입된 Clock 의 시각 그대로")
-    void nowReturnsRawInjectedTime() {
-        LocalDateTime now = LocalDateTime.of(2026, 9, 5, 3, 0, 0);
-        assertThat(businessClockAt(now).now()).isEqualTo(now);
+    @DisplayName("firstDayOfBusinessMonth() 는 1일 새벽이면 지난달 1일")
+    void firstDayOfBusinessMonthBeforeCutoff() {
+        assertThat(businessClockAt(LocalDateTime.of(2026, 9, 1, 3, 0, 0)).firstDayOfBusinessMonth())
+                .isEqualTo(LocalDate.of(2026, 8, 1));
     }
 }

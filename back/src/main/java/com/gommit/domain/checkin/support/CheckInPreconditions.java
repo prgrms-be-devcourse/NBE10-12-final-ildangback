@@ -8,7 +8,7 @@ import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
-import com.gommit.global.time.BusinessDateUtil;
+import com.gommit.global.time.BusinessDayCutoff;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -53,7 +53,7 @@ public class CheckInPreconditions {
         if (member.getStatus() == ChallengeMemberStatus.ACTIVE) {
             return new ReadDateAccess(challenge, null);
         }
-        LocalDate leftOn = member.getLeftAt() == null ? LocalDate.MIN : BusinessDateUtil.of(member.getLeftAt());
+        LocalDate leftOn = member.getLeftAt() == null ? LocalDate.MIN : BusinessDayCutoff.of(member.getLeftAt());
         return new ReadDateAccess(challenge, leftOn);
     }
 
