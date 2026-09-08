@@ -17,7 +17,9 @@ public record MediaStorageProperties(
     //           MediaLocalResourceConfig 의 정적 서빙 경로(baseUrl 의 path)와 일치해야 한다.
     public record LocalPaths(String baseDir, String baseUrl) {}
 
-    public record CloudinaryAccount(String cloudName, String apiKey, String apiSecret) {}
+    // rootFolder : Cloudinary 계정 안에서 이 서비스가 쓰는 최상위 폴더(예: go-mmit / test-go-mmit).
+    //   실제 저장 폴더 = rootFolder + "/" + StoragePolicy.folder. (비어 있으면 policy.folder 그대로)
+    public record CloudinaryAccount(String cloudName, String apiKey, String apiSecret, String rootFolder) {}
 
     public StoragePolicy policyFor(MediaRole role) {
         StoragePolicy policy = policies.get(role);
