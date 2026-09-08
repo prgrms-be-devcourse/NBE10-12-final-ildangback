@@ -119,13 +119,13 @@ public class ItemService {
                 StorageResult result = storageService.store(file, MediaRole.ITEM);
                 uploadedKeys.add(result.storageKey());
             }
+            return itemWriter.saveItemWithImages(request, uploadedKeys);
         } catch (Exception e) {
             for (String key : uploadedKeys) {
                 storageService.delete(key, MediaRole.ITEM);
             }
             throw e;
         }
-        return itemWriter.saveItemWithImages(request, uploadedKeys);
     }
 
     // 아이템 삭제 (관리자)

@@ -12,6 +12,7 @@ import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -97,16 +98,15 @@ public class UserItemService {
     }
 
     // 내 캐릭터 조회
-    public CharacterResponse getMyCharacter(Long userId) {
-        LocalDate today = LocalDateTime.now().minusHours(4).toLocalDate();
+    public CharacterResponse getMyCharacter(Long userId, Long challengeId) {
+        LocalDate today =
+                LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusHours(4).toLocalDate();
         boolean checkedIn = checkInRepository.existsByUserIdAndBusinessDate(userId, today);
         CheckInState checkInState = checkedIn ? CheckInState.DONE : CheckInState.NOT_DONE;
 
-        // TODO: 챌린지 도메인 완성 후 교체
-        // 참여 중인 챌린지 목록 + 종류 조회 필요
-        // 성공 2/3 이상 -> 성공 포즈 / 실패 2/3 이상 -> 실패 포즈 / 그 외 기본 포즈
-        // 종류가 섞였을 때 어느 포즈를 쓸 지 규칙 미정
-        Pose pose = (checkInState == CheckInState.DONE) ? Pose.WEIGHT_FAIL : Pose.DEFAULT;
+        // TODO: 체크인 도메인 완성 후 교체
+        // 최근 체크인 챌린지 파악
+        Pose pose = Pose.DEFAULT;
 
         List<UserItem> equippedItems = userItemRepository.findByUserIdAndEquippedSlotNotNull(userId);
 
