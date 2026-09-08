@@ -38,6 +38,7 @@ import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.domain.user.service.UserService;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import com.gommit.global.time.BusinessClock;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -96,7 +97,13 @@ class CheckInServiceTest {
         // businessDate 04:00 컷오프에 걸리지 않도록 이후 시각으로 고정
         Clock clock = Clock.fixed(TODAY.atTime(12, 0).toInstant(ZoneOffset.UTC), ZoneId.of("UTC"));
         service = new CheckInService(
-                checkInRepository, preconditions, policy, mediaStore, personalPointService, userService, clock);
+                checkInRepository,
+                preconditions,
+                policy,
+                mediaStore,
+                personalPointService,
+                userService,
+                new BusinessClock(clock));
         lenient().when(userService.findNicknames(anyList())).thenReturn(Map.of(USER_ID, "인증러"));
     }
 

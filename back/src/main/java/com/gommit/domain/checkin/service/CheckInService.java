@@ -26,8 +26,7 @@ import com.gommit.domain.user.service.UserService;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
-import com.gommit.global.time.BusinessDateUtil;
-import java.time.Clock;
+import com.gommit.global.time.BusinessClock;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
@@ -54,11 +53,11 @@ public class CheckInService {
     private final CheckInMediaStore mediaStore;
     private final PersonalPointService personalPointService;
     private final UserService userService;
-    private final Clock clock;
+    private final BusinessClock businessClock;
 
     public TodayCheckInStatusResponse getTodayStatus(Long userId, Long challengeId) {
         Challenge challenge = preconditions.getChallengeForActiveMember(challengeId, userId);
-        LocalDate today = BusinessDateUtil.today(clock);
+        LocalDate today = businessClock.today();
 
         int target = challenge.getDailyCheckInCount();
         int current = checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challengeId, userId, today);
@@ -78,7 +77,7 @@ public class CheckInService {
 
         String memo = (form.memo() == null || form.memo().isBlank()) ? null : form.memo();
 
-        LocalDate businessDate = BusinessDateUtil.today(clock);
+        LocalDate businessDate = businessClock.today();
         policy.validateCheckInDay(challenge, businessDate);
         policy.validateAllowedType(challenge, form.checkInType());
 
