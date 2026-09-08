@@ -39,7 +39,7 @@ class CloudinaryStorageServiceIntegrationTest {
             System.getenv("CLOUDINARY_CLOUD_NAME"),
             System.getenv("CLOUDINARY_API_KEY"),
             System.getenv("CLOUDINARY_API_SECRET"),
-            "gommit-it-test"); // 테스트 리소스는 이 폴더 아래로 (정리 스코프)
+            "test-go-mmit"); // @SpringBootTest 로 주입 확인할 것 없어서 직접 설정.
 
     private final Cloudinary cloudinary = CloudinaryClientFactory.create(account);
 
@@ -49,11 +49,14 @@ class CloudinaryStorageServiceIntegrationTest {
                     "cloudinary",
                     null,
                     account,
-                    // account.rootFolder("gommit-it-test") 가 앞에 붙어 실제 폴더는 gommit-it-test/check-ins
+                    // 통합테스트 산출물은 orphan 발생 등 문제시 폴더째 정리하기 위해 test-go-mmit/integration-test로 격리
                     Map.of(
                             MediaRole.CHECKIN,
                             new StoragePolicy(
-                                    "check-ins", DataSize.ofMegabytes(5), Visibility.PRIVATE, Set.of("image/png")))));
+                                    "integration-test/check-ins",
+                                    DataSize.ofMegabytes(5),
+                                    Visibility.PRIVATE,
+                                    Set.of("image/png")))));
 
     @Test
     @DisplayName("PRIVATE 이미지 store -> load -> delete 왕복")
@@ -61,7 +64,7 @@ class CloudinaryStorageServiceIntegrationTest {
         MockMultipartFile file = new MockMultipartFile("f", "x.png", "image/png", PNG_1X1);
 
         StorageResult stored = service.store(file, MediaRole.CHECKIN);
-        assertThat(stored.storageKey()).startsWith("gommit-it-test/check-ins/").endsWith(".png");
+        assertThat(stored.storageKey()).startsWith("test-go-mmit/integration-test/check-ins/").endsWith(".png");
 
         Resource loaded = service.load(stored.storageKey(), MediaRole.CHECKIN);
         assertThat(loaded.getContentAsByteArray()).isEqualTo(PNG_1X1);
