@@ -55,6 +55,23 @@ jobs:
               return;
             }
 
+            // diff 가 모델 입력 한도를 넘으면 뒷부분이 조용히 잘린다. 어디서 잘렸는지 알 수 없으므로
+            // 넣는 양을 우리가 정하고, 잘랐다는 사실과 남은 파일 수를 코멘트에 남긴다.
+            // 한글 주석이 많아 문자당 토큰이 큰 편이라 40만 자로 잡았다 (대략 15만 토큰).
+            const DIFF_LIMIT = 400000;
+            const fileCount = (text) => (text.match(/^diff --git /gm) || []).length;
+            const totalFiles = fileCount(diff_output);
+
+            let diff_for_review = diff_output;
+            let truncatedFiles = 0;
+            if (diff_output.length > DIFF_LIMIT) {
+              // 파일 경계에서 자른다. 훅 중간에서 끊으면 모델이 잘린 조각을 온전한 코드로 읽는다.
+              const cut = diff_output.lastIndexOf("\ndiff --git ", DIFF_LIMIT);
+              diff_for_review = diff_output.slice(0, cut > 0 ? cut : DIFF_LIMIT);
+              truncatedFiles = totalFiles - fileCount(diff_for_review);
+              console.log(`Diff truncated: ${diff_output.length} -> ${diff_for_review.length} chars, ${truncatedFiles} files dropped.`);
+            }
+
             const { GoogleGenAI } = require("@google/genai");
             const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -137,7 +154,7 @@ jobs:
             Description: ${prBody}
 
             [Git Diff]
-            ${diff_output}
+            ${diff_for_review}
 
             [응답해야 할 JSON 구조]
             {
@@ -298,7 +315,25 @@ jobs:
             }
 
             const cleanReport = (summary_report || '요약을 생성하지 못했습니다.').replace(/^#+\s*.+\n+/, '').trim();
-            const bodyText = `${COMMENT_MARKER}\n\n${cleanReport}\n${issuesTable}`;
+
+            // 코멘트를 덮어쓰는 방식이라 지금 보이는 내용이 어느 커밋 기준인지 본문에 남긴다.
+            const headSha = context.payload.pull_request.head.sha;
+            const headCommit = await github.rest.repos.getCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: headSha,
+            });
+            const headSubject = headCommit.data.commit.message.split('\n')[0];
+            const repoSlug = `${context.repo.owner}/${context.repo.repo}`;
+
+            let header = `${COMMENT_MARKER}\n`;
+            header += `📌 **기준 커밋**: [\`${headSha.substring(0, 7)}\`](https://github.com/${repoSlug}/commit/${headSha}) - ${headSubject}\n`;
+            // 전부 리뷰했으면 아무 말도 하지 않는다. 잘렸을 때만 알린다.
+            if (truncatedFiles > 0) {
+              header += `\n> ⚠️ diff 가 커서 뒤쪽 **${truncatedFiles}개 파일은 리뷰하지 못했습니다** (${totalFiles - truncatedFiles} / ${totalFiles}개만 봤습니다). PR 을 나누면 전부 볼 수 있습니다.\n`;
+            }
+
+            const bodyText = `${header}\n${cleanReport}\n${issuesTable}`;
 
             await upsertReviewComment(bodyText);
             console.log("Advanced Review Process Completed.");
