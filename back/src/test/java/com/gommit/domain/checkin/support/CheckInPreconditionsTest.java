@@ -65,7 +65,7 @@ class CheckInPreconditionsTest {
         void succeeds() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
             when(challengeRepository.findById(CHALLENGE_ID)).thenReturn(Optional.of(challenge));
-            when(challengeMemberRepository.findByChallenge_IdAndUserId(CHALLENGE_ID, USER_ID))
+            when(challengeMemberRepository.findByChallengeIdAndUserId(CHALLENGE_ID, USER_ID))
                     .thenReturn(Optional.of(CheckInFixture.activeMember(9L, challenge, USER_ID)));
 
             assertThat(preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
@@ -78,7 +78,7 @@ class CheckInPreconditionsTest {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
             ReflectionTestUtils.setField(challenge, "status", ChallengeStatus.ENDED);
             when(challengeRepository.findById(CHALLENGE_ID)).thenReturn(Optional.of(challenge));
-            when(challengeMemberRepository.findByChallenge_IdAndUserId(CHALLENGE_ID, USER_ID))
+            when(challengeMemberRepository.findByChallengeIdAndUserId(CHALLENGE_ID, USER_ID))
                     .thenReturn(Optional.of(CheckInFixture.activeMember(9L, challenge, USER_ID)));
 
             assertThatThrownBy(() -> preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
@@ -92,7 +92,7 @@ class CheckInPreconditionsTest {
         void rejectsNonMember() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
             when(challengeRepository.findById(CHALLENGE_ID)).thenReturn(Optional.of(challenge));
-            when(challengeMemberRepository.findByChallenge_IdAndUserId(CHALLENGE_ID, USER_ID))
+            when(challengeMemberRepository.findByChallengeIdAndUserId(CHALLENGE_ID, USER_ID))
                     .thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
@@ -106,7 +106,7 @@ class CheckInPreconditionsTest {
         void rejectsLeftMember() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
             when(challengeRepository.findById(CHALLENGE_ID)).thenReturn(Optional.of(challenge));
-            when(challengeMemberRepository.findByChallenge_IdAndUserId(CHALLENGE_ID, USER_ID))
+            when(challengeMemberRepository.findByChallengeIdAndUserId(CHALLENGE_ID, USER_ID))
                     .thenReturn(
                             Optional.of(CheckInFixture.leftMember(9L, challenge, USER_ID, LocalDate.of(2026, 9, 5))));
 
@@ -126,7 +126,7 @@ class CheckInPreconditionsTest {
         void activeMemberNoLimit() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
             when(challengeRepository.findById(CHALLENGE_ID)).thenReturn(Optional.of(challenge));
-            when(challengeMemberRepository.findByChallenge_IdAndUserId(CHALLENGE_ID, USER_ID))
+            when(challengeMemberRepository.findByChallengeIdAndUserId(CHALLENGE_ID, USER_ID))
                     .thenReturn(Optional.of(CheckInFixture.activeMember(9L, challenge, USER_ID)));
 
             ReadDateAccess access = preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID);
@@ -143,7 +143,7 @@ class CheckInPreconditionsTest {
             ChallengeMember member =
                     CheckInFixture.member(9L, challenge, USER_ID, ChallengeMemberStatus.LEFT, leftOn.atTime(12, 0));
             when(challengeRepository.findById(CHALLENGE_ID)).thenReturn(Optional.of(challenge));
-            when(challengeMemberRepository.findByChallenge_IdAndUserId(CHALLENGE_ID, USER_ID))
+            when(challengeMemberRepository.findByChallengeIdAndUserId(CHALLENGE_ID, USER_ID))
                     .thenReturn(Optional.of(member));
 
             ReadDateAccess access = preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID);

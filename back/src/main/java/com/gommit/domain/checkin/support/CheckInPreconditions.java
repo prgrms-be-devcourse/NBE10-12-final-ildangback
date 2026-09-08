@@ -58,7 +58,7 @@ public class CheckInPreconditions {
 
     private ChallengeMember findMember(Long challengeId, Long userId) {
         return challengeMemberRepository
-                .findByChallenge_IdAndUserId(challengeId, userId)
+                .findByChallengeIdAndUserId(challengeId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER));
     }
 
