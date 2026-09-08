@@ -69,7 +69,7 @@ public class StompAuthInterceptor implements ChannelInterceptor {
         }
 
         Long groupId = parseGroupId(destination.substring(WebSocketConfig.GROUP_TOPIC_PREFIX.length()));
-        if (!groupService.isActiveMember(groupId, resolveUserId(accessor))) {
+        if (!groupService.isActiveMember(groupId, StompPrincipals.resolveUserId(accessor.getUser()))) {
             throw new BusinessException(ErrorCode.NOT_GROUP_MEMBER);
         }
     }
@@ -81,14 +81,5 @@ public class StompAuthInterceptor implements ChannelInterceptor {
         } catch (NumberFormatException e) {
             throw new BusinessException(ErrorCode.ACCESS_DENIED);
         }
-    }
-
-    // 인증된 사용자 번호 추출
-    private Long resolveUserId(StompHeaderAccessor accessor) {
-        if (accessor.getUser() instanceof UsernamePasswordAuthenticationToken authentication
-                && authentication.getPrincipal() instanceof SecurityUser user) {
-            return user.getId();
-        }
-        throw new BusinessException(ErrorCode.UNAUTHORIZED);
     }
 }

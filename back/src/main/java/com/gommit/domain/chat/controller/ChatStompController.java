@@ -7,7 +7,7 @@ import com.gommit.global.config.WebSocketConfig;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import com.gommit.global.exception.ErrorResponse;
-import com.gommit.global.security.SecurityUser;
+import com.gommit.global.security.StompPrincipals;
 import jakarta.validation.Valid;
 import java.security.Principal;
 import java.util.List;
@@ -19,7 +19,6 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.handler.annotation.support.MethodArgumentNotValidException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.annotation.SendToUser;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Controller;
 
 @Controller
@@ -32,7 +31,8 @@ public class ChatStompController {
     @MessageMapping("/groups/{groupId}/messages")
     public void sendMessage(
             @DestinationVariable Long groupId, @Valid @Payload ChatMessageSendRequest request, Principal principal) {
-        ChatMessageResponse response = chatService.sendMessage(groupId, resolveUserId(principal), request);
+        ChatMessageResponse response =
+                chatService.sendMessage(groupId, StompPrincipals.resolveUserId(principal), request);
 
         messagingTemplate.convertAndSend(WebSocketConfig.GROUP_TOPIC_PREFIX + groupId, response);
     }
@@ -51,13 +51,5 @@ public class ChatStompController {
                 .toList();
 
         return ErrorResponse.of(ErrorCode.INVALID_INPUT_VALUE, errors);
-    }
-
-    private Long resolveUserId(Principal principal) {
-        if (principal instanceof UsernamePasswordAuthenticationToken authentication
-                && authentication.getPrincipal() instanceof SecurityUser user) {
-            return user.getId();
-        }
-        throw new BusinessException(ErrorCode.UNAUTHORIZED);
     }
 }
