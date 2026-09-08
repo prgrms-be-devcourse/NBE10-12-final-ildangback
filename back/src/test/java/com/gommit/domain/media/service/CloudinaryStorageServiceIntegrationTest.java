@@ -64,7 +64,9 @@ class CloudinaryStorageServiceIntegrationTest {
         MockMultipartFile file = new MockMultipartFile("f", "x.png", "image/png", PNG_1X1);
 
         StorageResult stored = service.store(file, MediaRole.CHECKIN);
-        assertThat(stored.storageKey()).startsWith("test-go-mmit/integration-test/check-ins/").endsWith(".png");
+        assertThat(stored.storageKey())
+                .startsWith("test-go-mmit/integration-test/check-ins/")
+                .endsWith(".png");
 
         Resource loaded = service.load(stored.storageKey(), MediaRole.CHECKIN);
         assertThat(loaded.getContentAsByteArray()).isEqualTo(PNG_1X1);
