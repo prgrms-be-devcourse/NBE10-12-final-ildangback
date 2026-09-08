@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willAnswer;
 import static org.mockito.Mockito.verify;
 
+import com.gommit.domain.group.service.GroupService;
 import com.gommit.domain.user.UserFixture;
 import com.gommit.domain.user.dto.request.ChangePasswordRequest;
 import com.gommit.domain.user.dto.request.DeleteAccountRequest;
@@ -43,6 +45,9 @@ class UserServiceTest {
 
     @Mock
     private RefreshTokenService refreshTokenService;
+
+    @Mock
+    private GroupService groupService;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -226,6 +231,36 @@ class UserServiceTest {
             userService.deleteAccount(USER_ID, new DeleteAccountRequest(UserFixture.RAW_PASSWORD));
 
             assertThat(user.getNickname()).hasSizeLessThanOrEqualTo(50);
+        }
+
+        @Test
+        @DisplayName("그룹 멤버십을 정리한다")
+        void deleteAccountLeavesAllGroups() {
+            givenActiveUser();
+            given(passwordEncoder.matches(anyString(), anyString())).willReturn(true);
+
+            userService.deleteAccount(USER_ID, new DeleteAccountRequest(UserFixture.RAW_PASSWORD));
+
+            verify(groupService).leaveAllGroupsOnAccountDeletion(USER_ID);
+        }
+
+        // 뒤로 가면 치환된 닉네임이 방장으로 앉는다. 순서를 되돌려도 위 테스트는 초록불이라 여기서만 막힌다.
+        @Test
+        @DisplayName("그룹 정리는 식별자 치환보다 먼저 돈다")
+        void deleteAccountLeavesGroupsBeforeErasingIdentifiers() {
+            givenActiveUser();
+            given(passwordEncoder.matches(anyString(), anyString())).willReturn(true);
+            willAnswer(invocation -> {
+                        assertThat(user.getNickname()).isEqualTo("꼬밋러");
+                        assertThat(user.getDeletedAt()).isNull();
+                        return null;
+                    })
+                    .given(groupService)
+                    .leaveAllGroupsOnAccountDeletion(USER_ID);
+
+            userService.deleteAccount(USER_ID, new DeleteAccountRequest(UserFixture.RAW_PASSWORD));
+
+            verify(groupService).leaveAllGroupsOnAccountDeletion(USER_ID);
         }
 
         @Test

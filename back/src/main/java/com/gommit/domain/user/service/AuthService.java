@@ -12,6 +12,7 @@ import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import com.gommit.global.security.jwt.JwtProvider;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -44,7 +45,7 @@ public class AuthService {
         User user = new User(email, passwordEncoder.encode(request.password()), nickname);
         try {
             user = userRepository.saveAndFlush(user);
-        } catch (DataIntegrityViolationException e) {
+        } catch (DataIntegrityViolationException | ConcurrencyFailureException e) {
             throw new BusinessException(ErrorCode.ACCOUNT_INFO_DUPLICATED);
         }
 

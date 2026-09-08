@@ -1,5 +1,6 @@
 package com.gommit.domain.user.service;
 
+import com.gommit.domain.group.service.GroupService;
 import com.gommit.domain.user.dto.request.ChangePasswordRequest;
 import com.gommit.domain.user.dto.request.DeleteAccountRequest;
 import com.gommit.domain.user.dto.request.UpdateProfileRequest;
@@ -26,6 +27,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final AuthIdentityRepository authIdentityRepository;
     private final RefreshTokenService refreshTokenService;
+    private final GroupService groupService;
     private final PasswordEncoder passwordEncoder;
 
     // 내 정보 조회
@@ -77,7 +79,7 @@ public class UserService {
             verifyPassword(user, request.password());
         }
 
-        // TODO: 챌린지의 멤버 상태 변경 필요
+        groupService.leaveAllGroupsOnAccountDeletion(userId);
 
         user.deleteAccount();
         authIdentityRepository.deleteByUserId(userId);
