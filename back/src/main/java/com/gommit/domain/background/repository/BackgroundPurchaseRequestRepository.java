@@ -13,6 +13,8 @@ public interface BackgroundPurchaseRequestRepository extends JpaRepository<Backg
 
     Optional<BackgroundPurchaseRequest> findByGroupIdAndStatus(Long groupId, PurchaseRequestStatus status);
 
+    boolean existsByBackgroundId(Long backgroundId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from BackgroundPurchaseRequest r where r.id = :requestId")
     Optional<BackgroundPurchaseRequest> findWithLockById(@Param("requestId") Long requestId);

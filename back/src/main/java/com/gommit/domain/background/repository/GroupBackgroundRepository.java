@@ -15,4 +15,6 @@ public interface GroupBackgroundRepository extends JpaRepository<GroupBackground
     Optional<GroupBackground> findByGroupIdAndBackgroundId(Long groupId, Long backgroundId);
 
     boolean existsByGroupIdAndBackgroundId(Long groupId, Long backgroundId);
+
+    boolean existsByBackgroundId(Long backgroundId);
 }

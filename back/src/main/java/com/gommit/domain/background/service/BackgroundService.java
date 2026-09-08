@@ -1,5 +1,7 @@
 package com.gommit.domain.background.service;
 
+import com.gommit.domain.background.dto.request.BackgroundCreateRequest;
+import com.gommit.domain.background.dto.response.BackgroundResponse;
 import com.gommit.domain.background.dto.response.GroupBackgroundResponse;
 import com.gommit.domain.background.dto.response.ShopBackgroundResponse;
 import com.gommit.domain.background.entity.Background;
@@ -15,10 +17,14 @@ import com.gommit.domain.group.entity.GroupMemberStatus;
 import com.gommit.domain.group.entity.MapType;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
 import com.gommit.domain.group.repository.GroupMemberRepository;
+import com.gommit.domain.media.dto.StorageResult;
+import com.gommit.domain.media.entity.MediaRole;
 import com.gommit.domain.media.service.StorageService;
+import com.gommit.domain.media.support.MediaValidator;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,6 +34,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -41,6 +48,7 @@ public class BackgroundService {
     private final ChallengeGroupRepository challengeGroupRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final StorageService storageService;
+    private final MediaValidator mediaValidator;
 
     // 그룹 상점 조회
     public SliceResponse<ShopBackgroundResponse> getShopBackgrounds(
@@ -57,6 +65,7 @@ public class BackgroundService {
 
         Long votingBackgroundId = purchaseRequestRepository
                 .findByGroupIdAndStatus(groupId, PurchaseRequestStatus.VOTING)
+                .filter(request -> !request.isExpired(LocalDateTime.now()))
                 .map(request -> request.getBackground().getId())
                 .orElse(null);
 
@@ -108,6 +117,44 @@ public class BackgroundService {
 
         Background background = target.getBackground();
         return new GroupBackgroundResponse(background, storageService.publicUrl(background.getImageKey()));
+    }
+
+    // 판매 배경 등록
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public BackgroundResponse createBackground(BackgroundCreateRequest request) {
+        mediaValidator.validate(request.image(), MediaRole.BACKGROUND);
+        StorageResult stored = storageService.store(request.image(), MediaRole.BACKGROUND);
+
+        try {
+            Background background = backgroundRepository.save(Background.builder()
+                    .mapType(request.mapType())
+                    .name(request.name())
+                    .imageKey(stored.storageKey())
+                    .price(request.price())
+                    .build());
+            return new BackgroundResponse(background, storageService.publicUrl(background.getImageKey()));
+        } catch (Exception e) {
+            storageService.delete(stored.storageKey(), MediaRole.BACKGROUND);
+            throw e;
+        }
+    }
+
+    // 판매 배경 삭제
+    @Transactional
+    public void deleteBackground(Long backgroundId) {
+        Background background = backgroundRepository
+                .findById(backgroundId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.BACKGROUND_NOT_FOUND));
+
+        if (groupBackgroundRepository.existsByBackgroundId(backgroundId)
+                || purchaseRequestRepository.existsByBackgroundId(backgroundId)) {
+            throw new BusinessException(ErrorCode.BACKGROUND_IN_USE);
+        }
+
+        String imageKey = background.getImageKey();
+        backgroundRepository.delete(background);
+        backgroundRepository.flush();
+        storageService.delete(imageKey, MediaRole.BACKGROUND);
     }
 
     // 필터별 판매 배경 한 페이지

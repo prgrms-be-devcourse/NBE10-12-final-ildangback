@@ -17,7 +17,7 @@ public record PurchaseRequestResponse(
         int disagreeCount,
         int totalMembers,
         int requiredCount,
-        boolean voted,
+        Boolean myAgreed,
         LocalDateTime expiresAt) {
 
     public PurchaseRequestResponse(
@@ -28,7 +28,7 @@ public record PurchaseRequestResponse(
             int disagreeCount,
             int totalMembers,
             int requiredCount,
-            boolean voted) {
+            Boolean myAgreed) {
         this(
                 request.getId(),
                 request.getBackground().getId(),
@@ -42,7 +42,7 @@ public record PurchaseRequestResponse(
                 disagreeCount,
                 totalMembers,
                 requiredCount,
-                voted,
+                myAgreed,
                 request.getExpiresAt());
     }
 }
