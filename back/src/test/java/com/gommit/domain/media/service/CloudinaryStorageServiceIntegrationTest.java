@@ -20,6 +20,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.util.unit.DataSize;
 
@@ -36,7 +38,8 @@ class CloudinaryStorageServiceIntegrationTest {
     private final CloudinaryAccount account = new CloudinaryAccount(
             System.getenv("CLOUDINARY_CLOUD_NAME"),
             System.getenv("CLOUDINARY_API_KEY"),
-            System.getenv("CLOUDINARY_API_SECRET"));
+            System.getenv("CLOUDINARY_API_SECRET"),
+            "test-go-mmit"); // @SpringBootTest 로 주입 확인할 것 없어서 직접 설정.
 
     private final Cloudinary cloudinary = CloudinaryClientFactory.create(account);
 
@@ -46,10 +49,11 @@ class CloudinaryStorageServiceIntegrationTest {
                     "cloudinary",
                     null,
                     account,
+                    // 통합테스트 산출물은 orphan 발생 등 문제시 폴더째 정리하기 위해 test-go-mmit/integration-test로 격리
                     Map.of(
                             MediaRole.CHECKIN,
                             new StoragePolicy(
-                                    "gommit-it-test/check-ins",
+                                    "integration-test/check-ins",
                                     DataSize.ofMegabytes(5),
                                     Visibility.PRIVATE,
                                     Set.of("image/png")))));
@@ -60,10 +64,13 @@ class CloudinaryStorageServiceIntegrationTest {
         MockMultipartFile file = new MockMultipartFile("f", "x.png", "image/png", PNG_1X1);
 
         StorageResult stored = service.store(file, MediaRole.CHECKIN);
-        assertThat(stored.storageKey()).startsWith("gommit-it-test/check-ins/").endsWith(".png");
+        assertThat(stored.storageKey()).startsWith("test-go-mmit/integration-test/check-ins/").endsWith(".png");
 
         Resource loaded = service.load(stored.storageKey(), MediaRole.CHECKIN);
         assertThat(loaded.getContentAsByteArray()).isEqualTo(PNG_1X1);
+        // #51: 파일명을 노출해 서빙 컨트롤러가 MediaTypeFactory 로 Content-Type 을 판정할 수 있어야 한다
+        assertThat(loaded.getFilename()).endsWith(".png");
+        assertThat(MediaTypeFactory.getMediaType(loaded.getFilename())).contains(MediaType.IMAGE_PNG);
 
         service.delete(stored.storageKey(), MediaRole.CHECKIN);
 
