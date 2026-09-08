@@ -1,6 +1,11 @@
 package com.gommit.domain.item.service;
 
+import com.gommit.domain.challenge.entity.Challenge;
+import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.checkin.repository.CheckInRepository;
+import com.gommit.domain.group.entity.ChallengeGroup;
+import com.gommit.domain.group.entity.GroupCategory;
+import com.gommit.domain.group.repository.ChallengeGroupRepository;
 import com.gommit.domain.item.dto.response.CharacterResponse;
 import com.gommit.domain.item.dto.response.ItemResponse;
 import com.gommit.domain.item.dto.response.UserItemResponse;
@@ -30,6 +35,8 @@ public class UserItemService {
     private final UserItemRepository userItemRepository;
     private final CheckInRepository checkInRepository;
     private final StorageService storageService;
+    private final ChallengeRepository challengeRepository;
+    private final ChallengeGroupRepository challengeGroupRepository;
 
     // 아이템 착용
     @Transactional
@@ -101,12 +108,16 @@ public class UserItemService {
     public CharacterResponse getMyCharacter(Long userId, Long challengeId) {
         LocalDate today =
                 LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusHours(4).toLocalDate();
-        boolean checkedIn = checkInRepository.existsByUserIdAndBusinessDate(userId, today);
+        boolean checkedIn = (challengeId != null)
+                ? checkInRepository.existsByChallengeIdAndUserIdAndBusinessDate(challengeId, userId, today)
+                : checkInRepository.existsByUserIdAndBusinessDate(userId, today);
+
         CheckInState checkInState = checkedIn ? CheckInState.DONE : CheckInState.NOT_DONE;
 
-        // TODO: 체크인 도메인 완성 후 교체
-        // 최근 체크인 챌린지 파악
         Pose pose = Pose.DEFAULT;
+        if (challengeId != null) {
+            pose = resolvePoze(challengeId, checkedIn);
+        }
 
         List<UserItem> equippedItems = userItemRepository.findByUserIdAndEquippedSlotNotNull(userId);
 
@@ -128,5 +139,24 @@ public class UserItemService {
         String key = userItem.getItem().imageKeyForPose(pose);
         String url = key != null ? storageService.publicUrl(key) : null;
         return new UserItemResponse(userItem, new ItemResponse(item, url));
+    }
+
+    private Pose resolvePoze(Long challengeId, boolean checkedIn) {
+        Challenge challenge = challengeRepository.findById(challengeId).orElse(null);
+        if (challenge == null) return Pose.DEFAULT;
+
+        ChallengeGroup group =
+                challengeGroupRepository.findById(challenge.getGroupId()).orElse(null);
+        if (group == null) return Pose.DEFAULT;
+
+        GroupCategory category = group.getCategory();
+
+        boolean isExercise = category == GroupCategory.EXERCISE || category == GroupCategory.HEALTH;
+
+        if (checkedIn) {
+            return isExercise ? Pose.GYM_SUCCESS : Pose.STUDY_SUCCESS;
+        } else {
+            return isExercise ? Pose.GYM_FAIL : Pose.STUDY_FAIL;
+        }
     }
 }

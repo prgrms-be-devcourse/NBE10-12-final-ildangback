@@ -25,7 +25,7 @@ import com.gommit.domain.media.service.StorageService;
 import com.gommit.domain.media.support.MediaValidator;
 import com.gommit.domain.point.dto.response.PointBalanceResponse;
 import com.gommit.domain.point.entity.UserPointReason;
-import com.gommit.domain.point.service.PointService;
+import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
@@ -55,7 +55,7 @@ public class ItemServiceTest {
     private UserItemService userItemService;
 
     @Mock
-    private PointService pointService;
+    private PersonalPointService pointService;
 
     @Mock
     private ItemImageRepository itemImageRepository;

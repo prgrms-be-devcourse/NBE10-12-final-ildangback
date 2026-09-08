@@ -14,7 +14,7 @@ import com.gommit.domain.media.service.StorageService;
 import com.gommit.domain.media.support.MediaValidator;
 import com.gommit.domain.point.dto.response.PointBalanceResponse;
 import com.gommit.domain.point.entity.UserPointReason;
-import com.gommit.domain.point.service.PointService;
+import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -37,7 +38,7 @@ public class ItemService {
     private final ItemImageRepository itemImageRepository;
     private final UserItemRepository userItemRepository;
     private final UserItemService userItemService;
-    private final PointService pointService;
+    private final PersonalPointService pointService;
     private final StorageService storageService;
     private final MediaValidator mediaValidator;
     private final ItemWriter itemWriter;
@@ -84,8 +85,9 @@ public class ItemService {
             throw new BusinessException(ErrorCode.ALREADY_OWNED_ITEM);
         }
 
-        // 포인트 차감 메서드 호출
-        pointService.deduct(userId, item.getPrice(), UserPointReason.ITEM_PURCHASE, item.getName());
+        if (item.getPrice() > 0) {
+            pointService.deduct(userId, item.getPrice(), UserPointReason.ITEM_PURCHASE, item.getName());
+        }
 
         UserItem newUserItem = UserItem.of(userId, item);
         UserItem savedUserItem;
@@ -147,7 +149,6 @@ public class ItemService {
             } catch (Exception e) {
                 log.warn("S3 파일 삭제 실패: {}", img.getImageKey(), e);
             }
-
         }
     }
 
