@@ -488,23 +488,18 @@ public class GroupService {
 
     @Transactional(readOnly = true)
     public List<SeasonSummary> getGroupChallenges(Long groupId, Long userId) {
-        challengeGroupRepository.findById(groupId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+        challengeGroupRepository.findById(groupId).orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
 
         GroupMember groupMember = groupMemberRepository
-            .findByGroupIdAndUserId(groupId, userId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_GROUP_MEMBER));
+                .findByGroupIdAndUserId(groupId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_GROUP_MEMBER));
 
         if (groupMember.getStatus() != GroupMemberStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.NOT_GROUP_MEMBER);
         }
 
         return challengeRepository.findAllByGroupIdOrderBySeqNoAsc(groupId).stream()
-            .map(challenge -> new SeasonSummary(
-                challenge.getId(),
-                challenge.getSeqNo(),
-                challenge.getStatus()
-            ))
-            .toList();
+                .map(challenge -> new SeasonSummary(challenge.getId(), challenge.getSeqNo(), challenge.getStatus()))
+                .toList();
     }
 }

@@ -15,13 +15,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @Tag(name = "group - 그룹")
 @RestController
@@ -117,8 +116,7 @@ public class GroupController {
     @Operation(summary = "그룹의 챌린지(시즌) 목록 조회", description = "해당 그룹의 전체 시즌 목록을 조회")
     @GetMapping("/{groupId}/challenges")
     public ResponseEntity<List<SeasonSummary>> getGroupChallenges(
-        @PathVariable Long groupId, @CurrentUser SecurityUser actor
-    ) {
+            @PathVariable Long groupId, @CurrentUser SecurityUser actor) {
         return ResponseEntity.ok(groupService.getGroupChallenges(groupId, actor.getId()));
     }
 }
