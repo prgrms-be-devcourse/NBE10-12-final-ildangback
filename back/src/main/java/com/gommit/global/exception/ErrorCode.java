@@ -24,6 +24,7 @@ public enum ErrorCode {
     CHALLENGE_NOT_OWNER(HttpStatus.FORBIDDEN, "챌린지 OWNER 권한이 없습니다."),
     CHALLENGE_NOT_MEMBER(HttpStatus.FORBIDDEN, "챌린지에 참여 중인 멤버가 아닙니다."),
     CHALLENGE_NOT_EDITABLE(HttpStatus.FORBIDDEN, "READY 상태의 챌린지만 설정을 수정할 수 있습니다."),
+    CHALLENGE_NOT_ACTIVE(HttpStatus.CONFLICT, "진행 중인 챌린지가 아닙니다."),
     INVALID_DAILY_COUNT(HttpStatus.BAD_REQUEST, "하루 인증 횟수가 허용 범위를 벗어났습니다."),
     CANNOT_DELEGATE_TO_SELF(HttpStatus.BAD_REQUEST, "자기 자신에게 OWNER를 위임할 수 없습니다."),
     EXTENSION_CHOICE_CLOSED(HttpStatus.CONFLICT, "연장 참여 의사 선택 기간이 마감되었습니다."),
@@ -32,16 +33,10 @@ public enum ErrorCode {
     EXTENSION_START_DATE_NOT_EDITABLE(HttpStatus.BAD_REQUEST, "연장 시즌의 시작일은 변경할 수 없습니다."),
 
     // ===== checkin =====
-    // CHALLENGE_NOT_FOUND 는 group 섹션(#6)에 정의됨.
     CHECK_IN_NOT_FOUND(HttpStatus.NOT_FOUND, "인증을 찾을 수 없습니다."),
-    NOT_CHALLENGE_MEMBER(HttpStatus.FORBIDDEN, "챌린지 참여자만 접근할 수 있습니다."),
     CHECK_IN_TYPE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "허용되지 않은 인증 방식입니다."),
     DAILY_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "오늘 인증 횟수를 모두 채웠습니다."),
     NOT_CHECK_IN_DAY(HttpStatus.CONFLICT, "오늘은 인증 대상일이 아닙니다."),
-    CHALLENGE_NOT_ACTIVE(HttpStatus.CONFLICT, "진행 중인 챌린지가 아닙니다."),
-
-    // media(#8) 의 EMPTY_FILE / FILE_TOO_LARGE / UNSUPPORTED_MEDIA_TYPE / MEDIA_NOT_FOUND / MEDIA_STORAGE_FAILED 를
-    // 미디어 저장/서빙에 사용한다 (feat/8 media 섹션에 정의됨).
 
     // ===== group =====
     GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "그룹을 찾을 수 없습니다."),

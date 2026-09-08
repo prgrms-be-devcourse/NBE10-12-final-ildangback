@@ -183,14 +183,14 @@ class CheckInServiceTest {
         }
 
         @Test
-        @DisplayName("참여자가 아니거나 이탈했으면 NOT_CHALLENGE_MEMBER")
+        @DisplayName("참여자가 아니거나 이탈했으면 CHALLENGE_NOT_MEMBER")
         void rejectsNonMember() {
             when(preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
-                    .thenThrow(new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER));
+                    .thenThrow(new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER));
 
             assertBusiness(
                     () -> service.submit(USER_ID, CHALLENGE_ID, request(null), media()),
-                    ErrorCode.NOT_CHALLENGE_MEMBER);
+                    ErrorCode.CHALLENGE_NOT_MEMBER);
         }
 
         @Test
@@ -355,23 +355,23 @@ class CheckInServiceTest {
         }
 
         @Test
-        @DisplayName("단건 — 다른 챌린지의 인증이면 NOT_CHALLENGE_MEMBER")
+        @DisplayName("단건 — 다른 챌린지의 인증이면 CHALLENGE_NOT_MEMBER")
         void oneWrongChallenge() {
             CheckIn checkIn = checkIn(5L, 999L, TODAY);
             when(checkInRepository.findById(5L)).thenReturn(Optional.of(checkIn));
 
-            assertBusiness(() -> service.getCheckIn(USER_ID, CHALLENGE_ID, 5L), ErrorCode.NOT_CHALLENGE_MEMBER);
+            assertBusiness(() -> service.getCheckIn(USER_ID, CHALLENGE_ID, 5L), ErrorCode.CHALLENGE_NOT_MEMBER);
         }
 
         @Test
-        @DisplayName("단건 — 이탈일 이후 날짜의 기록이면 NOT_CHALLENGE_MEMBER")
+        @DisplayName("단건 — 이탈일 이후 날짜의 기록이면 CHALLENGE_NOT_MEMBER")
         void oneAfterLeftDate() {
             CheckIn checkIn = checkIn(5L, CHALLENGE_ID, TODAY);
             when(checkInRepository.findById(5L)).thenReturn(Optional.of(checkIn));
             when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID))
                     .thenReturn(new ReadDateAccess(challenge, TODAY.minusDays(1)));
 
-            assertBusiness(() -> service.getCheckIn(USER_ID, CHALLENGE_ID, 5L), ErrorCode.NOT_CHALLENGE_MEMBER);
+            assertBusiness(() -> service.getCheckIn(USER_ID, CHALLENGE_ID, 5L), ErrorCode.CHALLENGE_NOT_MEMBER);
         }
 
         @Test
@@ -417,14 +417,14 @@ class CheckInServiceTest {
         }
 
         @Test
-        @DisplayName("미디어 서빙 — 이탈일 이후 기록은 NOT_CHALLENGE_MEMBER")
+        @DisplayName("미디어 서빙 — 이탈일 이후 기록은 CHALLENGE_NOT_MEMBER")
         void loadMediaAfterLeft() {
             CheckIn checkIn = checkIn(5L, CHALLENGE_ID, TODAY);
             when(checkInRepository.findById(5L)).thenReturn(Optional.of(checkIn));
             when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID))
                     .thenReturn(new ReadDateAccess(challenge, TODAY.minusDays(1)));
 
-            assertBusiness(() -> service.loadCheckInMedia(USER_ID, 5L), ErrorCode.NOT_CHALLENGE_MEMBER);
+            assertBusiness(() -> service.loadCheckInMedia(USER_ID, 5L), ErrorCode.CHALLENGE_NOT_MEMBER);
         }
     }
 

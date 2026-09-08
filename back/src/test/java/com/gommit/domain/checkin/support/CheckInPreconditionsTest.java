@@ -88,7 +88,7 @@ class CheckInPreconditionsTest {
         }
 
         @Test
-        @DisplayName("참여자 행이 없으면 NOT_CHALLENGE_MEMBER")
+        @DisplayName("참여자 행이 없으면 CHALLENGE_NOT_MEMBER")
         void rejectsNonMember() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
             when(challengeRepository.findById(CHALLENGE_ID)).thenReturn(Optional.of(challenge));
@@ -98,11 +98,11 @@ class CheckInPreconditionsTest {
             assertThatThrownBy(() -> preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.NOT_CHALLENGE_MEMBER);
+                    .isEqualTo(ErrorCode.CHALLENGE_NOT_MEMBER);
         }
 
         @Test
-        @DisplayName("이탈한 참여자면 NOT_CHALLENGE_MEMBER")
+        @DisplayName("이탈한 참여자면 CHALLENGE_NOT_MEMBER")
         void rejectsLeftMember() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
             when(challengeRepository.findById(CHALLENGE_ID)).thenReturn(Optional.of(challenge));
@@ -113,7 +113,7 @@ class CheckInPreconditionsTest {
             assertThatThrownBy(() -> preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.NOT_CHALLENGE_MEMBER);
+                    .isEqualTo(ErrorCode.CHALLENGE_NOT_MEMBER);
         }
     }
 

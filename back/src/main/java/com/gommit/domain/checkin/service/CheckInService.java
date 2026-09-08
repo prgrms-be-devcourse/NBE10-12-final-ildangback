@@ -213,7 +213,7 @@ public class CheckInService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHECK_IN_NOT_FOUND));
         ReadDateAccess access = preconditions.resolveReadDateAccess(checkIn.getChallengeId(), userId);
         if (!access.allows(checkIn.getBusinessDate())) {
-            throw new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER);
+            throw new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER);
         }
         try {
             return mediaStore.load(checkIn.getMediaKey());
@@ -232,11 +232,11 @@ public class CheckInService {
                 .findById(checkInId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHECK_IN_NOT_FOUND));
         if (!checkIn.getChallengeId().equals(challengeId)) {
-            throw new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER);
+            throw new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER);
         }
         ReadDateAccess access = preconditions.resolveReadDateAccess(challengeId, userId);
         if (!access.allows(checkIn.getBusinessDate())) {
-            throw new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER);
+            throw new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER);
         }
         return checkIn;
     }

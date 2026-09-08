@@ -239,7 +239,7 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("참여자가 아니면 403 NOT_CHALLENGE_MEMBER")
+        @DisplayName("참여자가 아니면 403 CHALLENGE_NOT_MEMBER")
         void rejectsNonMember() throws Exception {
             loginAs(EMAIL, NICKNAME);
             long challengeId = setUpChallenge(EMAIL, 3);
@@ -247,7 +247,7 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
 
             submit(challengeId, outsider.accessToken())
                     .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("NOT_CHALLENGE_MEMBER"));
+                    .andExpect(jsonPath("$.code").value("CHALLENGE_NOT_MEMBER"));
         }
 
         @Test
@@ -483,7 +483,7 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
                             get("/api/challenges/{cid}/check-ins/{id}", otherChallengeId, checkInId),
                             tokens.accessToken()))
                     .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("NOT_CHALLENGE_MEMBER"));
+                    .andExpect(jsonPath("$.code").value("CHALLENGE_NOT_MEMBER"));
         }
 
         @Test
@@ -535,7 +535,7 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
             mockMvc.perform(withToken(
                             get("/api/challenges/{cid}/check-ins/{id}", challengeId, checkInId), viewer.accessToken()))
                     .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("NOT_CHALLENGE_MEMBER"));
+                    .andExpect(jsonPath("$.code").value("CHALLENGE_NOT_MEMBER"));
         }
     }
 
@@ -600,7 +600,7 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("비참여자가 미디어 URL 로 접근하면 403 NOT_CHALLENGE_MEMBER")
+        @DisplayName("비참여자가 미디어 URL 로 접근하면 403 CHALLENGE_NOT_MEMBER")
         void nonMemberRejected() throws Exception {
             var owner = loginAs(EMAIL, NICKNAME);
             long challengeId = setUpChallenge(EMAIL, 3);
@@ -610,7 +610,7 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
 
             mockMvc.perform(withToken(get(mediaUrl), outsider.accessToken()))
                     .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("NOT_CHALLENGE_MEMBER"));
+                    .andExpect(jsonPath("$.code").value("CHALLENGE_NOT_MEMBER"));
         }
 
         @Test

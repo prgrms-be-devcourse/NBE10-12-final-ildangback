@@ -32,11 +32,12 @@ public class CheckInPreconditions {
         Challenge challenge = getChallenge(challengeId);
         ChallengeMember member = findMember(challengeId, userId);
         if (member.getStatus() != ChallengeMemberStatus.ACTIVE) {
-            throw new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER);
+            throw new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER);
         }
         return challenge;
     }
 
+    // 읽기와 달리 쓰기(인증 등록)는 ACTIVE 챌린지, ACTIVE 멤버만 허용
     public Challenge getActiveChallengeForActiveMember(Long challengeId, Long userId) {
         Challenge challenge = getChallengeForActiveMember(challengeId, userId);
         if (challenge.getStatus() != ChallengeStatus.ACTIVE) {
@@ -59,7 +60,7 @@ public class CheckInPreconditions {
     private ChallengeMember findMember(Long challengeId, Long userId) {
         return challengeMemberRepository
                 .findByChallengeIdAndUserId(challengeId, userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER));
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER));
     }
 
     // 조회 접근 범위. maxBusinessDate == null 이면 현 멤버, 제한 없음. 값이 있으면 이탈 멤버, 해당 날짜(이탈일) 이하의 기록만 접근 가능.
