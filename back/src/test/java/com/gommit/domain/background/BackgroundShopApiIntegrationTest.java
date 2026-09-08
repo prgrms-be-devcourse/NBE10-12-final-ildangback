@@ -3,12 +3,14 @@ package com.gommit.domain.background;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.gommit.support.IntegrationTestSupport;
+import java.net.URI;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,13 +21,20 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 
 @DisplayName("그룹 배경 상점 API")
 class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
 
     private static final String OWNER_EMAIL = "owner@example.com";
     private static final String OWNER_NICKNAME = "방장";
+    private static final String ADMIN_EMAIL = "admin@example.com";
+    private static final byte[] PNG_MAGIC = {
+        (byte) 0x89, (byte) 0x50, (byte) 0x4E, (byte) 0x47, (byte) 0x0D, (byte) 0x0A, (byte) 0x1A, (byte) 0x0A
+    };
 
     // ===== 엔드포인트 호출 =====
 
@@ -80,6 +89,21 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
         return mockMvc.perform(withToken(delete("/api/groups/" + groupId + "/members/" + targetUserId), accessToken));
     }
 
+    private ResultActions deleteBackground(String accessToken, Long backgroundId) throws Exception {
+        return mockMvc.perform(withToken(delete("/api/admin/backgrounds/" + backgroundId), accessToken));
+    }
+
+    private ResultActions createBackground(String accessToken, String mapType, String name, MockMultipartFile image)
+            throws Exception {
+        MockMultipartHttpServletRequestBuilder builder = multipart("/api/admin/backgrounds");
+        builder.file(image)
+                .param("mapType", mapType)
+                .param("name", name)
+                .param("price", "100")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken);
+        return mockMvc.perform(builder);
+    }
+
     // ===== 준비 =====
 
     // 판매 배경은 시드로 직접 넣는 방침이라 테스트가 자기 배경을 만든다.
@@ -89,7 +113,7 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
                         + " values (?, ?, ?, ?, now(6), now(6))",
                 mapType,
                 name,
-                "backgrounds/" + name + ".png",
+                "group-backgrounds/" + name + ".png",
                 price);
         return jdbcTemplate.queryForObject("select max(id) from backgrounds", Long.class);
     }
@@ -97,6 +121,23 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
     // 강퇴는 ACTIVE 챌린지가 있어야 한다.
     private void activateChallenge(Long groupId) {
         jdbcTemplate.update("update challenges set status = 'ACTIVE' where group_id = ?", groupId);
+    }
+
+    // 역할은 AT 클레임에 실린다. 승격한 뒤 다시 로그인해야 ADMIN 토큰이 나온다.
+    private String loginAsAdmin() {
+        loginAs(ADMIN_EMAIL, "관리자");
+        jdbcTemplate.update("update users set role = 'ADMIN' where email = ?", ADMIN_EMAIL);
+        return loginAs(ADMIN_EMAIL, "관리자").accessToken();
+    }
+
+    private Long lastBackgroundId() {
+        return jdbcTemplate.queryForObject("select max(id) from backgrounds", Long.class);
+    }
+
+    private MockMultipartFile pngImage() {
+        byte[] bytes = new byte[64];
+        System.arraycopy(PNG_MAGIC, 0, bytes, 0, PNG_MAGIC.length);
+        return new MockMultipartFile("image", "gym-night.png", "image/png", bytes);
     }
 
     private Long userIdOf(String email) {
@@ -287,7 +328,7 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(jsonPath("$.totalMembers").value(3))
                     .andExpect(jsonPath("$.requiredCount").value(2))
                     .andExpect(jsonPath("$.status").value("VOTING"))
-                    .andExpect(jsonPath("$.voted").value(true));
+                    .andExpect(jsonPath("$.myAgreed").value(true));
         }
 
         @Test
@@ -430,6 +471,25 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
         }
 
         @Test
+        @DisplayName("기한이 지나면 상점의 투표 중 배지가 내려간다")
+        void expiredRequestIsNotFlaggedInShop() throws Exception {
+            Long[] holder = new Long[1];
+            List<String> tokens = createGroupWith(2, holder);
+            Long backgroundId = insertBackground("GYM", "헬스장", 100);
+            giveGroupPoints(holder[0], 500);
+
+            createRequest(tokens.get(0), holder[0], backgroundId).andExpect(status().isCreated());
+            getShop(tokens.get(0), holder[0])
+                    .andExpect(jsonPath("$.content[0].voting").value(true));
+
+            expire(requestIdOf(holder[0]));
+
+            getShop(tokens.get(0), holder[0])
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[0].voting").value(false));
+        }
+
+        @Test
         @DisplayName("만료된 제안에는 투표할 수 없다")
         void expiredRequestRejectsVote() throws Exception {
             Long[] holder = new Long[1];
@@ -567,14 +627,20 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
             createRequest(tokens.get(0), holder[0], backgroundId).andExpect(status().isCreated());
             vote(tokens.get(1), holder[0], requestIdOf(holder[0]), false).andExpect(status().isCreated());
 
+            // 아직 안 던진 사람에게는 myAgreed 가 null 이다.
             getCurrentRequest(tokens.get(2), holder[0])
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.agreeCount").value(1))
                     .andExpect(jsonPath("$.disagreeCount").value(1))
                     .andExpect(jsonPath("$.totalMembers").value(4))
                     .andExpect(jsonPath("$.requiredCount").value(3))
-                    .andExpect(jsonPath("$.voted").value(false))
+                    .andExpect(jsonPath("$.myAgreed").isEmpty())
                     .andExpect(jsonPath("$.requestedByNickname").value(OWNER_NICKNAME));
+
+            // 반대를 던진 사람에게는 false 로 돌아온다.
+            getCurrentRequest(tokens.get(1), holder[0])
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.myAgreed").value(false));
         }
     }
 
@@ -764,6 +830,126 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(jsonPath("$.backgroundId").isEmpty())
                     .andExpect(jsonPath("$.imageUrl").isEmpty())
                     .andExpect(jsonPath("$.mapType").value("GYM"));
+        }
+    }
+
+    @Nested
+    @DisplayName("판매 배경 등록")
+    class AdminRegister {
+
+        @Test
+        @DisplayName("관리자가 올린 배경은 상점에 뜨고 그 URL 로 그림을 받을 수 있다")
+        void adminUploadsBackgroundAndImageIsServed() throws Exception {
+            String adminToken = loginAsAdmin();
+
+            String imageUrl = createBackground(adminToken, "GYM", "야간 헬스장", pngImage())
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.name").value("야간 헬스장"))
+                    .andExpect(jsonPath("$.mapType").value("GYM"))
+                    .andExpect(jsonPath("$.price").value(100))
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString()
+                    .split("\"imageUrl\":\"")[1]
+                    .split("\"")[0];
+
+            assertThat(imageUrl).contains("/media/group-backgrounds/");
+            mockMvc.perform(get(URI.create(imageUrl).getPath())).andExpect(status().isOk());
+
+            Long[] holder = new Long[1];
+            String memberToken = createGroupWith(0, holder).get(0);
+            getShop(memberToken, holder[0])
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[0].name").value("야간 헬스장"))
+                    .andExpect(jsonPath("$.content[0].owned").value(false));
+        }
+
+        @Test
+        @DisplayName("일반 사용자는 배경을 등록할 수 없다")
+        void nonAdminCannotRegister() throws Exception {
+            String userToken = loginAs().accessToken();
+
+            createBackground(userToken, "GYM", "야간 헬스장", pngImage()).andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("허용하지 않는 파일 형식은 거부된다")
+        void unsupportedContentTypeIsRejected() throws Exception {
+            String adminToken = loginAsAdmin();
+            MockMultipartFile gif = new MockMultipartFile("image", "a.gif", "image/gif", new byte[] {1, 2, 3, 4});
+
+            createBackground(adminToken, "GYM", "야간 헬스장", gif).andExpect(status().isUnsupportedMediaType());
+        }
+    }
+
+    @Nested
+    @DisplayName("판매 배경 삭제")
+    class AdminDelete {
+
+        @Test
+        @DisplayName("아무도 안 산 배경은 지워지고 그림도 함께 사라진다")
+        void unusedBackgroundIsDeletedWithItsImage() throws Exception {
+            String adminToken = loginAsAdmin();
+            String imageUrl = createBackground(adminToken, "GYM", "야간 헬스장", pngImage())
+                    .andExpect(status().isCreated())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString()
+                    .split("\"imageUrl\":\"")[1]
+                    .split("\"")[0];
+            String imagePath = URI.create(imageUrl).getPath();
+            mockMvc.perform(get(imagePath)).andExpect(status().isOk());
+
+            deleteBackground(adminToken, lastBackgroundId()).andExpect(status().isNoContent());
+
+            mockMvc.perform(get(imagePath)).andExpect(status().isNotFound());
+            Long[] holder = new Long[1];
+            String memberToken = createGroupWith(0, holder).get(0);
+            getShop(memberToken, holder[0])
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content").isEmpty());
+        }
+
+        @Test
+        @DisplayName("그룹이 보유한 배경은 지울 수 없다")
+        void ownedBackgroundIsRejected() throws Exception {
+            Long[] holder = new Long[1];
+            String ownerToken = createGroupWith(0, holder).get(0);
+            Long backgroundId = insertBackground("GYM", "헬스장", 100);
+            giveGroupPoints(holder[0], 500);
+
+            // 방장 혼자라 과반 1. 제안하는 순간 가결되어 그룹이 보유한다.
+            createRequest(ownerToken, holder[0], backgroundId).andExpect(status().isCreated());
+            assertThat(ownedCountOf(holder[0])).isEqualTo(1);
+
+            deleteBackground(loginAsAdmin(), backgroundId)
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("BACKGROUND_IN_USE"));
+        }
+
+        @Test
+        @DisplayName("구매 제안 이력이 있으면 지울 수 없다")
+        void backgroundWithRequestHistoryIsRejected() throws Exception {
+            Long[] holder = new Long[1];
+            List<String> tokens = createGroupWith(2, holder);
+            Long backgroundId = insertBackground("GYM", "헬스장", 100);
+            giveGroupPoints(holder[0], 500);
+
+            // 3명, 과반 2. 방장 찬성 1 뿐이라 아직 투표 중이고 보유는 아니다.
+            createRequest(tokens.get(0), holder[0], backgroundId).andExpect(status().isCreated());
+            assertThat(ownedCountOf(holder[0])).isZero();
+
+            deleteBackground(loginAsAdmin(), backgroundId)
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("BACKGROUND_IN_USE"));
+        }
+
+        @Test
+        @DisplayName("없는 배경을 지우면 404")
+        void missingBackgroundIsNotFound() throws Exception {
+            deleteBackground(loginAsAdmin(), 999_999L)
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("BACKGROUND_NOT_FOUND"));
         }
     }
 

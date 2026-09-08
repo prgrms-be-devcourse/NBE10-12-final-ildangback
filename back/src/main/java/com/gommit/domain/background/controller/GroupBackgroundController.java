@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "Group Background", description = "그룹 배경 조회 및 적용 API")
+@Tag(name = "Group Background", description = "그룹 배경 조회, 적용 및 admin용 API")
 @RestController
 @RequestMapping("/api/groups/{groupId}/background")
 @RequiredArgsConstructor

@@ -19,7 +19,7 @@ import com.gommit.domain.group.repository.ChallengeGroupRepository;
 import com.gommit.domain.group.repository.GroupMemberRepository;
 import com.gommit.domain.media.service.StorageService;
 import com.gommit.domain.point.entity.GroupPointReason;
-import com.gommit.domain.point.service.PointService;
+import com.gommit.domain.point.service.GroupPointService;
 import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
@@ -45,7 +45,7 @@ public class BackgroundPurchaseService {
     private final ChallengeGroupRepository challengeGroupRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final UserRepository userRepository;
-    private final PointService pointService;
+    private final GroupPointService groupPointService;
     private final StorageService storageService;
 
     // 구매 제안
@@ -210,7 +210,7 @@ public class BackgroundPurchaseService {
             return;
         }
 
-        pointService.deductGroup(
+        groupPointService.deduct(
                 groupId, background.getPrice(), GroupPointReason.BACKGROUND_PURCHASE, background.getName());
 
         GroupBackground purchased = groupBackgroundRepository.save(GroupBackground.builder()
@@ -264,7 +264,7 @@ public class BackgroundPurchaseService {
 
     // 그룹 포인트 잔액
     private int findGroupBalance(Long groupId) {
-        return pointService.getGroupBalance(groupId).balance();
+        return groupPointService.getBalance(groupId).balance();
     }
 
     // 활동 중인 멤버 확인
@@ -284,10 +284,10 @@ public class BackgroundPurchaseService {
 
         int agree = 0;
         int disagree = 0;
-        boolean voted = false;
+        Boolean myAgreed = null;
         for (BackgroundPurchaseVote vote : voteRepository.findAllByRequestId(request.getId())) {
             if (vote.getUserId().equals(userId)) {
-                voted = true;
+                myAgreed = vote.isAgreed();
             }
             if (!activeUserIds.contains(vote.getUserId())) {
                 continue;
@@ -313,6 +313,6 @@ public class BackgroundPurchaseService {
                 disagree,
                 totalMembers,
                 totalMembers / 2 + 1,
-                voted);
+                myAgreed);
     }
 }

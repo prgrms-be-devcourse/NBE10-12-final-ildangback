@@ -56,6 +56,7 @@ public enum ErrorCode {
     BACKGROUND_MAP_TYPE_MISMATCH(HttpStatus.BAD_REQUEST, "그룹과 배경의 맵 타입이 다릅니다."),
     BACKGROUND_ALREADY_OWNED(HttpStatus.CONFLICT, "이미 보유한 배경입니다."),
     BACKGROUND_NOT_OWNED(HttpStatus.CONFLICT, "보유하지 않은 배경입니다."),
+    BACKGROUND_IN_USE(HttpStatus.CONFLICT, "그룹이 보유했거나 구매 제안 이력이 있는 배경은 삭제할 수 없습니다."),
     PURCHASE_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "구매 제안을 찾을 수 없습니다."),
     PURCHASE_REQUEST_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 투표 중인 구매 제안이 있습니다."),
     PURCHASE_REQUEST_CLOSED(HttpStatus.CONFLICT, "이미 종료된 구매 제안입니다."),
