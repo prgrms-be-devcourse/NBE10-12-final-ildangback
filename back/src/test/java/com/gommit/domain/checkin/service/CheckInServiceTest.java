@@ -34,7 +34,7 @@ import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.checkin.support.CheckInPreconditions;
 import com.gommit.domain.checkin.support.CheckInPreconditions.ReadDateAccess;
 import com.gommit.domain.point.entity.UserPointReason;
-import com.gommit.domain.point.service.PointService;
+import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.domain.user.service.UserService;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
@@ -84,7 +84,7 @@ class CheckInServiceTest {
     private CheckInMediaStore mediaStore;
 
     @Mock
-    private PointService pointService;
+    private PersonalPointService personalPointService;
 
     @Mock
     private UserService userService;
@@ -96,7 +96,7 @@ class CheckInServiceTest {
         // businessDate 04:00 컷오프에 걸리지 않도록 이후 시각으로 고정
         Clock clock = Clock.fixed(TODAY.atTime(12, 0).toInstant(ZoneOffset.UTC), ZoneId.of("UTC"));
         service = new CheckInService(
-                checkInRepository, preconditions, policy, mediaStore, pointService, userService, clock);
+                checkInRepository, preconditions, policy, mediaStore, personalPointService, userService, clock);
         lenient().when(userService.findNicknames(anyList())).thenReturn(Map.of(USER_ID, "인증러"));
     }
 
@@ -148,10 +148,10 @@ class CheckInServiceTest {
             assertThat(result.checkIn().mediaType()).isEqualTo(MediaType.IMAGE);
 
             // 순서: 미디어 저장 → row 저장(flush) → 포인트 적립.
-            var order = inOrder(mediaStore, checkInRepository, pointService);
+            var order = inOrder(mediaStore, checkInRepository, personalPointService);
             order.verify(mediaStore).store(any());
             order.verify(checkInRepository).saveAndFlush(any(CheckIn.class));
-            order.verify(pointService).reward(USER_ID, CHALLENGE_ID, 10, UserPointReason.CHECK_IN, "인증");
+            order.verify(personalPointService).reward(USER_ID, CHALLENGE_ID, 10, UserPointReason.CHECK_IN, "인증");
         }
 
         @Test
@@ -250,7 +250,7 @@ class CheckInServiceTest {
 
             // insert 가 실패하면 방금 쓴 파일을 정리한다 — orphan 방지.
             verify(mediaStore).delete(anyString());
-            verify(pointService, never()).reward(anyLong(), anyLong(), anyInt(), any(), any());
+            verify(personalPointService, never()).reward(anyLong(), anyLong(), anyInt(), any(), any());
         }
     }
 
