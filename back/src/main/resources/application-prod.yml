@@ -27,3 +27,7 @@ auth-token:
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS}
+
+app:
+  frontend-base-url: https://go-mmit.site
+  api-base-url: https://api.go-mmit.site

@@ -14,7 +14,10 @@ services:
     depends_on:
       back:
         condition: service_healthy
-    mem_limit: 64m
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
   back:
     image: ghcr.io/${GHCR_REPO}/back:${IMAGE_TAG:-latest}
@@ -24,14 +27,15 @@ services:
     environment:
       JAVA_OPTS: "-Xms256m -Xmx768m -XX:+ExitOnOutOfMemoryError -Duser.timezone=Asia/Seoul"
       SPRING_PROFILES_ACTIVE: prod
-    expose:
-      - "8080"                        # nginx 만 접근. 호스트 포트 매핑 안 함.
     volumes:
       - media-tmp:/app/media-tmp      # ffmpeg 임시파일
     depends_on:
       mysql:
         condition: service_healthy
-    mem_limit: 1200m
+    deploy:
+      resources:
+        limits:
+          memory: 1200M
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
       interval: 30s
@@ -43,7 +47,7 @@ services:
     image: mysql:8.4
     restart: unless-stopped
     command:
-      # 버퍼풀 256M + 스레드 버퍼(50 conn) + InnoDB 오버헤드가 mem_limit(600m) 안에 들어오게.
+      # 버퍼풀 256M + 스레드 버퍼(50 conn) + InnoDB 오버헤드가 메모리 한도(600M) 안에 들어오도록.
       - --innodb-buffer-pool-size=256M
       - --max-connections=50
       - --character-set-server=utf8mb4
@@ -56,9 +60,12 @@ services:
       TZ: Asia/Seoul
     volumes:
       - mysql-data:/var/lib/mysql
-    expose:
-      - "3306"
-    mem_limit: 600m
+    ports:
+      - "127.0.0.1:3306:3306"
+    deploy:
+      resources:
+        limits:
+          memory: 600M
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 10s

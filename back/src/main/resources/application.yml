@@ -52,6 +52,10 @@ auth-token:
     expiration: 30d
     reuse-grace-period: 30s
 
+app:
+  frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+  api-base-url: ${API_BASE_URL:http://localhost:8080}
+
 media:
   storage:
     provider: ${MEDIA_STORAGE_PROVIDER:local}   # local | cloudinary
