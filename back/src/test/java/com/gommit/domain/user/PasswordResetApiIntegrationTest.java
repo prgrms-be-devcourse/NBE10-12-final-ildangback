@@ -2,6 +2,7 @@ package com.gommit.domain.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
@@ -109,6 +110,20 @@ class PasswordResetApiIntegrationTest extends IntegrationTestSupport {
             request(EMAIL).andExpect(status().isNoContent());
 
             assertThat(mailSender.lastToken()).isNull();
+        }
+
+        // 메일이 순서대로 도착하지 않아도 아무거나 누르면 된다
+        @Test
+        @DisplayName("여러 번 요청해도 이전 링크는 그대로 쓸 수 있다")
+        void keepsPreviousLinkOnReissue() throws Exception {
+            signUpAndVerify();
+            String oldToken = requestAndTakeToken();
+            ageTokens();
+
+            String newToken = requestAndTakeToken();
+
+            check(oldToken).andExpect(status().isOk());
+            check(newToken).andExpect(status().isOk());
         }
 
         // 인증 메일과 같은 방침이다. SMTP 가 죽었다고 요청이 실패하면 안 된다
@@ -220,6 +235,36 @@ class PasswordResetApiIntegrationTest extends IntegrationTestSupport {
         void rejectsShortPassword() throws Exception {
             confirm(issuedToken(), "Short1!").andExpect(status().isBadRequest());
         }
+
+        // 살아 있는 링크가 여럿이어도 비밀번호는 한 번만 바뀐다
+        @Test
+        @DisplayName("링크 하나를 쓰면 남은 링크도 무효화된다")
+        void revokesRemainingLinksOnReset() throws Exception {
+            signUpAndVerify();
+            String oldToken = requestAndTakeToken();
+            ageTokens();
+            String newToken = requestAndTakeToken();
+
+            confirm(oldToken, NEW_PASSWORD).andExpect(status().isNoContent());
+
+            check(newToken)
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("EMAIL_TOKEN_INVALID"));
+        }
+
+        // 링크를 받아둔 채로 마이페이지에서 직접 바꾼 경우다
+        @Test
+        @DisplayName("비밀번호를 직접 바꾸면 남아 있던 링크가 무효화된다")
+        void revokesLinkOnDirectPasswordChange() throws Exception {
+            String token = issuedToken();
+
+            changePassword(accessToken(DEFAULT_PASSWORD), NEW_PASSWORD).andExpect(status().isNoContent());
+
+            confirm(token, "An0therP@ss!")
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("EMAIL_TOKEN_INVALID"));
+            login(NEW_PASSWORD).andExpect(status().isOk());
+        }
     }
 
     // 폼을 다 채운 뒤에 만료를 알려주지 않기 위함이다
@@ -302,6 +347,21 @@ class PasswordResetApiIntegrationTest extends IntegrationTestSupport {
             mockMvc.perform(get("/api/auth/verify-email").param("token", resetToken))
                     .andExpect(redirectedUrl("http://localhost:5173/verify-result?status=invalid"));
         }
+
+        // 재발급이 종류를 안 가리면 가입 인증 링크까지 같이 죽는다
+        @Test
+        @DisplayName("재설정 링크를 재발급해도 가입 인증 토큰은 살아 있다")
+        void reissueKeepsSignUpToken() throws Exception {
+            signUp();
+            String verifyToken = mailSender.lastToken();
+            markEmailVerified();
+
+            requestAndTakeToken();
+            ageTokens();
+            requestAndTakeToken();
+
+            verify(verifyToken).andExpect(redirectedUrl("http://localhost:5173/verify-result?status=success"));
+        }
     }
 
     // 인증까지 마친 뒤 재설정 메일에서 토큰을 꺼낸다
@@ -357,6 +417,23 @@ class PasswordResetApiIntegrationTest extends IntegrationTestSupport {
     }
 
     // 최소 간격을 실제로 기다리지 않고 발급 시각을 과거로 민다
+    private ResultActions changePassword(String accessToken, String newPassword) throws Exception {
+        return mockMvc.perform(withToken(
+                jsonRequest(
+                        patch("/api/users/me/password"),
+                        json("currentPassword", DEFAULT_PASSWORD, "newPassword", newPassword)),
+                accessToken));
+    }
+
+    private String accessToken(String password) throws Exception {
+        return fieldOf(login(password).andReturn().getResponse().getContentAsString(), "accessToken");
+    }
+
+    // 가입 인증 토큰을 소진하지 않고 인증 상태만 만든다
+    private void markEmailVerified() {
+        jdbcTemplate.update("UPDATE users SET email_verified = TRUE WHERE email = ?", EMAIL);
+    }
+
     private void ageTokens() {
         jdbcTemplate.update(
                 "UPDATE email_tokens SET created_at = ?", LocalDateTime.now().minusMinutes(10));

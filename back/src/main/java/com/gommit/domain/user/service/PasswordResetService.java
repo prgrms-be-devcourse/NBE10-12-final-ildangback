@@ -96,6 +96,8 @@ public class PasswordResetService {
         Long userId = token.getUser().getId();
         emailTokenService.consume(token);
 
+        emailTokenService.revokeUnused(userId, TOKEN_TYPE);
+
         User user = userRepository
                 .findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));

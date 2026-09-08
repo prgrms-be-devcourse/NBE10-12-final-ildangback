@@ -13,6 +13,7 @@ import com.gommit.domain.user.UserFixture;
 import com.gommit.domain.user.dto.request.ChangePasswordRequest;
 import com.gommit.domain.user.dto.request.DeleteAccountRequest;
 import com.gommit.domain.user.dto.request.UpdateProfileRequest;
+import com.gommit.domain.user.entity.EmailTokenType;
 import com.gommit.domain.user.entity.User;
 import com.gommit.domain.user.repository.AuthIdentityRepository;
 import com.gommit.domain.user.repository.UserRepository;
@@ -47,6 +48,9 @@ class UserServiceTest {
     private RefreshTokenService refreshTokenService;
 
     @Mock
+    private EmailTokenService emailTokenService;
+
+    @Mock
     private GroupService groupService;
 
     @Mock
@@ -73,6 +77,7 @@ class UserServiceTest {
 
         assertThat(user.getPassword()).isEqualTo("new-encoded");
         verify(refreshTokenService).revokeAll(USER_ID);
+        verify(emailTokenService).revokeUnused(USER_ID, EmailTokenType.PASSWORD_RESET);
     }
 
     @Test

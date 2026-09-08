@@ -5,6 +5,7 @@ import com.gommit.domain.user.dto.request.ChangePasswordRequest;
 import com.gommit.domain.user.dto.request.DeleteAccountRequest;
 import com.gommit.domain.user.dto.request.UpdateProfileRequest;
 import com.gommit.domain.user.dto.response.UserProfileResponse;
+import com.gommit.domain.user.entity.EmailTokenType;
 import com.gommit.domain.user.entity.User;
 import com.gommit.domain.user.repository.AuthIdentityRepository;
 import com.gommit.domain.user.repository.UserRepository;
@@ -27,6 +28,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final AuthIdentityRepository authIdentityRepository;
     private final RefreshTokenService refreshTokenService;
+    private final EmailTokenService emailTokenService;
     private final GroupService groupService;
     private final PasswordEncoder passwordEncoder;
 
@@ -69,6 +71,7 @@ public class UserService {
 
         user.changePassword(passwordEncoder.encode(request.newPassword()));
         refreshTokenService.revokeAll(userId);
+        emailTokenService.revokeUnused(userId, EmailTokenType.PASSWORD_RESET);
     }
 
     // 회원 탈퇴

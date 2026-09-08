@@ -53,6 +53,12 @@ public class EmailTokenService {
         }
     }
 
+    // 해당 타입 미사용 토큰 전체 소진
+    @Transactional
+    public void revokeUnused(Long userId, EmailTokenType type) {
+        emailTokenRepository.revokeUnusedByUserIdAndType(userId, type, LocalDateTime.now());
+    }
+
     // 직전 토큰 발급이 최근인지 확인한다
     @Transactional(readOnly = true)
     public boolean hasRecent(Long userId, EmailTokenType type, Duration interval) {

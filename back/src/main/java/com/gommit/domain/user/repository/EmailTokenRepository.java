@@ -18,4 +18,10 @@ public interface EmailTokenRepository extends JpaRepository<EmailToken, Long> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update EmailToken t set t.usedAt = :now where t.id = :id and t.usedAt is null")
     int useIfUnused(@Param("id") Long id, @Param("now") LocalDateTime now);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update EmailToken t set t.usedAt = :now"
+            + " where t.user.id = :userId and t.tokenType = :type and t.usedAt is null")
+    int revokeUnusedByUserIdAndType(
+            @Param("userId") Long userId, @Param("type") EmailTokenType type, @Param("now") LocalDateTime now);
 }
