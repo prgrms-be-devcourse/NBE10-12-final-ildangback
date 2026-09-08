@@ -14,6 +14,7 @@ import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.domain.group.dto.request.GroupCreateRequest;
 import com.gommit.domain.group.entity.*;
 import com.gommit.domain.group.service.GroupService;
+import com.gommit.global.time.DaysOfWeek;
 import com.gommit.support.IntegrationTestSupport;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;

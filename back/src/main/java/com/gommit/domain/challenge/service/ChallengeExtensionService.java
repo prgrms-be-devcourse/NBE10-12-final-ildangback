@@ -10,6 +10,7 @@ import com.gommit.domain.group.entity.GroupMemberStatus;
 import com.gommit.domain.group.repository.GroupMemberRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import com.gommit.global.time.DaysOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;

@@ -1,8 +1,8 @@
 package com.gommit.domain.challenge.dto.request;
 
-import com.gommit.domain.challenge.entity.DaysOfWeek;
 import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.checkin.entity.CheckInType;
+import com.gommit.global.time.DaysOfWeek;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;

@@ -1,4 +1,4 @@
-package com.gommit.domain.challenge.entity;
+package com.gommit.global.time;
 
 import java.time.DayOfWeek;
 

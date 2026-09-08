@@ -3,8 +3,8 @@ package com.gommit.domain.challenge.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.gommit.domain.challenge.entity.Challenge;
-import com.gommit.domain.challenge.entity.DaysOfWeek;
 import com.gommit.domain.challenge.entity.FrequencyType;
+import com.gommit.global.time.DaysOfWeek;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;

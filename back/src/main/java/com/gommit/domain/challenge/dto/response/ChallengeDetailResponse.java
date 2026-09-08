@@ -2,9 +2,9 @@ package com.gommit.domain.challenge.dto.response;
 
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.ChallengeStatus;
-import com.gommit.domain.challenge.entity.DaysOfWeek;
 import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.checkin.entity.CheckInType;
+import com.gommit.global.time.DaysOfWeek;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
