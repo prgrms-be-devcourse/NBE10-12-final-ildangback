@@ -441,17 +441,21 @@ class CheckInServiceTest {
         }
 
         @Test
-        @DisplayName("최근 로그 — 한 줄 텍스트를 만들어 준다")
+        @DisplayName("최근 로그 — 메모가 있으면 '이름 + 메모', 없으면 폴백 문구")
         void recentText() {
+            CheckIn withMemo = checkIn(5L, CHALLENGE_ID, TODAY);
+            ReflectionTestUtils.setField(withMemo, "memo", "오늘 5km 뛰었다");
+            CheckIn noMemo = checkIn(6L, CHALLENGE_ID, TODAY);
             when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID))
                     .thenReturn(new ReadDateAccess(challenge, null));
             when(checkInRepository.findRecent(eq(CHALLENGE_ID), eq(null), any(Limit.class)))
-                    .thenReturn(List.of(checkIn(5L, CHALLENGE_ID, TODAY)));
+                    .thenReturn(List.of(withMemo, noMemo));
 
             RecentCheckInResponse recent = service.getRecent(USER_ID, CHALLENGE_ID, 3);
 
-            assertThat(recent.items()).hasSize(1);
-            assertThat(recent.items().get(0).text()).contains("인증러");
+            assertThat(recent.items()).hasSize(2);
+            assertThat(recent.items().get(0).text()).isEqualTo("인증러님: 오늘 5km 뛰었다");
+            assertThat(recent.items().get(1).text()).isEqualTo("인증러님이 인증을 남겼어요");
             assertThat(recent.items().get(0).earnedUserPoints()).isNull();
         }
 

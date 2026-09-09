@@ -200,13 +200,21 @@ public class CheckInService {
                     return new RecentCheckInItem(
                             c.getId(),
                             nickname,
-                            "%s님이 인증을 남겼어요".formatted(nickname),
+                            recentText(nickname, c.getMemo()),
                             null, // earnedUserPoints — 포인트 도메인(#7)
                             c.getCreatedAt());
                 })
                 .toList();
 
         return new RecentCheckInResponse(items);
+    }
+
+    // 한줄보기 문구 = 이름 + 메모. 메모 없는 인증은 기존 고정 문구로 폴백.
+    private static String recentText(String nickname, String memo) {
+        if (memo == null || memo.isBlank()) {
+            return "%s님이 인증을 남겼어요".formatted(nickname);
+        }
+        return "%s님: %s".formatted(nickname, memo);
     }
 
     public CheckInResponse getCheckIn(Long userId, Long challengeId, Long checkInId) {
