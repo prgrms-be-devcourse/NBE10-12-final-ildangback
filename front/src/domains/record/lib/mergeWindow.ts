@@ -1,7 +1,6 @@
-/** 회차 스테퍼/도트에 공통으로 쓰는 슬라이딩 윈도우 계산. 전체 회차 수가
- * windowSize를 넘으면(예: 1년 챌린지 12회차) 진행 중인 회차가 창 안에 들어오도록
- * 앞쪽(이미 지나간) 회차부터 밀어낸다 - MergeCircleHeader(가로 스테퍼)와
- * MergeProgressDots(사각 도트) 둘 다 이 계산을 그대로 쓴다. */
+/** MergeProgressDots가 쓰는 슬라이딩 윈도우 계산. 전체 회차 수가 windowSize를
+ * 넘으면(예: 1년 챌린지 12회차) 진행 중인 회차가 창 안에 들어오도록 앞쪽(이미
+ * 지나간) 회차부터 밀어낸다. */
 export interface MergeWindowResult {
   /** 창에 표시할 회차 index(0-based) 목록. */
   indices: number[];

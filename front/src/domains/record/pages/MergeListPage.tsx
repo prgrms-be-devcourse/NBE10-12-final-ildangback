@@ -2,7 +2,6 @@ import { CaretRightIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { getChallengeMergeOverview, getMergeList } from "../api";
-import { MergeCircleHeader } from "../components/MergeCircleHeader";
 import { MergeStatusCircle } from "../components/MergeStatusCircle";
 import { CATEGORY_LABEL } from "../lib/category";
 import { TopBar } from "../../../shared/ui/TopBar";
@@ -150,13 +149,6 @@ export function MergeListPage() {
               <span className="text-gray-400">
                 / {overview.totalMergeCount}개
               </span>
-            </div>
-            <div className="mt-4">
-              <MergeCircleHeader
-                totalCount={overview.totalMergeCount}
-                completedCount={overview.completedMergeCount}
-                hasCurrentCycle={overview.currentSeqNo != null}
-              />
             </div>
           </section>
         )}

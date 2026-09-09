@@ -3,8 +3,7 @@ import { CheckIcon } from "@phosphor-icons/react";
 export type MergeStatus = "completed" | "current" | "upcoming";
 
 // 원형 상태 마커. 완료(보라 채움+체크) / 진행중(흰 배경+보라 링+가운데 점) /
-// 예정(연한 회색) 3가지. 머지 목록 헤더의 가로 스테퍼랑, 목록 왼쪽 세로 타임라인
-// 둘 다 이걸 재사용한다.
+// 예정(연한 회색) 3가지. 머지 목록 왼쪽 세로 타임라인에서 쓴다.
 export function MergeStatusCircle({
   status,
   size = 32,

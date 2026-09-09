@@ -11,8 +11,8 @@ interface MergeProgressDotsProps {
 const WINDOW_SIZE = 5;
 
 // 완료(보라 채움+체크) / 진행중(흰 배경+보라 테두리+천천히 도는 로딩 아이콘) /
-// 예정(회색 배경+연한 테두리) 3가지 상태를 32x32 사각형(radius 7px)으로 표시한다.
-// 최대 5개만 보여준다 - 윈도잉 계산은 MergeCircleHeader와 공유(computeMergeWindow).
+// 예정(회색 배경+연한 테두리) 3가지 상태를 32x32 원형으로 표시한다. 최대 5개만
+// 보여준다. 점선은 도트가 2개 이상일 때만(사이를 이어줄 게 있을 때만) 그린다.
 export function MergeProgressDots({
   totalCount,
   completedCount,
@@ -27,10 +27,12 @@ export function MergeProgressDots({
 
   return (
     <div className="relative">
-      <div
-        className="absolute top-1/2 right-4 left-4 -translate-y-1/2 border-t border-dashed border-[#D2D2D2]"
-        aria-hidden
-      />
+      {indices.length > 1 && (
+        <div
+          className="absolute top-1/2 right-4 left-4 -translate-y-1/2 border-t border-dashed border-[#D2D2D2]"
+          aria-hidden
+        />
+      )}
       <div className="relative flex justify-between">
         {indices.map((index) => {
           const isCompleted = index < completedCount;
@@ -40,7 +42,7 @@ export function MergeProgressDots({
           return (
             <div
               key={index}
-              className={`flex h-8 w-8 items-center justify-center rounded-[7px] ${
+              className={`flex h-8 w-8 items-center justify-center rounded-full ${
                 isCompleted
                   ? "bg-[#8551C9]"
                   : isCurrent
