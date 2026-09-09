@@ -42,6 +42,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -246,6 +247,10 @@ public class CheckInService {
                 content, new MyCheckInPageMeta(page.nextCursor(), page.hasNext(), size, totalCount));
     }
 
+    // 엔티티 조회·인가만 하고 스토리지에서 바이트를 읽어 온다. Cloudinary 등 원격 스토리지의 load 는
+    // 동기 HTTP 왕복이라, 클래스 레벨 @Transactional(readOnly = true) 안에서 돌면 그 시간만큼 DB 커넥션을
+    // 붙잡는다. 여기 두 조회는 서로 독립이고 쓰기도 없으니 트랜잭션 없이 돌려 커넥션을 바로 반납한다.
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Resource loadCheckInMedia(Long userId, Long checkInId) {
         CheckIn checkIn = checkInRepository
                 .findById(checkInId)
