@@ -37,6 +37,10 @@ springdoc:
 app:
   time-zone: Asia/Seoul # 인증 businessDate('오늘') 판정에 쓰는 Clock 빈의 기준 타임존
 
+point: # [임시값] 기획 확정 시 조정. 없으면 PointProperties 의 @DefaultValue 로 뜬다.
+  check-in-reward: 10          # 개인 인증 1건
+  group-daily-all-complete: 5  # 그룹 ACTIVE 전원이 그날 목표 달성
+
 
 auth-token:
   access-token:

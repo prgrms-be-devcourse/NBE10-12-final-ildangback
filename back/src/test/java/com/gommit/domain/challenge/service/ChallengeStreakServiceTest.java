@@ -16,6 +16,7 @@ import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
+import com.gommit.domain.point.config.PointProperties;
 import com.gommit.domain.point.entity.GroupPointReason;
 import com.gommit.domain.point.service.GroupPointService;
 import com.gommit.domain.user.service.UserService;
@@ -60,7 +61,8 @@ class ChallengeStreakServiceTest {
                 challengeMemberRepository,
                 new ChallengeProgressCalculator(),
                 userService,
-                groupPointService);
+                groupPointService,
+                new PointProperties(10, 5, 0, 0));
     }
 
     private Challenge dailyChallenge() {

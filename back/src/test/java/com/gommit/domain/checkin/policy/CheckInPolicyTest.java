@@ -11,6 +11,7 @@ import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.challenge.service.ChallengeProgressCalculator;
 import com.gommit.domain.checkin.entity.CheckInType;
+import com.gommit.domain.point.config.PointProperties;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import java.util.List;
@@ -32,7 +33,7 @@ class CheckInPolicyTest {
 
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
-        policy = new CheckInPolicy(progressCalculator);
+        policy = new CheckInPolicy(progressCalculator, new PointProperties(10, 5, 0, 0));
     }
 
     @Nested

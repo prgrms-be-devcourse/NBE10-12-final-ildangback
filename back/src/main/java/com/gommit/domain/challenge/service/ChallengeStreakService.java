@@ -5,6 +5,7 @@ import com.gommit.domain.challenge.entity.ChallengeMember;
 import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
+import com.gommit.domain.point.config.PointProperties;
 import com.gommit.domain.point.entity.GroupPointReason;
 import com.gommit.domain.point.service.GroupPointService;
 import com.gommit.domain.user.service.UserService;
@@ -25,15 +26,12 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ChallengeStreakService {
 
-    // 그룹 하루 전원 완료 포인트. [임시값] — 기획 확정 필요. 개인 인증 10 대비 절반.
-    // TODO: PointProperties(@ConfigurationProperties) 로 이관 (별도 커밋). CheckInPolicy.POINT_PER_CHECK_IN 과 함께.
-    private static final int GROUP_DAILY_ALL_COMPLETE_POINT = 5;
-
     private final ChallengeRepository challengeRepository;
     private final ChallengeMemberRepository challengeMemberRepository;
     private final ChallengeProgressCalculator challengeProgressCalculator;
     private final UserService userService;
     private final GroupPointService groupPointService;
+    private final PointProperties pointProperties;
 
     @Transactional
     public MemberCheckInResult onMemberDailyComplete(Long challengeId, Long userId, LocalDate businessDate) {
@@ -64,7 +62,7 @@ public class ChallengeStreakService {
             // 그룹 포인트 적립 — 같은 트랜잭션. 그룹당 하루 1회(위 가드), 마지막 완료자 1명만 도달.
             groupPointService.reward(
                     challenge.getGroupId(),
-                    GROUP_DAILY_ALL_COMPLETE_POINT,
+                    pointProperties.groupDailyAllComplete(),
                     GroupPointReason.DAILY_ALL_COMPLETE,
                     "전원 하루 인증 완료");
             groupJustCompleted = true;
