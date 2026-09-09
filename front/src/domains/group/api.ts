@@ -1,3 +1,4 @@
+import type { ChallengeSummary } from "../challenge/types";
 import { apiFetch } from "../../shared/api/client";
 import type {
   GroupCreateRequest,
@@ -55,4 +56,24 @@ export function kickGroupMember(id: number, userId: number) {
   return apiFetch<void>(`/api/groups/${id}/members/${userId}`, {
     method: "DELETE",
   });
+}
+
+export async function getGroupChallenges(groupId: number) {
+  const seasons = await apiFetch<ChallengeSummary[]>(
+    `/api/groups/${groupId}/challenges`,
+  );
+  if (
+    !Array.isArray(seasons) ||
+    seasons.some(
+      (season) =>
+        !season ||
+        !Number.isSafeInteger(season.id) ||
+        season.id <= 0 ||
+        !Number.isSafeInteger(season.seqNo) ||
+        season.seqNo <= 0,
+    )
+  ) {
+    throw new Error("invalid season list");
+  }
+  return [...seasons].sort((a, b) => b.seqNo - a.seqNo);
 }

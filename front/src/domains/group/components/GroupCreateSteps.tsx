@@ -1,9 +1,7 @@
-import {
-  BarbellIcon,
-  BookOpenIcon,
-  CameraIcon,
-  CheckCircleIcon,
-} from "@phosphor-icons/react";
+import sportsIcon from "../../../assets/icons/sports.webp";
+import studyIcon from "../../../assets/icons/study.webp";
+import cameraIcon from "../../../assets/icons/camera.webp";
+import checkIcon from "../../../assets/icons/ei_check.webp";
 import { useFormContext, useWatch } from "react-hook-form";
 import { TextField } from "../../../shared/ui/TextField";
 import {
@@ -58,9 +56,21 @@ export function GroupCreateSteps({ step }: { step: number }) {
           >
             <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
               {map === "GYM" ? (
-                <BarbellIcon size={25} />
+                <img
+                  src={sportsIcon}
+                  alt=""
+                  width={25}
+                  height={25}
+                  className="shrink-0 object-contain"
+                />
               ) : (
-                <BookOpenIcon size={25} />
+                <img
+                  src={studyIcon}
+                  alt=""
+                  width={25}
+                  height={25}
+                  className="shrink-0 object-contain"
+                />
               )}
               {map === "GYM" ? "운동 맵" : "스터디룸 맵"}
             </h2>
@@ -301,18 +311,25 @@ export function GroupCreateSteps({ step }: { step: number }) {
     return (
       <div className="rounded-2xl border border-purple-500 bg-purple-50 p-5">
         <div className="flex items-center gap-4">
-          <CameraIcon size={36} className="text-purple-500" />
+          <img
+            src={cameraIcon}
+            alt=""
+            width={36}
+            height={36}
+            className="shrink-0 object-contain"
+          />
           <div className="flex-1">
             <h2 className="text-lg font-bold">사진</h2>
             <p className="mt-1 text-sm text-gray-500">
               사진으로 인증하는 챌린지예요.
             </p>
           </div>
-          <CheckCircleIcon
-            size={26}
-            weight="fill"
-            className="text-purple-500"
-            aria-label="선택됨"
+          <img
+            src={checkIcon}
+            alt="선택됨"
+            width={26}
+            height={26}
+            className="shrink-0 object-contain"
           />
         </div>
         <p className="mt-5 text-xs text-purple-700">

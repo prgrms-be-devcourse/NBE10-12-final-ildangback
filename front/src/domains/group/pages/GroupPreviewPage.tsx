@@ -1,3 +1,4 @@
+import peopleIcon from "../../../assets/icons/people.webp";
 import { useCallback, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useAuth } from "../../../shared/lib/useAuth";
@@ -105,7 +106,14 @@ function GroupPreview({ id }: { id: number }) {
               <ChallengeRulesCard settings={data.currentChallenge} />
             )}
             <section className="rounded-2xl border border-purple-200 p-4">
-              <h2 className="font-bold">
+              <h2 className="flex items-center gap-2 font-bold">
+                <img
+                  src={peopleIcon}
+                  alt=""
+                  width={20}
+                  height={20}
+                  className="shrink-0 object-contain"
+                />
                 함께할 멤버 {data.group.currentMembers} /{" "}
                 {data.group.maxMembers}
               </h2>

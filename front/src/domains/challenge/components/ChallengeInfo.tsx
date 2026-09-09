@@ -1,3 +1,7 @@
+import calendarIcon from "../../../assets/icons/griddy_icons_calendar_purple.webp";
+import cycleIcon from "../../../assets/icons/material_symbols_cycle_rounded.webp";
+import checkboxIcon from "../../../assets/icons/griddy_icons_checkbox.webp";
+import cameraIcon from "../../../assets/icons/iconoir_camera.webp";
 import { frequencyLabel } from "../presentation";
 import type { ReactNode } from "react";
 import type { ChallengeSettings, ChallengeStatus } from "../types";
@@ -13,14 +17,27 @@ export function StatusBadge({ status }: { status: ChallengeStatus }) {
 }
 export function InfoRow({
   label,
+  icon,
   children,
 }: {
   label: string;
+  icon?: string;
   children: ReactNode;
 }) {
   return (
     <div className="flex items-start justify-between gap-4 py-3 text-[13px]">
-      <dt className="shrink-0 text-gray-500">{label}</dt>
+      <dt className="flex shrink-0 items-center gap-2 text-gray-500">
+        {icon && (
+          <img
+            src={icon}
+            alt=""
+            width={18}
+            height={18}
+            className="h-[18px] w-[18px] shrink-0 object-contain"
+          />
+        )}
+        {label}
+      </dt>
       <dd className="min-w-0 text-right wrap-anywhere whitespace-pre-wrap">
         {children}
       </dd>
@@ -36,12 +53,16 @@ export function ChallengeRulesCard({
     <section className="rounded-2xl border border-purple-200 p-4">
       <h2 className="text-[17px] font-bold">챌린지 규칙</h2>
       <dl className="mt-2 divide-y divide-purple-100">
-        <InfoRow label="진행 기간">
+        <InfoRow label="진행 기간" icon={calendarIcon}>
           {settings.startDate} ~ {settings.endDate}
         </InfoRow>
-        <InfoRow label="인증 빈도">{frequencyLabel(settings)}</InfoRow>
-        <InfoRow label="하루 인증">{settings.dailyCheckInCount}회</InfoRow>
-        <InfoRow label="인증 방식">
+        <InfoRow label="인증 빈도" icon={cycleIcon}>
+          {frequencyLabel(settings)}
+        </InfoRow>
+        <InfoRow label="하루 인증" icon={checkboxIcon}>
+          {settings.dailyCheckInCount}회
+        </InfoRow>
+        <InfoRow label="인증 방식" icon={cameraIcon}>
           {settings.allowedTypes.includes("PHOTO")
             ? "사진"
             : "지원되는 인증 방식 없음"}

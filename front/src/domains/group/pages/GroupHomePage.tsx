@@ -1,4 +1,5 @@
-import { FunnelIcon, MagnifyingGlassIcon } from "@phosphor-icons/react";
+import filterIcon from "../../../assets/icons/mingcute_filter_line.webp";
+import searchIcon from "../../../assets/icons/tdesign_search.webp";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { ChallengeTabPlaceholder } from "../../../pages/ChallengeTabPlaceholder";
@@ -78,7 +79,13 @@ export function GroupHomePage() {
               onClick={() => setFilterOpen(true)}
               className="p-2 text-purple-700"
             >
-              <FunnelIcon size={24} />
+              <img
+                src={filterIcon}
+                alt=""
+                width={24}
+                height={24}
+                className="shrink-0 object-contain"
+              />
             </button>
           </div>
           <div className="mb-4 flex justify-end">
@@ -171,7 +178,13 @@ function SearchForm({
         className="h-13 min-w-0 flex-1 bg-transparent outline-none"
       />
       <button type="submit" aria-label="검색" className="p-2 text-gray-500">
-        <MagnifyingGlassIcon size={24} />
+        <img
+          src={searchIcon}
+          alt=""
+          width={24}
+          height={24}
+          className="shrink-0 object-contain"
+        />
       </button>
     </form>
   );

@@ -1,5 +1,5 @@
+import lockIcon from "../../../assets/icons/fluent_lock_closed_key_16_regular.webp";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { LockKeyIcon } from "@phosphor-icons/react";
 import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router";
@@ -55,7 +55,13 @@ export function GroupJoinByCodePage() {
     <>
       <TopBar title="초대코드로 참여" />
       <main className="px-6 pt-10 pb-10">
-        <LockKeyIcon size={72} className="mx-auto my-6 text-purple-500" />
+        <img
+          src={lockIcon}
+          alt=""
+          width={72}
+          height={72}
+          className="mx-auto my-6 h-18 w-18 object-contain"
+        />
         <h1 className="text-center text-2xl font-bold">
           초대코드를 입력해주세요
         </h1>

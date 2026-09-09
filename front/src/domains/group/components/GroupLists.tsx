@@ -1,10 +1,8 @@
-import {
-  ArrowRightIcon,
-  BookOpenIcon,
-  CodeIcon,
-  BarbellIcon,
-  UsersIcon,
-} from "@phosphor-icons/react";
+import sportsIcon from "../../../assets/icons/sports.webp";
+import codingIcon from "../../../assets/icons/coding.webp";
+import studyIcon from "../../../assets/icons/study.webp";
+import peopleIcon from "../../../assets/icons/people.webp";
+import { ArrowRightIcon } from "@phosphor-icons/react";
 import { useCallback } from "react";
 import { Link } from "react-router";
 import { Button } from "../../../shared/ui/Button";
@@ -41,12 +39,12 @@ export function ExploreGroupList({
   return (
     <div className="space-y-4">
       {list.page?.content.map((group) => {
-        const Icon =
+        const categoryImage =
           categoryMap(group.category) === "GYM"
-            ? BarbellIcon
+            ? sportsIcon
             : group.category === "DEV"
-              ? CodeIcon
-              : BookOpenIcon;
+              ? codingIcon
+              : studyIcon;
         return (
           <Link
             key={group.id}
@@ -54,7 +52,13 @@ export function ExploreGroupList({
             className="flex gap-4 rounded-2xl border border-purple-200 p-4 transition-colors hover:bg-purple-50 focus-visible:outline-purple-500"
           >
             <div className="flex h-20 w-20 shrink-0 items-center justify-center self-center rounded-xl bg-purple-50 text-purple-500">
-              <Icon size={42} weight="duotone" aria-hidden />
+              <img
+                src={categoryImage}
+                alt=""
+                width={42}
+                height={42}
+                className="shrink-0 object-contain"
+              />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
@@ -78,7 +82,13 @@ export function ExploreGroupList({
                 <p>{group.startDate} 시작</p>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1">
-                    <UsersIcon size={16} />
+                    <img
+                      src={peopleIcon}
+                      alt=""
+                      width={16}
+                      height={16}
+                      className="shrink-0 object-contain"
+                    />
                     {group.currentMembers} / {group.maxMembers}명
                   </span>
                   <ArrowRightIcon
@@ -147,7 +157,16 @@ function MyCard({ group }: { group: MyGroupSummary }) {
       </div>
       <ChallengeProgress {...group} />
       <p className="flex items-center justify-between text-sm text-gray-500">
-        <span>{group.participantCount}명 참여</span>
+        <span className="flex items-center gap-1">
+          <img
+            src={peopleIcon}
+            alt=""
+            width={16}
+            height={16}
+            className="shrink-0 object-contain"
+          />
+          {group.participantCount}명 참여
+        </span>
         <ArrowRightIcon size={20} />
       </p>
     </Link>
