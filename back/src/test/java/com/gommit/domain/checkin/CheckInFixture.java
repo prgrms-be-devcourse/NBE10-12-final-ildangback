@@ -75,8 +75,6 @@ public final class CheckInFixture {
         ReflectionTestUtils.setField(member, "userId", userId);
         ReflectionTestUtils.setField(member, "role", ChallengeMemberRole.MEMBER);
         ReflectionTestUtils.setField(member, "status", status);
-        ReflectionTestUtils.setField(member, "currentStreak", 0);
-        ReflectionTestUtils.setField(member, "bestStreak", 0);
         ReflectionTestUtils.setField(member, "leftAt", leftAt);
         ReflectionTestUtils.setField(member, "extensionChoice", ExtensionChoice.PENDING);
         return member;

@@ -21,6 +21,7 @@ import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.service.ChallengeProgressCalculator;
 import com.gommit.domain.challenge.service.ChallengeStreakService;
 import com.gommit.domain.challenge.service.MemberCheckInResult;
+import com.gommit.domain.challenge.service.MemberStreakCalculator;
 import com.gommit.domain.checkin.dto.request.SubmitCheckInRequest;
 import com.gommit.domain.checkin.dto.response.CheckInCursorResponse;
 import com.gommit.domain.checkin.dto.response.CheckInResponse;
@@ -99,6 +100,9 @@ class CheckInServiceTest {
     @Mock
     private ChallengeStreakService challengeStreakService;
 
+    @Mock
+    private MemberStreakCalculator memberStreakCalculator;
+
     private CheckInService service;
 
     @BeforeEach
@@ -114,6 +118,7 @@ class CheckInServiceTest {
                 personalPointService,
                 userService,
                 challengeStreakService,
+                memberStreakCalculator,
                 new BusinessClock(clock));
         lenient().when(userService.findNicknames(anyList())).thenReturn(Map.of(USER_ID, "인증러"));
     }
@@ -181,8 +186,10 @@ class CheckInServiceTest {
                     .thenReturn(0);
             when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
             when(checkInRepository.saveAndFlush(any(CheckIn.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(memberStreakCalculator.currentStreak(eq(challenge), eq(TODAY), any()))
+                    .thenReturn(3);
             when(challengeStreakService.onMemberDailyComplete(CHALLENGE_ID, USER_ID, TODAY))
-                    .thenReturn(new MemberCheckInResult(3, 2, 4, false));
+                    .thenReturn(new MemberCheckInResult(2, 4, false));
 
             CheckInResultResponse result = service.submit(USER_ID, CHALLENGE_ID, request(null), media());
 
