@@ -92,6 +92,8 @@ echo <GHCR_PAT> | docker login ghcr.io -u <github-user> --password-stdin
 # 최초 기동
 cp src/infra/compose/docker-compose.yml .
 cp src/infra/compose/backup.sh .
+cp src/infra/compose/deploy.sh .          # 이후 SSM 배포가 절대경로로 호출. 이후엔 deploy.sh 가 스스로 갱신.
+chmod +x deploy.sh
 rsync -a src/infra/nginx/ nginx/
 docker compose up -d
 docker compose ps

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # EC2 /opt/team1-app/deploy.sh. GitHub Actions 가 SSM RunCommand 로 호출:
 #   bash /opt/team1-app/deploy.sh <image-tag>
-# 롤백: 이전 태그로 다시 호출 (bash deploy.sh <old-sha>).
+# 롤백: 이미지·설정이 함께 되돌아가도록 SHA 를 두 번 넘긴다
+#   (bash deploy.sh <old-12자-sha> <old-full-sha>). 인자 1개면 설정은 최신 main 이 됨.
 #
 # 전제 (최초 1회, infra/docs/infra-runbook.md 참고):
 #   - /opt/team1-app/src        : 이 리포지토리 clone
@@ -30,6 +31,12 @@ git -C "$APP_DIR/src" reset --hard FETCH_HEAD
 rsync -a --delete "$APP_DIR/src/infra/nginx/" "$APP_DIR/nginx/"
 cp "$APP_DIR/src/infra/compose/docker-compose.yml" "$APP_DIR/docker-compose.yml"
 cp "$APP_DIR/src/infra/compose/backup.sh"          "$APP_DIR/backup.sh"
+
+# deploy.sh 자신도 갱신. 실행 중 파일을 in-place 로 덮으면 bash 가 깨지므로
+# 임시파일 → mv(원자적 rename, inode 교체). 새 버전은 다음 배포부터 적용.
+cp -p "$APP_DIR/deploy.sh" "$APP_DIR/deploy.sh.bak" 2>/dev/null || true
+install -m 755 "$APP_DIR/src/infra/compose/deploy.sh" "$APP_DIR/deploy.sh.new"
+mv "$APP_DIR/deploy.sh.new" "$APP_DIR/deploy.sh"
 
 # 3. 이미지 태그 갱신
 if grep -q '^IMAGE_TAG=' .env; then

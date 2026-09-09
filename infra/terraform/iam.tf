@@ -83,9 +83,11 @@ resource "aws_iam_role_policy" "deploy" {
         ]
       },
       {
-        Sid      = "ReadResultAndState"
-        Effect   = "Allow"
-        Action   = ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations", "ec2:DescribeInstances"]
+        Sid    = "ReadResultAndState"
+        Effect = "Allow"
+        # DescribeInstanceInformation: 콜드스타트 시 SSM 에이전트 준비 상태(PingStatus) 확인용.
+        # resource-level 제약 불가라 Resource="*" 필수 — 이 statement 가 이미 그렇다.
+        Action   = ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations", "ssm:DescribeInstanceInformation", "ec2:DescribeInstances"]
         Resource = "*"
       },
       {

@@ -36,11 +36,12 @@ services:
       resources:
         limits:
           memory: 1200M
+    # 이미지 Dockerfile 의 HEALTHCHECK 와 값을 맞춘다 (드리프트 방지).
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
       interval: 30s
       timeout: 3s
-      retries: 5
+      retries: 3
       start_period: 90s
 
   mysql:

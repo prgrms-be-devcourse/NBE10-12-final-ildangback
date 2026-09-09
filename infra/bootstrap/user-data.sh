@@ -64,6 +64,8 @@ cat > /etc/systemd/system/team1-app.service <<'UNIT'
 Description=gommit docker compose stack
 Requires=docker.service
 After=docker.service
+# 첫 배포 전(compose 파일 없음)에는 유닛을 skip — 부팅마다 failed 로 남지 않게.
+ConditionPathExists=/opt/team1-app/docker-compose.yml
 
 [Service]
 Type=oneshot
