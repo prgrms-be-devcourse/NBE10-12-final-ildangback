@@ -216,10 +216,9 @@ public class RecordQueryService {
                 currentCycleDay);
     }
 
-    // "개인 전체 통계" 화면(GET /users/me/stats) - 이미 발행된 머지 결과(스냅샷)만
-    // 집계하므로 CheckIn 도메인 없이도 계산할 수 있다. "패턴"(요일별 인증 패턴)은
-    // 날짜 단위 체크인 원본 데이터가 있어야 해서 CheckIn 도메인 연동 후 추가한다.
-    public PersonalStatsResponse getMyStats(Long userId) {
+    // "개인 전체 통계" 화면(GET /users/me/stats). 발행된 머지 결과(스냅샷)만 집계한다.
+    // from/to는 회차 period와 겹치는지로 필터, 둘 다 없으면 전체 기간.
+    public PersonalStatsResponse getMyStats(Long userId, LocalDate from, LocalDate to) {
         List<MonthlyMergeResult> monthlyResults = monthlyMergeResultRepository.findAllByUserId(userId);
         List<FinalMergeResult> finalResults = finalMergeResultRepository.findAllByUserId(userId);
         Map<Long, MonthlyMerge> monthlyMergesById = monthlyMergeRepository
@@ -257,6 +256,7 @@ public class RecordQueryService {
         // 그룹/챌린지가 삭제되는 등 정합성이 깨져 정보를 못 찾은 회차는 통계에서 제외한다.
         List<StatRow> rows = allRows.stream()
                 .filter(row -> infoByChallengeId.containsKey(row.challengeId()))
+                .filter(row -> overlaps(row, from, to))
                 .toList();
 
         return new PersonalStatsResponse(
@@ -330,6 +330,15 @@ public class RecordQueryService {
                         Math.min(HEATMAP_LEVELS, averageCompletionRate(entry.getValue()) * HEATMAP_LEVELS / 100)))
                 .sorted(Comparator.comparing(HeatmapCellResponse::month))
                 .toList();
+    }
+
+    // 회차 기간 [periodStart, periodEnd]가 조회 범위 [from, to]와 겹치는지. from/to가
+    // null이면 그쪽은 제한이 없는 것으로 취급한다.
+    private boolean overlaps(StatRow row, LocalDate from, LocalDate to) {
+        if (from != null && row.periodEnd().isBefore(from)) {
+            return false;
+        }
+        return to == null || !row.periodStart().isAfter(to);
     }
 
     private int averageCompletionRate(List<StatRow> rows) {

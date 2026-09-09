@@ -491,7 +491,7 @@ class RecordQueryServiceTest {
                             challengeGroup(10L, "오운완", GroupCategory.EXERCISE),
                             challengeGroup(20L, "매일 20분 독서", GroupCategory.READING)));
 
-            PersonalStatsResponse response = recordQueryService.getMyStats(1L);
+            PersonalStatsResponse response = recordQueryService.getMyStats(1L, null, null);
 
             // 챌린지 1(EXERCISE)은 최종 머지가 없어 진행 중, 챌린지 2(READING)는 최종
             // 머지가 있어 완주로 집계된다.
@@ -521,6 +521,35 @@ class RecordQueryServiceTest {
         }
 
         @Test
+        @DisplayName("from/to를 주면 그 기간과 겹치는 회차만 집계한다")
+        void filtersByFromTo() {
+            when(monthlyMergeResultRepository.findAllByUserId(1L))
+                    .thenReturn(List.of(monthlyMergeResult(1L, 10L, 1L), monthlyMergeResult(2L, 11L, 1L)));
+            when(finalMergeResultRepository.findAllByUserId(1L)).thenReturn(List.of(finalMergeResult(3L, 20L, 1L)));
+            when(monthlyMergeRepository.findAllById(List.of(10L, 11L)))
+                    .thenReturn(List.of(monthlyMerge(10L, 1L, 1), monthlyMerge(11L, 1L, 2)));
+            when(finalMergeRepository.findAllById(List.of(20L))).thenReturn(List.of(finalMerge(20L, 2L)));
+            when(challengeRepository.findAllById(List.of(1L, 2L)))
+                    .thenReturn(List.of(
+                            challenge(1L, 10L, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 18)),
+                            challenge(2L, 20L, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 8, 31))));
+            when(challengeGroupRepository.findAllById(List.of(10L, 20L)))
+                    .thenReturn(List.of(
+                            challengeGroup(10L, "오운완", GroupCategory.EXERCISE),
+                            challengeGroup(20L, "매일 20분 독서", GroupCategory.READING)));
+
+            // 월간 머지 두 건 기간은 8/20~9/18, 최종 머지 기간은 3/1~8/31(픽스처 고정값).
+            // 3월로 조회하면 월간 머지는 안 겹쳐서 빠지고 최종 머지만 남아야 한다.
+            PersonalStatsResponse response =
+                    recordQueryService.getMyStats(1L, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
+
+            assertThat(response.summary().totalCheckInCount()).isEqualTo(169);
+            assertThat(response.monthlyTrend())
+                    .extracting(MonthlyTrendItemResponse::month)
+                    .containsExactly("2026-03");
+        }
+
+        @Test
         @DisplayName("참여한 머지가 없으면 전부 0/빈 값이다")
         void returnsEmptyStatsWhenNoParticipation() {
             when(monthlyMergeResultRepository.findAllByUserId(1L)).thenReturn(List.of());
@@ -530,7 +559,7 @@ class RecordQueryServiceTest {
             when(challengeRepository.findAllById(List.of())).thenReturn(List.of());
             when(challengeGroupRepository.findAllById(List.of())).thenReturn(List.of());
 
-            PersonalStatsResponse response = recordQueryService.getMyStats(1L);
+            PersonalStatsResponse response = recordQueryService.getMyStats(1L, null, null);
 
             assertThat(response.summary().completedChallengeCount()).isZero();
             assertThat(response.summary().inProgressChallengeCount()).isZero();
