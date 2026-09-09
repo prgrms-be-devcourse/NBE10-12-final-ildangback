@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.gommit.domain.checkin.dto.request.SubmitCheckInRequest;
 import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.domain.checkin.service.CheckInService;
+import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.support.IntegrationTestSupport;
 import com.jayway.jsonpath.JsonPath;
@@ -33,6 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 
@@ -709,6 +711,44 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
             mockMvc.perform(withToken(get("/api/check-ins/999999/media"), tokens.accessToken()))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.code").value("CHECK_IN_NOT_FOUND"));
+        }
+    }
+
+    @Nested
+    @DisplayName("포인트 적립 트랜잭션 전파")
+    class PointRewardPropagation {
+
+        // PersonalPointService.reward 는 REQUIRED 전파라 submit 트랜잭션에 참여한다.
+        // 적립이 실패하면 인증 row 저장까지 함께 롤백돼야 한다.
+        @MockitoBean
+        private PersonalPointService personalPointService;
+
+        @Test
+        @DisplayName("포인트 적립이 실패하면 인증 row 도 롤백되고 500 을 준다")
+        void rewardFailureRollsBackCheckIn() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+            long userId = userIdOf(EMAIL);
+            long challengeId = setUpChallenge(EMAIL, 1);
+            org.mockito.Mockito.doThrow(new IllegalStateException("적립 실패"))
+                    .when(personalPointService)
+                    .reward(
+                            org.mockito.ArgumentMatchers.anyLong(),
+                            org.mockito.ArgumentMatchers.anyLong(),
+                            org.mockito.ArgumentMatchers.anyInt(),
+                            org.mockito.ArgumentMatchers.any(),
+                            org.mockito.ArgumentMatchers.anyString());
+
+            submit(challengeId, tokens.accessToken()).andExpect(status().is5xxServerError());
+
+            Integer checkInCount = jdbcTemplate.queryForObject(
+                    "select count(*) from check_ins where challenge_id = ? and user_id = ?",
+                    Integer.class,
+                    challengeId,
+                    userId);
+            assertThat(checkInCount).isZero();
+            Integer pointRows = jdbcTemplate.queryForObject(
+                    "select count(*) from user_points where user_id = ?", Integer.class, userId);
+            assertThat(pointRows).isZero();
         }
     }
 }
