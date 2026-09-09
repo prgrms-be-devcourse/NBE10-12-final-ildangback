@@ -46,6 +46,10 @@ class GroupApiIntegrationTest extends IntegrationTestSupport {
         return mockMvc.perform(withToken(get("/api/groups/" + groupId), accessToken));
     }
 
+    private ResultActions getGroupChallenges(String accessToken, Long groupId) throws Exception {
+        return mockMvc.perform(withToken(get("/api/groups/" + groupId + "/challenges"), accessToken));
+    }
+
     private ResultActions joinGroup(String accessToken, Long groupId) throws Exception {
         return mockMvc.perform(withToken(post("/api/groups/" + groupId + "/members"), accessToken));
     }
@@ -196,6 +200,97 @@ class GroupApiIntegrationTest extends IntegrationTestSupport {
             var tokens = loginAs(EMAIL, NICKNAME);
 
             getGroupDetail(tokens.accessToken(), 999L)
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("GROUP_NOT_FOUND"));
+        }
+    }
+
+    @Nested
+    @DisplayName("그룹 시즌 목록 조회")
+    class GroupChallenges {
+
+        @Test
+        @DisplayName("ACTIVE 멤버는 그룹의 시즌 목록을 조회할 수 있다")
+        void returnsSeasonsForActiveMember() throws Exception {
+            var owner = loginAs(EMAIL, NICKNAME);
+            Long groupId = createGroupAndReturnId(owner.accessToken(), userIdOf(EMAIL), "오운완 모임");
+            var member = loginAs("member@example.com", "멤버");
+            joinGroup(member.accessToken(), groupId).andExpect(status().isCreated());
+
+            getGroupChallenges(member.accessToken(), groupId)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.length()").value(1))
+                    .andExpect(jsonPath("$[0].id").value(readyChallengeIdOf(groupId)))
+                    .andExpect(jsonPath("$[0].seqNo").value(1))
+                    .andExpect(jsonPath("$[0].status").value("READY"));
+        }
+
+        @Test
+        @DisplayName("ENDED·ACTIVE·READY 시즌을 모두 seqNo 오름차순으로 반환한다")
+        void returnsAllSeasonStatusesInSeqNoAscendingOrder() throws Exception {
+            var owner = loginAs(EMAIL, NICKNAME);
+            Long groupId = createGroupAndReturnId(owner.accessToken(), userIdOf(EMAIL), "오운완 모임");
+            var member = loginAs("member@example.com", "멤버");
+            joinGroup(member.accessToken(), groupId).andExpect(status().isCreated());
+            Long firstId = readyChallengeIdOf(groupId);
+            jdbcTemplate.update("update challenges set status = 'ENDED' where id = ?", firstId);
+            Challenge third = saveSeason(groupId, 3, ChallengeStatus.READY);
+            Challenge second = saveSeason(groupId, 2, ChallengeStatus.ACTIVE);
+            createGroupAndReturnId(owner.accessToken(), userIdOf(EMAIL), "다른 그룹");
+
+            getGroupChallenges(member.accessToken(), groupId)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.length()").value(3))
+                    .andExpect(jsonPath("$[0].id").value(firstId))
+                    .andExpect(jsonPath("$[0].seqNo").value(1))
+                    .andExpect(jsonPath("$[0].status").value("ENDED"))
+                    .andExpect(jsonPath("$[1].id").value(second.getId()))
+                    .andExpect(jsonPath("$[1].seqNo").value(2))
+                    .andExpect(jsonPath("$[1].status").value("ACTIVE"))
+                    .andExpect(jsonPath("$[2].id").value(third.getId()))
+                    .andExpect(jsonPath("$[2].seqNo").value(3))
+                    .andExpect(jsonPath("$[2].status").value("READY"));
+        }
+
+        @Test
+        @DisplayName("그룹에 가입하지 않은 사용자는 403")
+        void rejectsNonMember() throws Exception {
+            var owner = loginAs(EMAIL, NICKNAME);
+            Long groupId = createGroupAndReturnId(owner.accessToken(), userIdOf(EMAIL), "오운완 모임");
+            var outsider = loginAs("outsider@example.com", "비회원");
+
+            getGroupChallenges(outsider.accessToken(), groupId)
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("NOT_GROUP_MEMBER"));
+        }
+
+        @ParameterizedTest
+        @EnumSource(
+                value = GroupMemberStatus.class,
+                names = {"LEFT", "KICKED"})
+        @DisplayName("LEFT·KICKED 멤버는 403")
+        void rejectsInactiveMember(GroupMemberStatus memberStatus) throws Exception {
+            var owner = loginAs(EMAIL, NICKNAME);
+            Long groupId = createGroupAndReturnId(owner.accessToken(), userIdOf(EMAIL), "오운완 모임");
+            var member = loginAs("member@example.com", "멤버");
+            joinGroup(member.accessToken(), groupId).andExpect(status().isCreated());
+            jdbcTemplate.update(
+                    "update group_members set status = ? where group_id = ? and user_id = ?",
+                    memberStatus.name(),
+                    groupId,
+                    userIdOf("member@example.com"));
+
+            getGroupChallenges(member.accessToken(), groupId)
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("NOT_GROUP_MEMBER"));
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 그룹이면 404")
+        void returns404WhenGroupNotFound() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+
+            getGroupChallenges(tokens.accessToken(), 999L)
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.code").value("GROUP_NOT_FOUND"));
         }
