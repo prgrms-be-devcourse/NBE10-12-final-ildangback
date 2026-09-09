@@ -180,7 +180,7 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
             assertThat(history)
                     .containsEntry("amount", 10)
                     .containsEntry("reason", "CHECK_IN")
-                    .containsEntry("source_name", "인증");
+                    .containsEntry("source_name", "테스트그룹");
         }
 
         @Test

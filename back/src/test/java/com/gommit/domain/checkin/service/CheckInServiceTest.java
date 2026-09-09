@@ -37,6 +37,7 @@ import com.gommit.domain.checkin.policy.CheckInPolicy;
 import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.checkin.support.CheckInPreconditions;
 import com.gommit.domain.checkin.support.CheckInPreconditions.ReadDateAccess;
+import com.gommit.domain.group.repository.ChallengeGroupRepository;
 import com.gommit.domain.point.entity.UserPointReason;
 import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.domain.user.service.UserService;
@@ -103,6 +104,9 @@ class CheckInServiceTest {
     @Mock
     private MemberStreakCalculator memberStreakCalculator;
 
+    @Mock
+    private ChallengeGroupRepository challengeGroupRepository;
+
     private CheckInService service;
 
     @BeforeEach
@@ -119,8 +123,10 @@ class CheckInServiceTest {
                 userService,
                 challengeStreakService,
                 memberStreakCalculator,
+                challengeGroupRepository,
                 new BusinessClock(clock));
         lenient().when(userService.findNicknames(anyList())).thenReturn(Map.of(USER_ID, "인증러"));
+        lenient().when(challengeGroupRepository.findNameById(1L)).thenReturn(Optional.of("오운완 모임"));
     }
 
     private MultipartFile media() {
@@ -174,7 +180,7 @@ class CheckInServiceTest {
             var order = inOrder(mediaStore, checkInRepository, personalPointService);
             order.verify(mediaStore).store(any());
             order.verify(checkInRepository).saveAndFlush(any(CheckIn.class));
-            order.verify(personalPointService).reward(USER_ID, CHALLENGE_ID, 10, UserPointReason.CHECK_IN, "인증");
+            order.verify(personalPointService).reward(USER_ID, CHALLENGE_ID, 10, UserPointReason.CHECK_IN, "오운완 모임");
         }
 
         @Test
@@ -197,6 +203,23 @@ class CheckInServiceTest {
             assertThat(result.currentStreak()).isEqualTo(3);
             assertThat(result.groupCompletedCount()).isEqualTo(2);
             assertThat(result.groupTotalCount()).isEqualTo(4);
+        }
+
+        @Test
+        @DisplayName("그룹명을 찾을 수 없으면 포인트 이력 sourceName 은 고정 라벨로 폴백한다")
+        void fallsBackToLabelWhenGroupNameMissing() {
+            Challenge challenge = dailyChallenge(CHALLENGE_ID, 3);
+            givenActiveMemberAndValidDay(challenge);
+            when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
+                    .thenReturn(1);
+            when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
+            when(policy.checkInReward()).thenReturn(10);
+            when(checkInRepository.saveAndFlush(any(CheckIn.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(challengeGroupRepository.findNameById(1L)).thenReturn(Optional.empty());
+
+            service.submit(USER_ID, CHALLENGE_ID, request(null), media());
+
+            verify(personalPointService).reward(USER_ID, CHALLENGE_ID, 10, UserPointReason.CHECK_IN, "인증");
         }
 
         // 챌린지 ACTIVE 여부 / 멤버 ACTIVE 여부 판정 자체는 CheckInPreconditionsTest 가 검증한다.

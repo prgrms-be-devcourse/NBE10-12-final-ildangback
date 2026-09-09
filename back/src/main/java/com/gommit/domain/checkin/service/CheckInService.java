@@ -24,6 +24,7 @@ import com.gommit.domain.checkin.policy.CheckInPolicy;
 import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.checkin.support.CheckInPreconditions;
 import com.gommit.domain.checkin.support.CheckInPreconditions.ReadDateAccess;
+import com.gommit.domain.group.repository.ChallengeGroupRepository;
 import com.gommit.domain.point.entity.UserPointReason;
 import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.domain.user.service.UserService;
@@ -62,6 +63,7 @@ public class CheckInService {
     private final UserService userService;
     private final ChallengeStreakService challengeStreakService;
     private final MemberStreakCalculator memberStreakCalculator;
+    private final ChallengeGroupRepository challengeGroupRepository;
     private final BusinessClock businessClock;
 
     public TodayCheckInStatusResponse getTodayStatus(Long userId, Long challengeId) {
@@ -110,11 +112,13 @@ public class CheckInService {
         }
 
         // 포인트 적립 — 같은 트랜잭션. 실패 시 인증도 롤백된다.
-        // PersonalPointService.reward는 전달한 sourceName 을 그대로 저장.
-        // TODO: 포인트 이력 화면에 필요한 챌린지/그룹명을 checkin이 ChallengeGroup 을 조회해 넘겨야 함, 지금은 고정 라벨 사용.
+        // PersonalPointService.reward는 전달한 sourceName 을 그대로 저장. 포인트 이력 화면이 그룹명을 보여줘야 해서
+        // 챌린지가 속한 그룹명을 넘긴다. (그룹이 지워진 예외적 상황이면 고정 라벨로 폴백)
+        String sourceName =
+                challengeGroupRepository.findNameById(challenge.getGroupId()).orElse("인증");
         int earnedUserPoints = policy.checkInReward();
         try {
-            personalPointService.reward(userId, challengeId, earnedUserPoints, UserPointReason.CHECK_IN, "인증");
+            personalPointService.reward(userId, challengeId, earnedUserPoints, UserPointReason.CHECK_IN, sourceName);
         } catch (RuntimeException e) {
             log.error(
                     "포인트 적립 실패로 인증 롤백: challengeId={}, userId={}, roundNo={}, earnedUserPoints={}",
