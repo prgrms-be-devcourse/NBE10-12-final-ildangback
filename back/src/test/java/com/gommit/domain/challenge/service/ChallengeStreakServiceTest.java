@@ -197,7 +197,7 @@ class ChallengeStreakServiceTest {
 
             service.onMemberDailyComplete(CHALLENGE_ID, 1L, TODAY);
 
-            verify(userService).recordDailyCompletion(1L, TODAY, TODAY.minusDays(1));
+            verify(userService).applyDailyCompletion(1L, TODAY, TODAY.minusDays(1));
         }
     }
 

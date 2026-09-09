@@ -87,7 +87,7 @@ public class User extends BaseEntity {
     // 연속성은 "인증 대상일" 기준: previousCheckInDay 는 이 완료를 트리거한 챌린지의 직전 대상일.
     // 여러 챌린지 교차 스트릭이라 특정 챌린지 대상일에 정확히 일치할 필요는 없고, 직전 대상일 이후로
     // 활동이 이어졌으면(마지막 완료일 >= 직전 대상일) 연속으로 본다. 아니면 1 로 리셋.
-    public void recordDailyCompletion(LocalDate businessDate, LocalDate previousCheckInDay) {
+    public void applyDailyCompletion(LocalDate businessDate, LocalDate previousCheckInDay) {
         if (businessDate.equals(this.lastCheckedInDate)) {
             return;
         }

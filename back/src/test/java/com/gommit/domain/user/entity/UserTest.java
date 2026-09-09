@@ -26,7 +26,7 @@ class UserTest {
     @DisplayName("첫 완료면 스트릭 1")
     void first() {
         User user = user();
-        user.recordDailyCompletion(D10, D10.minusDays(1));
+        user.applyDailyCompletion(D10, D10.minusDays(1));
         assertThat(user.getPersonalStreak()).isEqualTo(1);
         assertThat(user.getBestStreak()).isEqualTo(1);
     }
@@ -36,7 +36,7 @@ class UserTest {
     void consecutiveExact() {
         User user = user();
         setStreak(user, 3, 5, D10.minusDays(1));
-        user.recordDailyCompletion(D10, D10.minusDays(1));
+        user.applyDailyCompletion(D10, D10.minusDays(1));
         assertThat(user.getPersonalStreak()).isEqualTo(4);
     }
 
@@ -46,7 +46,7 @@ class UserTest {
         User user = user();
         // 트리거 챌린지의 직전 대상일은 9/7 인데, 유저는 9/9 에 다른 챌린지로 활동했다.
         setStreak(user, 3, 5, D10.minusDays(1));
-        user.recordDailyCompletion(D10, D10.minusDays(3));
+        user.applyDailyCompletion(D10, D10.minusDays(3));
         assertThat(user.getPersonalStreak()).isEqualTo(4);
     }
 
@@ -55,7 +55,7 @@ class UserTest {
     void resetWhenGapBeforePreviousCheckInDay() {
         User user = user();
         setStreak(user, 8, 8, D10.minusDays(5));
-        user.recordDailyCompletion(D10, D10.minusDays(2));
+        user.applyDailyCompletion(D10, D10.minusDays(2));
         assertThat(user.getPersonalStreak()).isEqualTo(1);
         assertThat(user.getBestStreak()).isEqualTo(8);
     }
@@ -65,7 +65,7 @@ class UserTest {
     void idempotentPerDay() {
         User user = user();
         setStreak(user, 4, 4, D10);
-        user.recordDailyCompletion(D10, D10.minusDays(1));
+        user.applyDailyCompletion(D10, D10.minusDays(1));
         assertThat(user.getPersonalStreak()).isEqualTo(4);
     }
 }

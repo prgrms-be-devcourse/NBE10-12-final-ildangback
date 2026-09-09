@@ -118,8 +118,8 @@ public class UserService {
     // 소속 챌린지 중 하나라도 businessDate 의 하루 인증 목표를 채웠을 때 호출한다(당일 1회).
     // previousCheckInDay = 그 완료를 트리거한 챌린지의 직전 인증 대상일(연속성 판정용).
     @Transactional
-    public void recordDailyCompletion(Long userId, LocalDate businessDate, LocalDate previousCheckInDay) {
-        findNotDeleted(userId).recordDailyCompletion(businessDate, previousCheckInDay);
+    public void applyDailyCompletion(Long userId, LocalDate businessDate, LocalDate previousCheckInDay) {
+        findNotDeleted(userId).applyDailyCompletion(businessDate, previousCheckInDay);
     }
 
     // 닉네임 일괄 조회

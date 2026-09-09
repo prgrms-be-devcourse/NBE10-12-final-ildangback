@@ -58,7 +58,7 @@ public class ChallengeStreakService {
         member.completeDay(businessDate, previousCheckInDay);
 
         // 유저 전역 스트릭 — 이 챌린지의 직전 대상일 기준으로 연속성 판정.
-        userService.recordDailyCompletion(userId, businessDate, previousCheckInDay);
+        userService.applyDailyCompletion(userId, businessDate, previousCheckInDay);
 
         // 그룹 전원 완료 판정. 다른 멤버가 방금 커밋한 인증까지 보려면 새 트랜잭션(새 스냅샷)으로 읽는다.
         // 그 읽기에는 아직 커밋 전인 "내 이번 인증"이 안 보이므로, 나는 완료로 치고 나머지만 확인한다.
