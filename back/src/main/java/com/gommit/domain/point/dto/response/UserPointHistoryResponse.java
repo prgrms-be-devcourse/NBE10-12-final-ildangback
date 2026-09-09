@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 public record UserPointHistoryResponse(
         Long id,
         Long userId,
+        Long challengeId,
         String sourceName,
         int amount,
         UserPointReason reason,
@@ -17,6 +18,7 @@ public record UserPointHistoryResponse(
         return new UserPointHistoryResponse(
                 history.getId(),
                 history.getUserId(),
+                history.getChallengeId(),
                 history.getSourceName(),
                 history.getAmount(),
                 history.getReason(),
