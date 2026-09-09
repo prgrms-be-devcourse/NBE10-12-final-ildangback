@@ -328,7 +328,7 @@ class CheckInServiceTest {
         @DisplayName("현재/목표 회차와 대상일 여부, 허용 방식을 준다")
         void returnsStatus() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 3);
-            when(preconditions.getChallengeForActiveMember(CHALLENGE_ID, USER_ID))
+            when(preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
                     .thenReturn(challenge);
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(2);
@@ -343,6 +343,15 @@ class CheckInServiceTest {
             assertThat(status.completed()).isFalse();
             assertThat(status.isCheckInDay()).isTrue();
             assertThat(status.allowedTypes()).containsExactly(CheckInType.PHOTO);
+        }
+
+        @Test
+        @DisplayName("ACTIVE 시즌·ACTIVE 멤버가 아니면 preconditions 예외를 그대로 전파한다")
+        void propagatesPreconditionFailure() {
+            when(preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
+                    .thenThrow(new BusinessException(ErrorCode.CHALLENGE_NOT_ACTIVE));
+
+            assertBusiness(() -> service.getTodayStatus(USER_ID, CHALLENGE_ID), ErrorCode.CHALLENGE_NOT_ACTIVE);
         }
     }
 

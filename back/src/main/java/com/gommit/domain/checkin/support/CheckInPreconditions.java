@@ -29,18 +29,14 @@ public class CheckInPreconditions {
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
     }
 
-    public Challenge getChallengeForActiveMember(Long challengeId, Long userId) {
+    // 인증 등록·오늘 상태 조회처럼 "지금 이 시즌에 인증하는" 흐름은 ACTIVE 챌린지 + ACTIVE 멤버만 허용.
+    // 지난 시즌 기록 열람은 resolveReadDateAccess 를 쓴다.
+    public Challenge getActiveChallengeForActiveMember(Long challengeId, Long userId) {
         Challenge challenge = getChallenge(challengeId);
         ChallengeMember member = findMember(challengeId, userId);
         if (member.getStatus() != ChallengeMemberStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER);
         }
-        return challenge;
-    }
-
-    // 읽기와 달리 쓰기(인증 등록)는 ACTIVE 챌린지, ACTIVE 멤버만 허용
-    public Challenge getActiveChallengeForActiveMember(Long challengeId, Long userId) {
-        Challenge challenge = getChallengeForActiveMember(challengeId, userId);
         if (challenge.getStatus() != ChallengeStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.CHALLENGE_NOT_ACTIVE);
         }

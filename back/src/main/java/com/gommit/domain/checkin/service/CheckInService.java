@@ -63,7 +63,7 @@ public class CheckInService {
     private final BusinessClock businessClock;
 
     public TodayCheckInStatusResponse getTodayStatus(Long userId, Long challengeId) {
-        Challenge challenge = preconditions.getChallengeForActiveMember(challengeId, userId);
+        Challenge challenge = preconditions.getActiveChallengeForActiveMember(challengeId, userId);
         LocalDate today = businessClock.today();
 
         int target = challenge.getDailyCheckInCount();

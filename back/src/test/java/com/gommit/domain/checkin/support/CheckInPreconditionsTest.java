@@ -57,39 +57,6 @@ class CheckInPreconditionsTest {
     }
 
     @Nested
-    @DisplayName("getChallengeForActiveMember — 읽기 경로(챌린지 status 는 안 본다)")
-    class ChallengeForActiveMember {
-
-        @Test
-        @DisplayName("멤버가 ACTIVE 면 챌린지가 ACTIVE 가 아니어도 챌린지를 돌려준다")
-        void returnsChallengeRegardlessOfChallengeStatus() {
-            Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
-            ReflectionTestUtils.setField(challenge, "status", ChallengeStatus.ENDED);
-            when(challengeRepository.findById(CHALLENGE_ID)).thenReturn(Optional.of(challenge));
-            when(challengeMemberRepository.findByChallengeIdAndUserId(CHALLENGE_ID, USER_ID))
-                    .thenReturn(Optional.of(CheckInFixture.activeMember(9L, challenge, USER_ID)));
-
-            assertThat(preconditions.getChallengeForActiveMember(CHALLENGE_ID, USER_ID))
-                    .isEqualTo(challenge);
-        }
-
-        @Test
-        @DisplayName("이탈한 참여자면 CHALLENGE_NOT_MEMBER")
-        void rejectsLeftMember() {
-            Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
-            when(challengeRepository.findById(CHALLENGE_ID)).thenReturn(Optional.of(challenge));
-            when(challengeMemberRepository.findByChallengeIdAndUserId(CHALLENGE_ID, USER_ID))
-                    .thenReturn(
-                            Optional.of(CheckInFixture.leftMember(9L, challenge, USER_ID, LocalDate.of(2026, 9, 5))));
-
-            assertThatThrownBy(() -> preconditions.getChallengeForActiveMember(CHALLENGE_ID, USER_ID))
-                    .isInstanceOf(BusinessException.class)
-                    .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.CHALLENGE_NOT_MEMBER);
-        }
-    }
-
-    @Nested
     @DisplayName("getActiveChallengeForActiveMember")
     class ActiveChallengeForActiveMember {
 
