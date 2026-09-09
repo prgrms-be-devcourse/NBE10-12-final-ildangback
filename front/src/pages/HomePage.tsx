@@ -23,6 +23,9 @@ const CARD = "#FEFEFE";
 const PILL = "#F6F1FF";
 const DONE = "#16A300";
 
+// 홈은 미리보기다. 카드 높이가 세 줄에 맞춰져 있다.
+const RECENT_LIMIT = 3;
+
 // 상태 메시지를 아직 안 쓴 사람에게 보여줄 문구.
 const STATUS_PLACEHOLDER = "오늘도 한 칸 채우러 갑니다";
 
@@ -76,6 +79,8 @@ function SignedInHome() {
   }
 
   const doneCount = home.todayChallenges.filter((c) => c.done >= c.goal).length;
+  // 카드 높이와 점 잇는 세로선이 세 줄에 맞춰져 있다. 나머지는 "전체 보기" 로 간다.
+  const recentActivities = home.recentActivities.slice(0, RECENT_LIMIT);
 
   return (
     <div className="px-[22px] pt-[7px] pb-10">
@@ -175,7 +180,7 @@ function SignedInHome() {
         </div>
 
         <ul
-          className="mt-[12px] flex h-[150px] flex-col overflow-hidden rounded-[10px] border border-purple-200"
+          className="mt-[12px] flex min-h-[150px] flex-col overflow-hidden rounded-[10px] border border-purple-200"
           style={{ backgroundColor: CARD }}
         >
           {home.todayChallenges.length === 0 && (
@@ -238,18 +243,18 @@ function SignedInHome() {
           style={{ backgroundColor: CARD }}
         >
           {/* 점을 잇는 세로선. 점이 없으면 그리지 않는다. */}
-          {home.recentActivities.length > 0 && (
+          {recentActivities.length > 0 && (
             <span
               className="absolute top-[17px] left-[20px] h-[70px] w-px bg-purple-200"
               aria-hidden
             />
           )}
-          {home.recentActivities.length === 0 && (
+          {recentActivities.length === 0 && (
             <li className="flex flex-1 items-center justify-center text-[12px] text-gray-500">
               아직 활동 기록이 없어요.
             </li>
           )}
-          {home.recentActivities.map((activity) => (
+          {recentActivities.map((activity) => (
             <li
               key={activity.id}
               className="relative flex flex-1 items-center pr-[16px] pl-[16px] after:absolute after:right-[16px] after:bottom-0 after:left-[44px] after:h-px after:bg-purple-100 after:content-[''] last:after:hidden"
