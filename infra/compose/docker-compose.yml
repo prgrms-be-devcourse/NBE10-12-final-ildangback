@@ -37,11 +37,13 @@ services:
         limits:
           memory: 1200M
     # 이미지 Dockerfile 의 HEALTHCHECK 와 값을 맞춘다 (드리프트 방지).
+    # retries 5 = start_period 후 ~150s 여유 — 아침 콜드스타트(2분+)에 --wait 가
+    # 조기에 unhealthy 로 판정하지 않도록.
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
       interval: 30s
       timeout: 3s
-      retries: 3
+      retries: 5
       start_period: 90s
 
   mysql:

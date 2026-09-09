@@ -47,5 +47,5 @@ EXPOSE 8080
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError -Duser.timezone=Asia/Seoul"
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=90s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=3s --start-period=90s --retries=5 \
   CMD curl -fsS http://localhost:8080/actuator/health || exit 1

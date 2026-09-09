@@ -34,15 +34,24 @@ cp "$APP_DIR/src/infra/compose/backup.sh"          "$APP_DIR/backup.sh"
 
 # deploy.sh 자신도 갱신. 실행 중 파일을 in-place 로 덮으면 bash 가 깨지므로
 # 임시파일 → mv(원자적 rename, inode 교체). 새 버전은 다음 배포부터 적용.
-cp -p "$APP_DIR/deploy.sh" "$APP_DIR/deploy.sh.bak" 2>/dev/null || true
-install -m 755 "$APP_DIR/src/infra/compose/deploy.sh" "$APP_DIR/deploy.sh.new"
-mv "$APP_DIR/deploy.sh.new" "$APP_DIR/deploy.sh"
+# src 에 스크립트가 없으면(옛 SHA 로 config 롤백 등) 건너뜀 — set -e 로 죽지 않게.
+if [ -f "$APP_DIR/src/infra/compose/deploy.sh" ]; then
+  cp -p "$APP_DIR/deploy.sh" "$APP_DIR/deploy.sh.bak" 2>/dev/null || true
+  install -m 755 "$APP_DIR/src/infra/compose/deploy.sh" "$APP_DIR/deploy.sh.new"
+  mv "$APP_DIR/deploy.sh.new" "$APP_DIR/deploy.sh"
+fi
 
 # 3. 이미지 태그 갱신
 if grep -q '^IMAGE_TAG=' .env; then
   sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${TAG}/" .env
 else
   echo "IMAGE_TAG=${TAG}" >> .env
+fi
+
+# 3.5 새 nginx 설정 사전 검증 — 백엔드 이미지 스왑 전에 실패하도록.
+#     (bind-mount 라 파일은 이미 위에서 갱신됨. 실행 중 nginx 로 새 파일을 test.)
+if docker compose ps --status running --quiet nginx | grep -q .; then
+  docker compose exec -T nginx nginx -t
 fi
 
 # 4. 재기동
@@ -59,9 +68,8 @@ if ! docker compose up -d --wait --wait-timeout 300; then
 fi
 
 # 5. nginx 설정 반영 — bind-mount 라 파일만 바뀌면 컨테이너가 재생성되지 않음.
-#    설정 오류면 nginx -t 가 non-zero → set -e 로 배포 실패 처리.
+#    문법 검증은 3.5 에서 이미 함. 여기선 reload 만.
 if docker compose ps --status running --quiet nginx | grep -q .; then
-  docker compose exec -T nginx nginx -t
   docker compose exec -T nginx nginx -s reload
   echo "nginx reloaded"
 fi
