@@ -3,21 +3,17 @@ package com.gommit.domain.record.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-// 월간/최종 머지 "생성" 담당. 완료율·연속일수·인증 추이 계산 자체는
-// RecordCompletionCalculator에 미리 다 짜뒀다 - CheckIn 도메인의 리포지토리가
-// main에 병합되면, 그 쪽에서 참여자별 체크인 날짜 목록만 뽑아서
-// RecordCompletionCalculator에 넘기면 된다.
+// 월간/최종 머지 "생성" 담당. 계산 로직은 RecordCompletionCalculator에 미리 짜뒀고,
+// CheckIn 도메인 병합 후 체크인 날짜만 뽑아 넘기면 된다.
 @Service
 @RequiredArgsConstructor
 public class RecordBatchService {
 
-    // TODO(Record): 매일 스케줄러가 호출. ACTIVE 챌린지 중 시작일 기준 30일 배수 시점이
-    // 지난 것을 찾아 월간 머지를 생성한다. CheckIn 도메인의 리포지토리로 참여자별 체크인
-    // 날짜를 모은 뒤 RecordCompletionCalculator로 완료율/연속일수/추이를 계산한다.
+    // TODO(Record): 스케줄러가 매일 호출. ACTIVE 챌린지 중 30일 주기가 지난 걸 찾아
+    // 월간 머지를 생성한다.
     public void generateDueMonthlyMerges() {}
 
-    // TODO(Record): Challenge 도메인이 챌린지를 ENDED로 바꾸는 트랜잭션 안에서 직접 호출.
-    // 완료율 기반 차등 보너스 포인트 지급(PersonalPointService.reward, UserPointReason.
-    // CHALLENGE_BONUS)까지 이 메서드 안에서 처리한다.
+    // TODO(Record): 챌린지를 ENDED로 바꾸는 트랜잭션 안에서 Challenge 도메인이 호출.
+    // 완료율 기반 보너스 포인트 지급까지 여기서 처리한다.
     public void generateFinalMerge(Long challengeId) {}
 }

@@ -7,10 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
-// 완료율/연속일수/기여도/인증 추이 계산. "체크인한 날짜 목록"만 있으면 계산할 수 있는
-// 순수 통계 로직이라, CheckIn 도메인의 실제 리포지토리 시그니처를 몰라도 미리 짤 수 있다.
-// CheckIn이 main에 merge되면 RecordBatchService가 체크인 날짜만 뽑아서 여기 넘기면 된다.
-// ChallengeMergeCycleCalculator와 마찬가지로 DB 접근 없는 순수 계산 컴포넌트다.
+// 완료율/연속일수/기여도/인증 추이 계산. 체크인 날짜 목록만 있으면 되는 순수 계산이라
+// CheckIn 도메인 병합 전에 미리 짤 수 있다. DB 접근 없음.
 @Component
 public class RecordCompletionCalculator {
 
