@@ -9,11 +9,6 @@ spring:
     console:
       enabled: false
 
-  servlet:
-    multipart:
-      max-file-size: 12MB
-      max-request-size: 15MB
-
 media:
   storage:
     local:
