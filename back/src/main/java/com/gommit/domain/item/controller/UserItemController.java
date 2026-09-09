@@ -27,9 +27,8 @@ public class UserItemController {
     // 내 캐릭터 조회
     @GetMapping("/character")
     @Operation(summary = "내 캐릭터 조회")
-    public ResponseEntity<CharacterResponse> getMyCharacter(
-            @RequestParam(required = false) Long challengeId, @CurrentUser SecurityUser actor) {
-        return ResponseEntity.ok(userItemService.getMyCharacter(actor.getId(), challengeId));
+    public ResponseEntity<CharacterResponse> getMyCharacter(@CurrentUser SecurityUser actor) {
+        return ResponseEntity.ok(userItemService.getMyCharacter(actor.getId()));
     }
 
     // 보유 아이템 조회

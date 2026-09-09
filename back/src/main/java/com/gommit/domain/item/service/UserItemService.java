@@ -1,17 +1,21 @@
 package com.gommit.domain.item.service;
 
 import com.gommit.domain.challenge.entity.Challenge;
+import com.gommit.domain.challenge.entity.ChallengeMember;
+import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
+import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.group.entity.ChallengeGroup;
-import com.gommit.domain.group.entity.GroupCategory;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
+import com.gommit.domain.item.dto.response.ChallengeCharacterResponse;
 import com.gommit.domain.item.dto.response.CharacterResponse;
 import com.gommit.domain.item.dto.response.ItemResponse;
 import com.gommit.domain.item.dto.response.UserItemResponse;
 import com.gommit.domain.item.entity.*;
 import com.gommit.domain.item.repository.UserItemRepository;
 import com.gommit.domain.media.service.StorageService;
+import com.gommit.domain.user.service.UserService;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
@@ -19,9 +23,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -37,6 +45,8 @@ public class UserItemService {
     private final StorageService storageService;
     private final ChallengeRepository challengeRepository;
     private final ChallengeGroupRepository challengeGroupRepository;
+    private final ChallengeMemberRepository challengeMemberRepository;
+    private final UserService userService;
 
     // 아이템 착용
     @Transactional
@@ -105,22 +115,55 @@ public class UserItemService {
     }
 
     // 내 캐릭터 조회
-    public CharacterResponse getMyCharacter(Long userId, Long challengeId) {
-        LocalDate today =
-                LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusHours(4).toLocalDate();
-        boolean checkedIn = (challengeId != null)
-                ? checkInRepository.existsByChallengeIdAndUserIdAndBusinessDate(challengeId, userId, today)
-                : checkInRepository.existsByUserIdAndBusinessDate(userId, today);
-
-        CheckInState checkInState = checkedIn ? CheckInState.DONE : CheckInState.NOT_DONE;
-
-        Pose pose = Pose.DEFAULT;
-        if (challengeId != null) {
-            pose = resolvePoze(challengeId, checkedIn);
-        }
-
+    public CharacterResponse getMyCharacter(Long userId) {
         List<UserItem> equippedItems = userItemRepository.findByUserIdAndEquippedSlotNotNull(userId);
 
+        return new CharacterResponse(toSlotMap(equippedItems, Pose.DEFAULT));
+    }
+
+    // 챌린지 멤버 캐릭터 조회
+    public List<ChallengeCharacterResponse> getChallengeCharacters(Long challengeId, Long actorId) {
+        Challenge challenge = challengeRepository
+                .findById(challengeId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
+        ChallengeGroup group = challengeGroupRepository
+                .findById(challenge.getGroupId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+        challengeMemberRepository
+                .findByChallengeIdAndUserId(challengeId, actorId)
+                .filter(member -> member.getStatus() == ChallengeMemberStatus.ACTIVE)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER));
+
+        List<Long> userIds =
+                challengeMemberRepository
+                        .findAllByChallengeIdAndStatus(challengeId, ChallengeMemberStatus.ACTIVE)
+                        .stream()
+                        .sorted(Comparator.comparing(ChallengeMember::getId))
+                        .map(ChallengeMember::getUserId)
+                        .toList();
+        Set<Long> completedUserIds = new HashSet<>(
+                checkInRepository.findCompletedUserIds(challengeId, businessDate(), challenge.getDailyCheckInCount()));
+        Map<Long, String> nicknames = userService.findNicknames(userIds);
+        Map<Long, List<UserItem>> equippedByUser =
+                userItemRepository.findByUserIdInAndEquippedSlotNotNull(userIds).stream()
+                        .collect(Collectors.groupingBy(UserItem::getUserId));
+
+        List<ChallengeCharacterResponse> responseList = new ArrayList<>();
+        for (Long userId : userIds) {
+            Pose pose = Pose.of(group.getMapType(), completedUserIds.contains(userId));
+            Map<ItemSlot, String> slots = toSlotMap(equippedByUser.getOrDefault(userId, List.of()), pose);
+            responseList.add(new ChallengeCharacterResponse(userId, nicknames.get(userId), pose, slots));
+        }
+
+        return responseList;
+    }
+
+    // TODO: 체크인 도메인이 머지되면 BusinessDateUtil 사용 예정
+    private LocalDate businessDate() {
+        return LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusHours(4).toLocalDate();
+    }
+
+    private Map<ItemSlot, String> toSlotMap(List<UserItem> equippedItems, Pose pose) {
         Map<ItemSlot, String> slotMap = new HashMap<>();
         for (ItemSlot slot : ItemSlot.values()) {
             slotMap.put(slot, null);
@@ -131,7 +174,7 @@ public class UserItemService {
             slotMap.put(userItem.getEquippedSlot(), url);
         }
 
-        return new CharacterResponse(slotMap, checkInState);
+        return slotMap;
     }
 
     private UserItemResponse toUserItemResponse(UserItem userItem, Pose pose) {
@@ -139,24 +182,5 @@ public class UserItemService {
         String key = userItem.getItem().imageKeyForPose(pose);
         String url = key != null ? storageService.publicUrl(key) : null;
         return new UserItemResponse(userItem, new ItemResponse(item, url));
-    }
-
-    private Pose resolvePoze(Long challengeId, boolean checkedIn) {
-        Challenge challenge = challengeRepository.findById(challengeId).orElse(null);
-        if (challenge == null) return Pose.DEFAULT;
-
-        ChallengeGroup group =
-                challengeGroupRepository.findById(challenge.getGroupId()).orElse(null);
-        if (group == null) return Pose.DEFAULT;
-
-        GroupCategory category = group.getCategory();
-
-        boolean isExercise = category == GroupCategory.EXERCISE || category == GroupCategory.HEALTH;
-
-        if (checkedIn) {
-            return isExercise ? Pose.GYM_SUCCESS : Pose.STUDY_SUCCESS;
-        } else {
-            return isExercise ? Pose.GYM_FAIL : Pose.STUDY_FAIL;
-        }
     }
 }
