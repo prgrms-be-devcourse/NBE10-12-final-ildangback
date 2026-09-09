@@ -15,11 +15,7 @@ import { SignUpPrompt } from "../../../shared/ui/SignUpPrompt";
 import { useToast } from "../../../shared/lib/useToast";
 
 const MENU: { icon: string; label: string; to?: string }[] = [
-  {
-    icon: pixelIcons.personalStats,
-    label: "개인 통계",
-    to: "/profile/stats",
-  },
+  { icon: pixelIcons.personalStats, label: "개인 통계" },
   {
     icon: pixelIcons.monthlyMergeArchive,
     label: "월간 머지 아카이브",

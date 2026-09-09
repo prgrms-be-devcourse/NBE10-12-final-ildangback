@@ -14,7 +14,6 @@ import { FinalMergeResultPage } from "./domains/record/pages/FinalMergeResultPag
 import { MergeListPage } from "./domains/record/pages/MergeListPage";
 import { MonthlyMergeResultPage } from "./domains/record/pages/MonthlyMergeResultPage";
 import { MyMonthlyMergeArchivePage } from "./domains/record/pages/MyMonthlyMergeArchivePage";
-import { PersonalStatsPage } from "./domains/record/pages/PersonalStatsPage";
 import { ProfilePage } from "./domains/user/pages/ProfilePage";
 import { SettingsPage } from "./domains/user/pages/SettingsPage";
 import { ChallengeTabPlaceholder } from "./pages/ChallengeTabPlaceholder";
@@ -55,7 +54,6 @@ export function App() {
             path="profile/points/:historyId"
             element={<PointHistoryDetailPage />}
           />
-          <Route path="profile/stats" element={<PersonalStatsPage />} />
           <Route
             path="profile/monthly-merges"
             element={<MyMonthlyMergeArchivePage />}
