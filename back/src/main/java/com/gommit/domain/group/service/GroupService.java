@@ -492,6 +492,9 @@ public class GroupService {
                 .findByGroupIdAndUserId(groupId, userId)
                 .filter(member -> member.getStatus() == GroupMemberStatus.ACTIVE)
                 .isPresent();
+    }
+
+    @Transactional(readOnly = true)
     public List<SeasonSummary> getGroupChallenges(Long groupId, Long userId) {
         challengeGroupRepository.findById(groupId).orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
 
