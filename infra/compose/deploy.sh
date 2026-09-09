@@ -23,7 +23,8 @@ git -C "$APP_DIR/src" fetch --depth 1 origin main
 if [ "$REF" != "origin/main" ]; then
   git -C "$APP_DIR/src" fetch --depth 1 origin "$REF"
 fi
-git -C "$APP_DIR/src" reset --hard "$REF"
+# 직전 fetch 결과로 고정 — shallow 에서 SHA 는 로컬 ref 가 안 생김
+git -C "$APP_DIR/src" reset --hard FETCH_HEAD
 
 # 2. 배포물을 작업 디렉터리로 동기화
 rsync -a --delete "$APP_DIR/src/infra/nginx/" "$APP_DIR/nginx/"

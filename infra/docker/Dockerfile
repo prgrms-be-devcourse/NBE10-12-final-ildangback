@@ -37,6 +37,9 @@ WORKDIR /app
 
 COPY --from=build --chown=gommit:gommit /app/app.jar ./app.jar
 
+# media-tmp named volume 이 root 소유로 초기화돼 비루트 런타임이 쓰기 실패하는 것 방지
+RUN mkdir -p /app/media-tmp && chown -R gommit:gommit /app/media-tmp
+
 USER gommit
 EXPOSE 8080
 

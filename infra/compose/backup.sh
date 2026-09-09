@@ -3,6 +3,9 @@
 # DLM EBS 스냅샷과 별개의 논리 백업. 복구 절차는 infra/docs/infra-runbook.md.
 set -euo pipefail
 
+# cron 은 최소 PATH 로 실행 — docker 조회 실패 대비
+export PATH=/usr/local/bin:/usr/bin:/bin:$PATH
+
 APP_DIR=/opt/team1-app
 cd "$APP_DIR"
 
