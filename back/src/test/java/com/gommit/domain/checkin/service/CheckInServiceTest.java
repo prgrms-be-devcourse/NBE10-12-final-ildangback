@@ -1,6 +1,7 @@
 package com.gommit.domain.checkin.service;
 
 import static com.gommit.domain.checkin.CheckInFixture.START;
+import static com.gommit.domain.checkin.CheckInFixture.challenge;
 import static com.gommit.domain.checkin.CheckInFixture.dailyChallenge;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -18,6 +19,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.gommit.domain.challenge.entity.Challenge;
+import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.challenge.service.ChallengeProgressCalculator;
 import com.gommit.domain.challenge.service.ChallengeStreakService;
 import com.gommit.domain.challenge.service.MemberCheckInResult;
@@ -32,11 +34,11 @@ import com.gommit.domain.checkin.entity.CheckIn;
 import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.domain.checkin.entity.MediaType;
 import com.gommit.domain.checkin.media.CheckInMediaStore;
-import com.gommit.domain.checkin.policy.CheckInPolicy;
 import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.checkin.support.CheckInPreconditions;
 import com.gommit.domain.checkin.support.CheckInPreconditions.ReadDateAccess;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
+import com.gommit.domain.point.config.PointProperties;
 import com.gommit.domain.point.entity.UserPointReason;
 import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.domain.user.service.UserService;
@@ -83,9 +85,6 @@ class CheckInServiceTest {
     private CheckInPreconditions preconditions;
 
     @Mock
-    private CheckInPolicy policy;
-
-    @Mock
     private ChallengeProgressCalculator progressCalculator;
 
     @Mock
@@ -103,6 +102,8 @@ class CheckInServiceTest {
     @Mock
     private ChallengeGroupRepository challengeGroupRepository;
 
+    private final PointProperties pointProperties = new PointProperties(10, 5, 0, 0);
+
     private CheckInService service;
 
     @BeforeEach
@@ -112,13 +113,13 @@ class CheckInServiceTest {
         service = new CheckInService(
                 checkInRepository,
                 preconditions,
-                policy,
                 progressCalculator,
                 mediaStore,
                 personalPointService,
                 userService,
                 challengeStreakService,
                 challengeGroupRepository,
+                pointProperties,
                 new BusinessClock(clock));
         lenient().when(userService.findNicknames(anyList())).thenReturn(Map.of(USER_ID, "인증러"));
         lenient().when(challengeGroupRepository.findNameById(1L)).thenReturn(Optional.of("오운완 모임"));
@@ -135,6 +136,7 @@ class CheckInServiceTest {
     private void givenActiveMemberAndValidDay(Challenge challenge) {
         when(preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
                 .thenReturn(challenge);
+        lenient().when(progressCalculator.isCheckInDay(challenge, TODAY)).thenReturn(true);
     }
 
     private CheckIn checkInRow(Long id) {
@@ -155,7 +157,6 @@ class CheckInServiceTest {
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(1);
             when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
-            when(policy.checkInReward()).thenReturn(10);
             when(checkInRepository.saveAndFlush(any(CheckIn.class))).thenAnswer(inv -> {
                 CheckIn c = inv.getArgument(0);
                 ReflectionTestUtils.setField(c, "id", 100L);
@@ -206,7 +207,6 @@ class CheckInServiceTest {
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(1);
             when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
-            when(policy.checkInReward()).thenReturn(10);
             when(checkInRepository.saveAndFlush(any(CheckIn.class))).thenAnswer(inv -> inv.getArgument(0));
             when(challengeGroupRepository.findNameById(1L)).thenReturn(Optional.empty());
 
@@ -243,10 +243,9 @@ class CheckInServiceTest {
         @DisplayName("인증 대상일이 아니면 NOT_CHECK_IN_DAY")
         void rejectsNonCheckInDay() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
-            givenActiveMemberAndValidDay(challenge);
-            doThrow(new BusinessException(ErrorCode.NOT_CHECK_IN_DAY))
-                    .when(policy)
-                    .validateCheckInDay(challenge, TODAY);
+            when(preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
+                    .thenReturn(challenge);
+            when(progressCalculator.isCheckInDay(challenge, TODAY)).thenReturn(false);
 
             assertBusiness(
                     () -> service.submit(USER_ID, CHALLENGE_ID, request(null), media()), ErrorCode.NOT_CHECK_IN_DAY);
@@ -255,11 +254,11 @@ class CheckInServiceTest {
         @Test
         @DisplayName("허용되지 않은 인증 방식이면 CHECK_IN_TYPE_NOT_ALLOWED")
         void rejectsDisallowedType() {
-            Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
-            givenActiveMemberAndValidDay(challenge);
-            doThrow(new BusinessException(ErrorCode.CHECK_IN_TYPE_NOT_ALLOWED))
-                    .when(policy)
-                    .validateAllowedType(challenge, CheckInType.PHOTO);
+            // allowPhoto=false → 허용 방식 목록이 비어 PHOTO 제출이 거부된다.
+            Challenge challenge = challenge(CHALLENGE_ID, FrequencyType.DAILY, null, null, 1, false);
+            when(preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
+                    .thenReturn(challenge);
+            when(progressCalculator.isCheckInDay(challenge, TODAY)).thenReturn(true);
 
             assertBusiness(
                     () -> service.submit(USER_ID, CHALLENGE_ID, request(null), media()),
@@ -307,7 +306,6 @@ class CheckInServiceTest {
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(1);
             when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
-            when(policy.checkInReward()).thenReturn(10);
             when(checkInRepository.saveAndFlush(any(CheckIn.class))).thenAnswer(inv -> inv.getArgument(0));
             doThrow(new IllegalStateException("적립 실패"))
                     .when(personalPointService)
@@ -333,7 +331,6 @@ class CheckInServiceTest {
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(2);
             when(progressCalculator.canCheckInOn(challenge, TODAY)).thenReturn(true);
-            when(policy.allowedTypes(challenge)).thenReturn(List.of(CheckInType.PHOTO));
 
             TodayCheckInStatusResponse status = service.getTodayStatus(USER_ID, CHALLENGE_ID);
 

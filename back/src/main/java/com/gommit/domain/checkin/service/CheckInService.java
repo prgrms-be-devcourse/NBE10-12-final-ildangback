@@ -19,11 +19,11 @@ import com.gommit.domain.checkin.entity.CheckIn;
 import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.domain.checkin.entity.MediaType;
 import com.gommit.domain.checkin.media.CheckInMediaStore;
-import com.gommit.domain.checkin.policy.CheckInPolicy;
 import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.checkin.support.CheckInPreconditions;
 import com.gommit.domain.checkin.support.CheckInPreconditions.ReadDateAccess;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
+import com.gommit.domain.point.config.PointProperties;
 import com.gommit.domain.point.entity.UserPointReason;
 import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.domain.user.service.UserService;
@@ -54,13 +54,13 @@ public class CheckInService {
 
     private final CheckInRepository checkInRepository;
     private final CheckInPreconditions preconditions;
-    private final CheckInPolicy policy;
     private final ChallengeProgressCalculator progressCalculator;
     private final CheckInMediaStore mediaStore;
     private final PersonalPointService personalPointService;
     private final UserService userService;
     private final ChallengeStreakService challengeStreakService;
     private final ChallengeGroupRepository challengeGroupRepository;
+    private final PointProperties pointProperties;
     private final BusinessClock businessClock;
 
     public TodayCheckInStatusResponse getTodayStatus(Long userId, Long challengeId) {
@@ -76,7 +76,7 @@ public class CheckInService {
                 current,
                 target,
                 current >= target,
-                policy.allowedTypes(challenge));
+                challenge.allowedCheckInTypes());
     }
 
     @Transactional
@@ -86,8 +86,12 @@ public class CheckInService {
         String memo = (form.memo() == null || form.memo().isBlank()) ? null : form.memo();
 
         LocalDate businessDate = businessClock.today();
-        policy.validateCheckInDay(challenge, businessDate);
-        policy.validateAllowedType(challenge, form.checkInType());
+        if (!progressCalculator.isCheckInDay(challenge, businessDate)) {
+            throw new BusinessException(ErrorCode.NOT_CHECK_IN_DAY);
+        }
+        if (!challenge.allowedCheckInTypes().contains(form.checkInType())) {
+            throw new BusinessException(ErrorCode.CHECK_IN_TYPE_NOT_ALLOWED);
+        }
 
         int target = challenge.getDailyCheckInCount();
         int already = checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challengeId, userId, businessDate);
@@ -112,7 +116,7 @@ public class CheckInService {
         // 파일은 남으므로, uk_check_ins 위반 처리와 같이 best-effort 로 정리하고 되던진다.
         String sourceName =
                 challengeGroupRepository.findNameById(challenge.getGroupId()).orElse("인증");
-        int earnedUserPoints = policy.checkInReward();
+        int earnedUserPoints = pointProperties.checkInReward();
         try {
             // 포인트 적립 — 같은 트랜잭션. 실패 시 인증도 롤백된다.
             // PersonalPointService.reward 는 전달한 sourceName 을 그대로 저장. 포인트 이력 화면이 그룹명을
