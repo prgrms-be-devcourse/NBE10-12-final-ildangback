@@ -344,6 +344,94 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
         }
     }
 
+    @Nested
+    @DisplayName("그룹 하루 전원 완료 → 그룹 포인트")
+    class GroupDailyAllComplete {
+
+        @Test
+        @DisplayName("1인 그룹이 그날 목표를 채우면 그룹 포인트 5가 적립되고 그룹 스트릭이 1이 된다")
+        void singleMemberAllComplete() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+            long challengeId = setUpChallenge(EMAIL, 1);
+            long groupId = jdbcTemplate.queryForObject(
+                    "select group_id from challenges where id = ?", Long.class, challengeId);
+
+            submit(challengeId, tokens.accessToken())
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.dailyCompleted").value(true))
+                    .andExpect(jsonPath("$.groupCompletedCount").value(1))
+                    .andExpect(jsonPath("$.groupTotalCount").value(1));
+
+            assertThat(jdbcTemplate.queryForObject(
+                            "select balance from group_points where group_id = ?", Integer.class, groupId))
+                    .isEqualTo(5);
+            var history = jdbcTemplate.queryForMap(
+                    "select amount, reason, source_name from group_point_histories where group_id = ?", groupId);
+            assertThat(history)
+                    .containsEntry("amount", 5)
+                    .containsEntry("reason", "DAILY_ALL_COMPLETE")
+                    .containsEntry("source_name", "전원 하루 인증 완료");
+            assertThat(jdbcTemplate.queryForObject(
+                            "select group_current_streak from challenges where id = ?", Integer.class, challengeId))
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("2인 그룹의 마지막 두 인증이 동시에 들어와도 그룹 포인트는 1회, 그룹 스트릭은 1만 오른다")
+        void concurrentLastCheckInsRewardOnce() throws Exception {
+            var owner = loginAs(EMAIL, NICKNAME);
+            long ownerId = userIdOf(EMAIL);
+            var second = loginAs("member2@example.com", "멤버2");
+            long secondId = userIdOf("member2@example.com");
+
+            long challengeId = setUpChallenge(EMAIL, 1); // owner 를 ACTIVE 멤버로 시딩
+            seedMember(challengeId, secondId, "ACTIVE", null);
+            long groupId = jdbcTemplate.queryForObject(
+                    "select group_id from challenges where id = ?", Long.class, challengeId);
+
+            CyclicBarrier barrier = new CyclicBarrier(2);
+            List<Callable<Boolean>> tasks =
+                    List.of(submitTask(barrier, ownerId, challengeId), submitTask(barrier, secondId, challengeId));
+
+            ExecutorService pool = Executors.newFixedThreadPool(2);
+            try {
+                for (Future<Boolean> f : pool.invokeAll(tasks)) {
+                    assertThat(f.get()).isTrue(); // 두 인증 자체는 모두 성공
+                }
+            } finally {
+                pool.shutdownNow();
+            }
+
+            assertThat(jdbcTemplate.queryForObject(
+                            "select balance from group_points where group_id = ?", Integer.class, groupId))
+                    .isEqualTo(5);
+            assertThat(jdbcTemplate.queryForObject(
+                            "select count(*) from group_point_histories where group_id = ? and reason = 'DAILY_ALL_COMPLETE'",
+                            Integer.class,
+                            groupId))
+                    .isEqualTo(1);
+            assertThat(jdbcTemplate.queryForObject(
+                            "select group_current_streak from challenges where id = ?", Integer.class, challengeId))
+                    .isEqualTo(1);
+        }
+
+        private Callable<Boolean> submitTask(CyclicBarrier barrier, long userId, long challengeId) {
+            return () -> {
+                barrier.await();
+                try {
+                    checkInService.submit(
+                            userId,
+                            challengeId,
+                            new SubmitCheckInRequest(CheckInType.PHOTO, null),
+                            new MockMultipartFile("media", "shot.png", "image/png", PNG_1X1));
+                    return true;
+                } catch (BusinessException e) {
+                    return false;
+                }
+            };
+        }
+    }
+
     private long countMediaFiles() throws IOException {
         if (!Files.exists(MEDIA_DIR)) {
             return 0;

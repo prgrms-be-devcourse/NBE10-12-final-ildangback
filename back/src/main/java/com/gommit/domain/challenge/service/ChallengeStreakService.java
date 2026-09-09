@@ -35,6 +35,16 @@ public class ChallengeStreakService {
 
     @Transactional
     public MemberCheckInResult onMemberDailyComplete(Long challengeId, Long userId, LocalDate businessDate) {
+        // 그룹 하루 완료 판정을 group_points 행 잠금으로 직렬화한다. 같은 그룹의 마지막 인증이 동시에 들어와도
+        // 잠금 뒤 재조회 시 앞선 인증의 완료가 반영돼, 그룹 스트릭/포인트가 정확히 1회만 처리된다.
+        // (challenge 행을 잠그면 check_ins → challenges FK 의 공유잠금과 엇갈려 데드락)
+        // 이 호출은 group_points 행을 만들며 영속성 컨텍스트를 비울 수 있으므로, 뒤에서 수정할 엔티티는 그 다음에 로드한다.
+        Long groupId = challengeRepository
+                .findById(challengeId)
+                .map(Challenge::getGroupId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
+        groupPointService.lockForGroupCompletion(groupId);
+
         Challenge challenge = challengeRepository
                 .findById(challengeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
@@ -48,8 +58,9 @@ public class ChallengeStreakService {
         // 유저 전역 스트릭(users.personal_streak) — 이 챌린지의 직전 대상일 기준으로 연속성 판정.
         userService.recordDailyCompletion(userId, businessDate, previousCheckInDay);
 
-        List<ChallengeMember> activeMembers =
-                challengeMemberRepository.findAllByChallengeIdAndStatus(challengeId, ChallengeMemberStatus.ACTIVE);
+        // 잠금 읽기 — REPEATABLE READ 스냅샷을 우회해 앞선 인증들이 커밋한 완료 상태까지 반영해 전원 완료를 판정한다.
+        List<ChallengeMember> activeMembers = challengeMemberRepository.findAllForUpdateByChallengeIdAndStatus(
+                challengeId, ChallengeMemberStatus.ACTIVE);
         int groupTotalCount = activeMembers.size();
         int groupCompletedCount = (int)
                 activeMembers.stream().filter(m -> m.hasCompleted(businessDate)).count();

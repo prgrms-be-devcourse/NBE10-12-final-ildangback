@@ -1,10 +1,12 @@
 package com.gommit.domain.challenge.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -107,7 +109,8 @@ class ChallengeStreakServiceTest {
             when(challengeRepository.findById(CHALLENGE_ID)).thenReturn(Optional.of(challenge));
             when(challengeMemberRepository.findByChallengeIdAndUserId(CHALLENGE_ID, 1L))
                     .thenReturn(Optional.of(me));
-            when(challengeMemberRepository.findAllByChallengeIdAndStatus(CHALLENGE_ID, ChallengeMemberStatus.ACTIVE))
+            when(challengeMemberRepository.findAllForUpdateByChallengeIdAndStatus(
+                            CHALLENGE_ID, ChallengeMemberStatus.ACTIVE))
                     .thenReturn(List.of(me));
 
             MemberCheckInResult result = service.onMemberDailyComplete(CHALLENGE_ID, 1L, TODAY);
@@ -126,7 +129,8 @@ class ChallengeStreakServiceTest {
             when(challengeRepository.findById(CHALLENGE_ID)).thenReturn(Optional.of(challenge));
             when(challengeMemberRepository.findByChallengeIdAndUserId(CHALLENGE_ID, 1L))
                     .thenReturn(Optional.of(me));
-            when(challengeMemberRepository.findAllByChallengeIdAndStatus(CHALLENGE_ID, ChallengeMemberStatus.ACTIVE))
+            when(challengeMemberRepository.findAllForUpdateByChallengeIdAndStatus(
+                            CHALLENGE_ID, ChallengeMemberStatus.ACTIVE))
                     .thenReturn(List.of(me));
 
             MemberCheckInResult result = service.onMemberDailyComplete(CHALLENGE_ID, 1L, TODAY);
@@ -142,7 +146,8 @@ class ChallengeStreakServiceTest {
             when(challengeRepository.findById(CHALLENGE_ID)).thenReturn(Optional.of(challenge));
             when(challengeMemberRepository.findByChallengeIdAndUserId(CHALLENGE_ID, 1L))
                     .thenReturn(Optional.of(me));
-            when(challengeMemberRepository.findAllByChallengeIdAndStatus(CHALLENGE_ID, ChallengeMemberStatus.ACTIVE))
+            when(challengeMemberRepository.findAllForUpdateByChallengeIdAndStatus(
+                            CHALLENGE_ID, ChallengeMemberStatus.ACTIVE))
                     .thenReturn(List.of(me));
 
             service.onMemberDailyComplete(CHALLENGE_ID, 1L, TODAY);
@@ -165,7 +170,8 @@ class ChallengeStreakServiceTest {
             when(challengeRepository.findById(CHALLENGE_ID)).thenReturn(Optional.of(challenge));
             when(challengeMemberRepository.findByChallengeIdAndUserId(CHALLENGE_ID, 1L))
                     .thenReturn(Optional.of(me));
-            when(challengeMemberRepository.findAllByChallengeIdAndStatus(CHALLENGE_ID, ChallengeMemberStatus.ACTIVE))
+            when(challengeMemberRepository.findAllForUpdateByChallengeIdAndStatus(
+                            CHALLENGE_ID, ChallengeMemberStatus.ACTIVE))
                     .thenReturn(List.of(me, other));
 
             MemberCheckInResult result = service.onMemberDailyComplete(CHALLENGE_ID, 1L, TODAY);
@@ -188,13 +194,34 @@ class ChallengeStreakServiceTest {
             when(challengeRepository.findById(CHALLENGE_ID)).thenReturn(Optional.of(challenge));
             when(challengeMemberRepository.findByChallengeIdAndUserId(CHALLENGE_ID, 1L))
                     .thenReturn(Optional.of(me));
-            when(challengeMemberRepository.findAllByChallengeIdAndStatus(CHALLENGE_ID, ChallengeMemberStatus.ACTIVE))
+            when(challengeMemberRepository.findAllForUpdateByChallengeIdAndStatus(
+                            CHALLENGE_ID, ChallengeMemberStatus.ACTIVE))
                     .thenReturn(List.of(me, other));
 
             MemberCheckInResult result = service.onMemberDailyComplete(CHALLENGE_ID, 1L, TODAY);
 
             assertThat(result.groupJustCompleted()).isFalse();
             verify(groupPointService, never()).reward(anyLong(), anyInt(), any(), anyString());
+        }
+
+        @Test
+        @DisplayName("그룹 포인트 적립이 실패하면 예외를 전파한다 (스트릭 갱신도 같은 tx 라 롤백됨)")
+        void propagatesGroupRewardFailure() {
+            Challenge challenge = dailyChallenge();
+            ChallengeMember me = member(1L, 0, null);
+            ChallengeMember other = member(2L, 0, TODAY);
+            when(challengeRepository.findById(CHALLENGE_ID)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(CHALLENGE_ID, 1L))
+                    .thenReturn(Optional.of(me));
+            when(challengeMemberRepository.findAllForUpdateByChallengeIdAndStatus(
+                            CHALLENGE_ID, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(List.of(me, other));
+            doThrow(new IllegalStateException("group_points 락 타임아웃"))
+                    .when(groupPointService)
+                    .reward(anyLong(), anyInt(), any(), anyString());
+
+            assertThatThrownBy(() -> service.onMemberDailyComplete(CHALLENGE_ID, 1L, TODAY))
+                    .isInstanceOf(IllegalStateException.class);
         }
 
         @Test
@@ -206,7 +233,8 @@ class ChallengeStreakServiceTest {
             when(challengeRepository.findById(CHALLENGE_ID)).thenReturn(Optional.of(challenge));
             when(challengeMemberRepository.findByChallengeIdAndUserId(CHALLENGE_ID, 1L))
                     .thenReturn(Optional.of(me));
-            when(challengeMemberRepository.findAllByChallengeIdAndStatus(CHALLENGE_ID, ChallengeMemberStatus.ACTIVE))
+            when(challengeMemberRepository.findAllForUpdateByChallengeIdAndStatus(
+                            CHALLENGE_ID, ChallengeMemberStatus.ACTIVE))
                     .thenReturn(List.of(me, other));
 
             MemberCheckInResult result = service.onMemberDailyComplete(CHALLENGE_ID, 1L, TODAY);
