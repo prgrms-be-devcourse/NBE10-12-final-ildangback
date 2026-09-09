@@ -37,17 +37,13 @@ public class ChallengeMember extends BaseEntity {
     @Column(nullable = false, length = 20)
     private ChallengeMemberStatus status;
 
-    // 개인이 마지막으로 하루 인증 목표를 채운 시점 기준의 연속 완료일 수.
-    // 완료 인증 시점에만 갱신되는 캐시라, 조회 시점 기준값은 lastCompletedDate 와 함께 판단한다.
     @Column(nullable = false)
     private int currentStreak;
 
-    // currentStreak 이 도달한 최고값. 한 번 오르면 내려가지 않는다.
     @Column(nullable = false)
     private int bestStreak;
 
-    // 개인이 마지막으로 하루 인증 목표를 모두 채운 businessDate. 스트릭 연속성 판정에 쓴다.
-    private LocalDate lastCompletedDate;
+    private LocalDate lastCompletedDate; // streak 연속성 판정에 사용
 
     private LocalDateTime leftAt;
 
@@ -95,5 +91,21 @@ public class ChallengeMember extends BaseEntity {
         this.currentStreak = consecutive ? this.currentStreak + 1 : 1;
         this.bestStreak = Math.max(this.bestStreak, this.currentStreak);
         this.lastCompletedDate = businessDate;
+    }
+
+    // 조회 시점(businessDate) 기준 현재 스트릭. currentStreak 은 마지막 완료일 값이라,
+    // 직전 인증 대상일까지 완료가 이어지지 않았으면(중간에 빠졌으면) 0 으로 본다.
+    // 저장값 자체는 다음 완료 인증 때 completeDay() 가 리셋한다.
+    public int currentStreakAsOf(LocalDate businessDate, LocalDate previousCheckInDay) {
+        if (this.lastCompletedDate == null) {
+            return 0;
+        }
+        if (this.lastCompletedDate.equals(businessDate)) {
+            return this.currentStreak;
+        }
+        if (previousCheckInDay != null && !this.lastCompletedDate.isBefore(previousCheckInDay)) {
+            return this.currentStreak;
+        }
+        return 0;
     }
 }
