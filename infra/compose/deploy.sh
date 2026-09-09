@@ -39,24 +39,27 @@ else
 fi
 
 # 4. 재기동
+#    --wait: 컨테이너 내부 healthcheck 가 통과할 때까지 블록 (8080 은 호스트 미노출).
+#    타임아웃은 넉넉히 — 아침 콜드스타트면 mysql init + Spring 기동에 2분 넘게 걸릴 수 있음.
 echo "pulling ghcr image (tag=${TAG})..."
 docker compose pull back
 echo "restarting..."
-docker compose up -d
+if ! docker compose up -d --wait --wait-timeout 300; then
+  echo "STACK UNHEALTHY — dumping logs" >&2
+  docker compose ps >&2
+  docker compose logs --tail=80 back >&2
+  exit 1
+fi
 
-# 5. 헬스 확인
-echo "waiting for health..."
-for i in $(seq 1 40); do
-  if docker compose exec -T back curl -fsS http://localhost:8080/actuator/health >/dev/null 2>&1; then
-    echo "healthy after $((i * 3))s"
-    # 안 쓰는 이미지 정리. -a = 태그만 있고 컨테이너가 안 쓰는 것도 대상(옛 back:<sha>).
-    # until=72h = 최근 3일치는 남겨 빠른 롤백 시 재pull 없이 되돌림. 실행 중 이미지는 항상 보호됨.
-    docker image prune -af --filter "until=72h" >/dev/null || true
-    exit 0
-  fi
-  sleep 3
-done
+# 5. nginx 설정 반영 — bind-mount 라 파일만 바뀌면 컨테이너가 재생성되지 않음.
+#    설정 오류면 nginx -t 가 non-zero → set -e 로 배포 실패 처리.
+if docker compose ps --status running --quiet nginx | grep -q .; then
+  docker compose exec -T nginx nginx -t
+  docker compose exec -T nginx nginx -s reload
+  echo "nginx reloaded"
+fi
 
-echo "HEALTH CHECK FAILED — dumping logs" >&2
-docker compose logs --tail=80 back >&2
-exit 1
+# 6. 안 쓰는 이미지 정리. -a = 태그만 있고 컨테이너가 안 쓰는 것도 대상(옛 back:<sha>).
+#    until=72h = 최근 3일치는 남겨 빠른 롤백 시 재pull 없이 되돌림. 실행 중 이미지는 항상 보호됨.
+docker image prune -af --filter "until=72h" >/dev/null || true
+echo "deploy ok"
