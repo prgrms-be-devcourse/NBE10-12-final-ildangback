@@ -15,7 +15,7 @@ import { SignUpPrompt } from "../../../shared/ui/SignUpPrompt";
 import { useToast } from "../../../shared/lib/useToast";
 
 const MENU: { icon: string; label: string; to?: string }[] = [
-  { icon: pixelIcons.personalStats, label: "개인 통계" },
+  { icon: pixelIcons.personalStats, label: "개인 통계", to: "/profile/stats" },
   {
     icon: pixelIcons.monthlyMergeArchive,
     label: "월간 머지 아카이브",
@@ -77,9 +77,7 @@ export function ProfilePage() {
           </div>
           <Button
             type="button"
-            onClick={() =>
-              showToast("캐릭터 꾸미기 기능은 다음 업데이트에 오픈됩니다.")
-            }
+            onClick={() => navigate("/profile/shop")}
             className="mt-3 flex items-center justify-center gap-2.5 text-[17px] font-bold"
           >
             <CoatHangerIcon size={24} weight="bold" />
