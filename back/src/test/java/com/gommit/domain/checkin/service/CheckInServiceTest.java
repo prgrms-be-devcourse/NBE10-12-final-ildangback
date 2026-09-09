@@ -454,7 +454,7 @@ class CheckInServiceTest {
         }
 
         @Test
-        @DisplayName("최근 로그 — 메모가 있으면 '이름 + 메모', 없으면 폴백 문구")
+        @DisplayName("최근 로그 — 메모가 있으면 '{이름}_{메모}', 없으면 '{이름}_{그룹명}'")
         void recentText() {
             CheckIn withMemo = checkIn(5L, CHALLENGE_ID, TODAY);
             ReflectionTestUtils.setField(withMemo, "memo", "오늘 5km 뛰었다");
@@ -467,8 +467,8 @@ class CheckInServiceTest {
             RecentCheckInResponse recent = service.getRecent(USER_ID, CHALLENGE_ID, 3);
 
             assertThat(recent.items()).hasSize(2);
-            assertThat(recent.items().get(0).text()).isEqualTo("인증러님: 오늘 5km 뛰었다");
-            assertThat(recent.items().get(1).text()).isEqualTo("인증러님이 인증을 남겼어요");
+            assertThat(recent.items().get(0).text()).isEqualTo("인증러_오늘 5km 뛰었다");
+            assertThat(recent.items().get(1).text()).isEqualTo("인증러_오운완 모임");
             assertThat(recent.items().get(0).earnedUserPoints()).isNull();
         }
 
