@@ -2,6 +2,7 @@ package com.gommit.domain.item.repository;
 
 import com.gommit.domain.item.entity.ItemSlot;
 import com.gommit.domain.item.entity.UserItem;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
@@ -37,6 +38,10 @@ public interface UserItemRepository extends JpaRepository<UserItem, Long> {
     // 캐릭터 조회: 착용 중인 아이템 전체 (슬롯이 최대 4개라 전체 조회 부담 없음)
     @EntityGraph(attributePaths = {"item", "item.images"})
     List<UserItem> findByUserIdAndEquippedSlotNotNull(Long userId);
+
+    // 챌린지 캐릭터 조회: 여러 유저의 착용 아이템을 한 번에
+    @EntityGraph(attributePaths = {"item", "item.images"})
+    List<UserItem> findByUserIdInAndEquippedSlotNotNull(Collection<Long> userIds);
 
     // 관리자 아이템 삭제 전 보유 유저 존재 여부 확인
     boolean existsByItemId(Long itemId);

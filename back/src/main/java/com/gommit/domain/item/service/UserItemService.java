@@ -1,12 +1,22 @@
 package com.gommit.domain.item.service;
 
+import com.gommit.domain.challenge.entity.Challenge;
+import com.gommit.domain.challenge.entity.ChallengeMember;
+import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
+import com.gommit.domain.challenge.entity.ChallengeStatus;
+import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
+import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.checkin.repository.CheckInRepository;
+import com.gommit.domain.group.entity.ChallengeGroup;
+import com.gommit.domain.group.repository.ChallengeGroupRepository;
+import com.gommit.domain.item.dto.response.ChallengeCharacterResponse;
 import com.gommit.domain.item.dto.response.CharacterResponse;
 import com.gommit.domain.item.dto.response.ItemResponse;
 import com.gommit.domain.item.dto.response.UserItemResponse;
 import com.gommit.domain.item.entity.*;
 import com.gommit.domain.item.repository.UserItemRepository;
 import com.gommit.domain.media.service.StorageService;
+import com.gommit.domain.user.service.UserService;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
@@ -14,9 +24,14 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -30,6 +45,10 @@ public class UserItemService {
     private final UserItemRepository userItemRepository;
     private final CheckInRepository checkInRepository;
     private final StorageService storageService;
+    private final ChallengeRepository challengeRepository;
+    private final ChallengeGroupRepository challengeGroupRepository;
+    private final ChallengeMemberRepository challengeMemberRepository;
+    private final UserService userService;
 
     // 아이템 착용
     @Transactional
@@ -98,18 +117,76 @@ public class UserItemService {
     }
 
     // 내 캐릭터 조회
-    public CharacterResponse getMyCharacter(Long userId, Long challengeId) {
-        LocalDate today =
-                LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusHours(4).toLocalDate();
-        boolean checkedIn = checkInRepository.existsByUserIdAndBusinessDate(userId, today);
-        CheckInState checkInState = checkedIn ? CheckInState.DONE : CheckInState.NOT_DONE;
-
-        // TODO: 체크인 도메인 완성 후 교체
-        // 최근 체크인 챌린지 파악
-        Pose pose = Pose.DEFAULT;
-
+    public CharacterResponse getMyCharacter(Long userId) {
         List<UserItem> equippedItems = userItemRepository.findByUserIdAndEquippedSlotNotNull(userId);
 
+        return new CharacterResponse(toSlotMap(equippedItems, Pose.DEFAULT));
+    }
+
+    // 챌린지 멤버 캐릭터 조회
+    public List<ChallengeCharacterResponse> getChallengeCharacters(Long challengeId, Long actorId) {
+        Challenge challenge = challengeRepository
+                .findById(challengeId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
+        ChallengeGroup group = challengeGroupRepository
+                .findById(challenge.getGroupId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+        challengeMemberRepository
+                .findByChallengeIdAndUserId(challengeId, actorId)
+                .filter(member -> member.getStatus() == ChallengeMemberStatus.ACTIVE)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER));
+
+        List<Long> userIds =
+                challengeMemberRepository
+                        .findAllByChallengeIdAndStatus(challengeId, ChallengeMemberStatus.ACTIVE)
+                        .stream()
+                        .sorted(Comparator.comparing(ChallengeMember::getId))
+                        .map(ChallengeMember::getUserId)
+                        .toList();
+        boolean ended = challenge.getStatus() == ChallengeStatus.ENDED;
+        Set<Long> completedUserIds = ended
+                ? Set.of()
+                : new HashSet<>(checkInRepository.findCompletedUserIds(
+                        challengeId, businessDate(), challenge.getDailyCheckInCount()));
+        Map<Long, String> nicknames = userService.findNicknames(userIds);
+        Map<Long, List<UserItem>> equippedByUser =
+                userItemRepository.findByUserIdInAndEquippedSlotNotNull(userIds).stream()
+                        .collect(Collectors.groupingBy(UserItem::getUserId));
+
+        List<ChallengeCharacterResponse> responseList = new ArrayList<>();
+        for (Long userId : userIds) {
+            Pose pose = Pose.of(group.getMapType(), ended || completedUserIds.contains(userId));
+            Map<ItemSlot, String> slots = toSlotMap(equippedByUser.getOrDefault(userId, List.of()), pose);
+            responseList.add(new ChallengeCharacterResponse(userId, nicknames.get(userId), pose, slots));
+        }
+
+        return responseList;
+    }
+
+    // TODO: 체크인 도메인이 머지되면 BusinessDateUtil 사용 예정
+    private LocalDate businessDate() {
+        return LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusHours(4).toLocalDate();
+    }
+
+    // 여러 유저 캐릭터 조회(DEFAULT 자세 고정)
+    public Map<Long, Map<ItemSlot, String>> getCharacters(Collection<Long> userIds) {
+        if (userIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, List<UserItem>> equippedByUser =
+                userItemRepository.findByUserIdInAndEquippedSlotNotNull(userIds).stream()
+                        .collect(Collectors.groupingBy(UserItem::getUserId));
+
+        Map<Long, Map<ItemSlot, String>> characters = new HashMap<>();
+        for (Long userId : userIds) {
+            characters.put(userId, toSlotMap(equippedByUser.getOrDefault(userId, List.of()), Pose.DEFAULT));
+        }
+
+        return characters;
+    }
+
+    private Map<ItemSlot, String> toSlotMap(List<UserItem> equippedItems, Pose pose) {
         Map<ItemSlot, String> slotMap = new HashMap<>();
         for (ItemSlot slot : ItemSlot.values()) {
             slotMap.put(slot, null);
@@ -120,7 +197,7 @@ public class UserItemService {
             slotMap.put(userItem.getEquippedSlot(), url);
         }
 
-        return new CharacterResponse(slotMap, checkInState);
+        return slotMap;
     }
 
     private UserItemResponse toUserItemResponse(UserItem userItem, Pose pose) {
