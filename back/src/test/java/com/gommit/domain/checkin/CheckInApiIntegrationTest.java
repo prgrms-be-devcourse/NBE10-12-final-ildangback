@@ -103,9 +103,9 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
     private void seedMember(long challengeId, long userId, String memberStatus, LocalDate leftOn) {
         jdbcTemplate.update(
                 "insert into challenge_members"
-                        + " (challenge_id, user_id, role, status, left_at,"
+                        + " (challenge_id, user_id, role, status, current_streak, best_streak, left_at,"
                         + " extension_choice, created_at, updated_at)"
-                        + " values (?, ?, 'MEMBER', ?, ?, 'PENDING', now(6), now(6))",
+                        + " values (?, ?, 'MEMBER', ?, 0, 0, ?, 'PENDING', now(6), now(6))",
                 challengeId,
                 userId,
                 memberStatus,

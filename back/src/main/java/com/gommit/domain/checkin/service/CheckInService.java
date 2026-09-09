@@ -4,7 +4,6 @@ import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.service.ChallengeProgressCalculator;
 import com.gommit.domain.challenge.service.ChallengeStreakService;
 import com.gommit.domain.challenge.service.MemberCheckInResult;
-import com.gommit.domain.challenge.service.MemberStreakCalculator;
 import com.gommit.domain.checkin.dto.request.SubmitCheckInRequest;
 import com.gommit.domain.checkin.dto.response.CheckInCursorResponse;
 import com.gommit.domain.checkin.dto.response.CheckInResponse;
@@ -34,10 +33,8 @@ import com.gommit.global.exception.ErrorCode;
 import com.gommit.global.time.BusinessClock;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
@@ -62,7 +59,6 @@ public class CheckInService {
     private final PersonalPointService personalPointService;
     private final UserService userService;
     private final ChallengeStreakService challengeStreakService;
-    private final MemberStreakCalculator memberStreakCalculator;
     private final ChallengeGroupRepository challengeGroupRepository;
     private final BusinessClock businessClock;
 
@@ -132,16 +128,17 @@ public class CheckInService {
 
         String nickname = nicknameOf(userId, checkIn.getId());
 
-        // 이번 인증이 그날 목표를 채운 마지막 회차면 개인 스트릭을 유도하고, 그룹/유저 갱신을 넘긴다. 같은 트랜잭션.
+        // 이번 인증이 그날 목표를 채운 마지막 회차면 개인/그룹/유저 스트릭을 갱신한다. 같은 트랜잭션.
         boolean dailyCompleted = roundNo >= target;
         int currentStreak = 0;
         int groupCompletedCount = 0;
         int groupTotalCount = 0;
         if (dailyCompleted) {
-            currentStreak = deriveCurrentStreak(challenge, userId, businessDate, target);
-            MemberCheckInResult group = challengeStreakService.onMemberDailyComplete(challengeId, userId, businessDate);
-            groupCompletedCount = group.groupCompletedCount();
-            groupTotalCount = group.groupTotalCount();
+            MemberCheckInResult streak =
+                    challengeStreakService.onMemberDailyComplete(challengeId, userId, businessDate);
+            currentStreak = streak.memberCurrentStreak();
+            groupCompletedCount = streak.groupCompletedCount();
+            groupTotalCount = streak.groupTotalCount();
         }
 
         return new CheckInResultResponse(
@@ -277,15 +274,6 @@ public class CheckInService {
             throw new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER);
         }
         return checkIn;
-    }
-
-    // 개인 스트릭을 check_ins 에서 유도한다(저장값 없음). businessDate 별 회차 수가 target 이상인 날을
-    // 뽑아, 오늘부터 직전 인증 대상일로 되짚으며 이어지는 길이를 센다. 방금 저장한 회차는 같은 tx 라 보인다.
-    private int deriveCurrentStreak(Challenge challenge, Long userId, LocalDate businessDate, int target) {
-        Set<LocalDate> completedDays =
-                new HashSet<>(checkInRepository.findCompletedBusinessDates(challenge.getId(), userId, target));
-        completedDays.add(businessDate); // 이번 완료가 아직 집계 전이어도 오늘은 완료로 친다
-        return memberStreakCalculator.currentStreak(challenge, businessDate, completedDays);
     }
 
     private void deleteQuietly(String storageKey) {

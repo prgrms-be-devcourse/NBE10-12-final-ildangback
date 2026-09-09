@@ -1,6 +1,7 @@
 package com.gommit.domain.challenge.service;
 
 import com.gommit.domain.challenge.entity.Challenge;
+import com.gommit.domain.challenge.entity.ChallengeMember;
 import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
@@ -17,10 +18,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// 하루 인증 목표 완료 시점의 그룹/유저 갱신. checkin submit() 트랜잭션 안에서 동기 호출된다.
-// - users     : 소속 챌린지 중 하나라도 채우면 유저 전역 스트릭(UserService 위임)
-// - challenges : 이 인증으로 ACTIVE 멤버 전원이 그날 목표를 채우면 그룹 스트릭 + 그룹 포인트
-// 개인 스트릭은 checkin 이 check_ins 에서 직접 유도한다(MemberStreakCalculator). 여기서 다루지 않는다.
+// 하루 인증 목표 완료 시점의 스트릭 갱신 + 그룹 전원 완료 시 그룹 포인트 적립.
+// checkin submit() 트랜잭션 안에서 동기 호출된다. 연속성은 셋 다 "인증 대상일" 기준.
+// - challenge_members : 개인이 그날 목표를 채우면 개인 스트릭(currentStreak/bestStreak/lastCompletedDate)
+// - users            : 소속 챌린지 중 하나라도 채우면 유저 전역 스트릭(UserService 위임)
+// - challenges        : 이 인증으로 ACTIVE 멤버 전원이 그날 목표를 채우면 그룹 스트릭 + 그룹 포인트
 @Service
 @RequiredArgsConstructor
 public class ChallengeStreakService {
@@ -48,6 +50,12 @@ public class ChallengeStreakService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
         LocalDate previousCheckInDay = challengeProgressCalculator.previousCheckInDay(challenge, businessDate);
         int target = challenge.getDailyCheckInCount();
+
+        // 개인 스트릭 — 직전 인증 대상일에도 채웠으면 +1, 아니면 1 로 리셋(같은 날 재호출은 무시).
+        ChallengeMember member = challengeMemberRepository
+                .findByChallengeIdAndUserId(challengeId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER));
+        member.completeDay(businessDate, previousCheckInDay);
 
         // 유저 전역 스트릭 — 이 챌린지의 직전 대상일 기준으로 연속성 판정.
         userService.recordDailyCompletion(userId, businessDate, previousCheckInDay);
@@ -82,6 +90,7 @@ public class ChallengeStreakService {
             groupJustCompleted = true;
         }
 
-        return new MemberCheckInResult(groupCompletedCount, groupTotalCount, groupJustCompleted);
+        return new MemberCheckInResult(
+                member.getCurrentStreak(), groupCompletedCount, groupTotalCount, groupJustCompleted);
     }
 }
