@@ -1,5 +1,5 @@
 import { CaretRightIcon } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { getChallengeMergeOverview, getMergeList } from "../api";
 import { MergeStatusCircle } from "../components/MergeStatusCircle";
@@ -41,13 +41,20 @@ interface DisplayRow {
   onClick?: () => void;
 }
 
+const PAGE_SIZE = 20;
+
 export function MergeListPage() {
   const { challengeId } = useParams<{ challengeId: string }>();
   const navigate = useNavigate();
   const [overview, setOverview] =
     useState<ChallengeMergeOverviewResponse | null>(null);
   const [merges, setMerges] = useState<MergeSummaryResponse[] | null>(null);
+  const [cursor, setCursor] = useState<number | null>(null);
+  const [hasNext, setHasNext] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(false);
+
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!challengeId) return;
@@ -55,12 +62,14 @@ export function MergeListPage() {
 
     Promise.all([
       getChallengeMergeOverview(Number(challengeId)),
-      getMergeList(Number(challengeId)),
+      getMergeList(Number(challengeId), { size: PAGE_SIZE }),
     ])
-      .then(([overviewData, list]) => {
+      .then(([overviewData, page]) => {
         if (cancelled) return;
         setOverview(overviewData);
-        setMerges(list);
+        setMerges(page.content);
+        setCursor(page.nextCursor);
+        setHasNext(page.hasNext);
       })
       .catch(() => {
         if (!cancelled) setError(true);
@@ -70,6 +79,41 @@ export function MergeListPage() {
       cancelled = true;
     };
   }, [challengeId]);
+
+  const loadMore = useCallback(async () => {
+    if (!challengeId || loadingMore || cursor == null) return;
+    setLoadingMore(true);
+    try {
+      const page = await getMergeList(Number(challengeId), {
+        cursor,
+        size: PAGE_SIZE,
+      });
+      setMerges((prev) => [...(prev ?? []), ...page.content]);
+      setCursor(page.nextCursor);
+      setHasNext(page.hasNext);
+    } catch {
+      // 다음 페이지 실패는 조용히 넘어간다 - 이미 보이는 목록은 그대로 유지한다.
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [challengeId, cursor, loadingMore]);
+
+  // 스크롤이 바닥 근처에 닿으면 다음 페이지를 이어붙인다.
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !hasNext || loadingMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadMore();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasNext, loadingMore, loadMore]);
 
   const rows: DisplayRow[] = [];
   if (overview?.currentSeqNo != null) {
@@ -194,6 +238,13 @@ export function MergeListPage() {
                 );
               })}
             </ul>
+
+            <div ref={sentinelRef} />
+            {loadingMore && (
+              <p className="py-4 text-center text-[12px] text-gray-400">
+                더 불러오는 중…
+              </p>
+            )}
           </>
         )}
 

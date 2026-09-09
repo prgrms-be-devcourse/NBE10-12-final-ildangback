@@ -6,6 +6,7 @@ import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.group.entity.ChallengeGroup;
+import com.gommit.domain.group.entity.GroupCategory;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
 import com.gommit.domain.record.dto.response.CategoryStatResponse;
 import com.gommit.domain.record.dto.response.ChallengeMergeOverviewResponse;
@@ -32,6 +33,7 @@ import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -62,8 +64,10 @@ public class RecordQueryService {
     private final ChallengeMergeCycleCalculator cycleCalculator;
 
     // 챌린지 화면의 "월간 머지 목록"에 최종 머지가 있으면 맨 위에 함께 보여준다
-    // (발행 시점상 최종 머지가 항상 가장 나중이라 이 순서로 충분하다).
-    public List<MergeSummaryResponse> getMergeList(Long challengeId, Long requesterId) {
+    // (발행 시점상 최종 머지가 항상 가장 나중이라 publishedAt 내림차순 = 이 순서다).
+    // 한 챌린지의 머지 총 개수는 상한이 있어(30일 주기라 아무리 길어도 몇십 개) 두 테이블을
+    // 합친 뒤 메모리에서 커서로 자른다 - 모바일 화면은 다 무한스크롤로 통일하기로 했다.
+    public SliceResponse<MergeSummaryResponse> getMergeList(Long challengeId, Long requesterId, Long cursor, int size) {
         requireActiveMember(challengeId, requesterId);
         List<MergeSummaryResponse> summaries = new ArrayList<>();
         finalMergeRepository
@@ -73,7 +77,18 @@ public class RecordQueryService {
         monthlyMergeRepository.findByChallengeIdOrderBySeqNoDesc(challengeId).stream()
                 .map(MergeSummaryResponse::from)
                 .forEach(summaries::add);
-        return summaries;
+
+        List<MergeSummaryResponse> page = summaries.stream()
+                .filter(m -> cursor == null || mergeCursorOf(m) < cursor)
+                .limit(size + 1L)
+                .toList();
+        return SliceResponse.ofCursor(page, size, this::mergeCursorOf);
+    }
+
+    // publishedAt을 커서로 쓴다 - 위 목록 순서(최종 머지가 항상 가장 나중에 발행됨)와
+    // 그대로 일치해서, 두 테이블의 독립적인 id 대신 이걸 정렬/커서 기준으로 삼을 수 있다.
+    private long mergeCursorOf(MergeSummaryResponse merge) {
+        return merge.publishedAt().toEpochSecond(ZoneOffset.UTC);
     }
 
     public MonthlyMergeDetailResponse getMonthlyMergeDetail(Long challengeId, int seqNo, Long requesterId) {
@@ -153,7 +168,10 @@ public class RecordQueryService {
     }
 
     // 월간 머지 아카이브(프로필) 최상위 화면 - 내가 속한 챌린지마다 하나씩 요약을 만든다.
-    public List<ChallengeMergeOverviewResponse> getMyChallengeMergeOverviews(Long userId) {
+    // 한 유저가 동시에 속한 챌린지 수도 상한이 있어(그룹 여러 개를 동시에 하진 않는다)
+    // 필터링/정렬을 메모리에서 하고 무한스크롤 규약(SliceResponse)에 맞춰 커서로 자른다.
+    public SliceResponse<ChallengeMergeOverviewResponse> getMyChallengeMergeOverviews(
+            Long userId, String keyword, GroupCategory category, Long cursor, int size) {
         List<Long> challengeIds = challengeMemberRepository.findAllByUserId(userId).stream()
                 .map(ChallengeMember::getChallenge)
                 .map(Challenge::getId)
@@ -174,7 +192,8 @@ public class RecordQueryService {
                 .map(FinalMerge::getChallengeId)
                 .collect(Collectors.toSet());
 
-        return challenges.stream()
+        List<ChallengeMergeOverviewResponse> overviews = challenges.stream()
+                .sorted(Comparator.comparing(Challenge::getId).reversed())
                 .map(challenge -> toOverview(
                         challenge,
                         groupsById.get(challenge.getGroupId()),
@@ -182,7 +201,15 @@ public class RecordQueryService {
                                 .getOrDefault(challenge.getId(), 0L)
                                 .intValue(),
                         challengeIdsWithFinalMerge.contains(challenge.getId())))
+                .filter(o -> category == null || category.name().equals(o.category()))
+                .filter(o ->
+                        keyword == null || keyword.isBlank() || o.groupName().contains(keyword))
+                .filter(o -> cursor == null || o.challengeId() < cursor)
                 .toList();
+
+        List<ChallengeMergeOverviewResponse> page =
+                overviews.stream().limit(size + 1L).toList();
+        return SliceResponse.ofCursor(page, size, ChallengeMergeOverviewResponse::challengeId);
     }
 
     private ChallengeMergeOverviewResponse toOverview(

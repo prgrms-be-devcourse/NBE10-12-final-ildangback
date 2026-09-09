@@ -3,7 +3,7 @@ import {
   CaretRightIcon,
   MagnifyingGlassIcon,
 } from "@phosphor-icons/react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { getMyChallengeMergeOverviews } from "../api";
 import { MergeProgressDots } from "../components/MergeProgressDots";
@@ -20,24 +20,51 @@ function formatDateDot(localDate: string): string {
 }
 
 const ALL_CATEGORIES = "ALL";
+const PAGE_SIZE = 20;
+// 검색어 입력마다 바로 서버로 보내지 않고, 타이핑이 멈춘 뒤에만 보낸다.
+const KEYWORD_DEBOUNCE_MS = 300;
 
 export function MyMonthlyMergeArchivePage() {
   const navigate = useNavigate();
   const [overviews, setOverviews] = useState<
     ChallengeMergeOverviewResponse[] | null
   >(null);
+  const [cursor, setCursor] = useState<number | null>(null);
+  const [hasNext, setHasNext] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(false);
+  const [keywordInput, setKeywordInput] = useState("");
   const [keyword, setKeyword] = useState("");
   const [category, setCategory] = useState<
     GroupCategory | typeof ALL_CATEGORIES
   >(ALL_CATEGORIES);
 
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // keywordInput이 멈추면 300ms 뒤에 실제 검색어(keyword)로 반영한다.
+  useEffect(() => {
+    const timer = setTimeout(
+      () => setKeyword(keywordInput),
+      KEYWORD_DEBOUNCE_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [keywordInput]);
+
+  // 검색어/카테고리가 바뀌면 처음부터 다시 불러온다.
   useEffect(() => {
     let cancelled = false;
 
-    getMyChallengeMergeOverviews()
-      .then((list) => {
-        if (!cancelled) setOverviews(list);
+    getMyChallengeMergeOverviews({
+      keyword: keyword || undefined,
+      category: category === ALL_CATEGORIES ? undefined : category,
+      size: PAGE_SIZE,
+    })
+      .then((page) => {
+        if (cancelled) return;
+        setOverviews(page.content);
+        setCursor(page.nextCursor);
+        setHasNext(page.hasNext);
+        setError(false);
       })
       .catch(() => {
         if (!cancelled) setError(true);
@@ -46,15 +73,47 @@ export function MyMonthlyMergeArchivePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [keyword, category]);
 
-  const filtered = (overviews ?? []).filter((o) => {
-    if (category !== ALL_CATEGORIES && o.category !== category) return false;
-    if (keyword && !o.groupName.includes(keyword)) return false;
-    return true;
-  });
-  const inProgress = filtered.filter((o) => !o.hasFinalMerge);
-  const finished = filtered.filter((o) => o.hasFinalMerge);
+  const loadMore = useCallback(async () => {
+    if (loadingMore || cursor == null) return;
+    setLoadingMore(true);
+    try {
+      const page = await getMyChallengeMergeOverviews({
+        keyword: keyword || undefined,
+        category: category === ALL_CATEGORIES ? undefined : category,
+        cursor,
+        size: PAGE_SIZE,
+      });
+      setOverviews((prev) => [...(prev ?? []), ...page.content]);
+      setCursor(page.nextCursor);
+      setHasNext(page.hasNext);
+    } catch {
+      // 다음 페이지 실패는 조용히 넘어간다 - 이미 보이는 목록은 그대로 유지한다.
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [category, cursor, keyword, loadingMore]);
+
+  // 스크롤이 바닥 근처에 닿으면 다음 페이지를 이어붙인다.
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !hasNext || loadingMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadMore();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasNext, loadingMore, loadMore]);
+
+  const inProgress = (overviews ?? []).filter((o) => !o.hasFinalMerge);
+  const finished = (overviews ?? []).filter((o) => o.hasFinalMerge);
 
   return (
     <>
@@ -68,8 +127,8 @@ export function MyMonthlyMergeArchivePage() {
             aria-hidden
           />
           <input
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
+            value={keywordInput}
+            onChange={(e) => setKeywordInput(e.target.value)}
             placeholder="챌린지 검색"
             className="w-full text-[14px] text-gray-900 placeholder:text-gray-400 focus:outline-none"
           />
@@ -89,11 +148,11 @@ export function MyMonthlyMergeArchivePage() {
           </p>
         )}
 
-        {!error && overviews && filtered.length === 0 && (
+        {!error && overviews && overviews.length === 0 && (
           <p className="py-10 text-center text-[13px] text-gray-500">
-            {overviews.length === 0
-              ? "아직 참여 중인 챌린지가 없어요."
-              : "조건에 맞는 챌린지가 없어요."}
+            {keyword || category !== ALL_CATEGORIES
+              ? "조건에 맞는 챌린지가 없어요."
+              : "아직 참여 중인 챌린지가 없어요."}
           </p>
         )}
 
@@ -162,6 +221,13 @@ export function MyMonthlyMergeArchivePage() {
               ))}
             </div>
           </section>
+        )}
+
+        <div ref={sentinelRef} />
+        {loadingMore && (
+          <p className="py-4 text-center text-[12px] text-gray-400">
+            더 불러오는 중…
+          </p>
         )}
       </div>
     </>

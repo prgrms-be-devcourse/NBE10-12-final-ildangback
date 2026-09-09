@@ -13,10 +13,26 @@ export function getMyStats(): Promise<PersonalStatsResponse> {
   return apiFetch("/api/users/me/stats");
 }
 
-export function getMyChallengeMergeOverviews(): Promise<
-  ChallengeMergeOverviewResponse[]
-> {
-  return apiFetch("/api/users/me/challenge-merge-overviews");
+export interface GetMyChallengeMergeOverviewsParams {
+  keyword?: string;
+  category?: string;
+  cursor?: number | null;
+  size?: number;
+}
+
+export function getMyChallengeMergeOverviews(
+  params: GetMyChallengeMergeOverviewsParams = {},
+): Promise<SliceResponse<ChallengeMergeOverviewResponse>> {
+  const query = new URLSearchParams();
+  if (params.keyword) query.set("keyword", params.keyword);
+  if (params.category) query.set("category", params.category);
+  if (params.cursor != null) query.set("cursor", String(params.cursor));
+  if (params.size != null) query.set("size", String(params.size));
+
+  const queryString = query.toString();
+  return apiFetch(
+    `/api/users/me/challenge-merge-overviews${queryString ? `?${queryString}` : ""}`,
+  );
 }
 
 export function getChallengeMergeOverview(
@@ -25,10 +41,23 @@ export function getChallengeMergeOverview(
   return apiFetch(`/api/challenges/${challengeId}/merge-overview`);
 }
 
+export interface GetMergeListParams {
+  cursor?: number | null;
+  size?: number;
+}
+
 export function getMergeList(
   challengeId: number,
-): Promise<MergeSummaryResponse[]> {
-  return apiFetch(`/api/challenges/${challengeId}/merges`);
+  params: GetMergeListParams = {},
+): Promise<SliceResponse<MergeSummaryResponse>> {
+  const query = new URLSearchParams();
+  if (params.cursor != null) query.set("cursor", String(params.cursor));
+  if (params.size != null) query.set("size", String(params.size));
+
+  const queryString = query.toString();
+  return apiFetch(
+    `/api/challenges/${challengeId}/merges${queryString ? `?${queryString}` : ""}`,
+  );
 }
 
 export function getMonthlyMergeDetail(

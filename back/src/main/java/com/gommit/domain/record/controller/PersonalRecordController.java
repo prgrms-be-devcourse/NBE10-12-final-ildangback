@@ -1,5 +1,6 @@
 package com.gommit.domain.record.controller;
 
+import com.gommit.domain.group.entity.GroupCategory;
 import com.gommit.domain.record.dto.response.ChallengeMergeOverviewResponse;
 import com.gommit.domain.record.dto.response.MyMonthlyMergeResponse;
 import com.gommit.domain.record.dto.response.PersonalStatsResponse;
@@ -13,7 +14,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.time.LocalDate;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
@@ -52,10 +52,18 @@ public class PersonalRecordController {
         return recordQueryService.getMyStats(user.getId(), from, to);
     }
 
-    @Operation(summary = "내가 속한 챌린지별 머지 진행 현황", description = "월간 머지 아카이브 최상위 화면(챌린지 목록 + 진행률)에서 쓴다.")
+    @Operation(
+            summary = "내가 속한 챌린지별 머지 진행 현황",
+            description = "월간 머지 아카이브 최상위 화면(챌린지 목록 + 진행률)에서 쓴다. 커서 기반 무한스크롤로 반환한다.")
     @GetMapping("/challenge-merge-overviews")
-    public List<ChallengeMergeOverviewResponse> getMyChallengeMergeOverviews(@CurrentUser SecurityUser user) {
-        return recordQueryService.getMyChallengeMergeOverviews(user.getId());
+    public SliceResponse<ChallengeMergeOverviewResponse> getMyChallengeMergeOverviews(
+            @CurrentUser SecurityUser user,
+            @Parameter(description = "챌린지 이름(그룹 이름) 검색어") @RequestParam(required = false) String keyword,
+            @Parameter(description = "카테고리 필터") @RequestParam(required = false) GroupCategory category,
+            @Parameter(description = "이전 응답의 nextCursor 값. 첫 페이지는 생략") @RequestParam(required = false) Long cursor,
+            @Parameter(description = "한 번에 가져올 개수") @RequestParam(defaultValue = "" + DEFAULT_SIZE) @Min(1) @Max(100)
+                    int size) {
+        return recordQueryService.getMyChallengeMergeOverviews(user.getId(), keyword, category, cursor, size);
     }
 
     @Operation(summary = "내 월간 머지 아카이브 조회", description = "내가 참여한 챌린지들의 월간 머지 결과를 최근 발생 순서로 커서 기반 무한스크롤로 반환한다.")

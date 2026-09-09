@@ -103,6 +103,8 @@ class RecordQueryServiceTest {
     }
 
     private MonthlyMerge monthlyMerge(Long id, Long challengeId, int seqNo) {
+        // publishedAt은 seqNo가 클수록 나중에 발행된 것으로 - getMergeList의 커서(publishedAt
+        // 기준)가 seqNo 역순과 일치하는지 테스트하려면 값이 서로 달라야 한다.
         MonthlyMerge merge = MonthlyMerge.create(
                 challengeId,
                 seqNo,
@@ -111,7 +113,7 @@ class RecordQueryServiceTest {
                 30,
                 135,
                 90,
-                LocalDateTime.of(2026, 9, 18, 4, 0));
+                LocalDateTime.of(2026, 1, 1, 4, 0).plusMonths(seqNo));
         ReflectionTestUtils.setField(merge, "id", id);
         return merge;
     }
@@ -197,7 +199,8 @@ class RecordQueryServiceTest {
             when(monthlyMergeRepository.findByChallengeIdOrderBySeqNoDesc(1L))
                     .thenReturn(List.of(monthlyMerge(4L, 1L, 4), monthlyMerge(3L, 1L, 3)));
 
-            List<MergeSummaryResponse> result = recordQueryService.getMergeList(1L, 1L);
+            List<MergeSummaryResponse> result =
+                    recordQueryService.getMergeList(1L, 1L, null, 20).content();
 
             assertThat(result).hasSize(3);
             assertThat(result.get(0).type()).isEqualTo(MergeType.FINAL);
@@ -215,7 +218,8 @@ class RecordQueryServiceTest {
             when(monthlyMergeRepository.findByChallengeIdOrderBySeqNoDesc(1L))
                     .thenReturn(List.of(monthlyMerge(1L, 1L, 1)));
 
-            List<MergeSummaryResponse> result = recordQueryService.getMergeList(1L, 1L);
+            List<MergeSummaryResponse> result =
+                    recordQueryService.getMergeList(1L, 1L, null, 20).content();
 
             assertThat(result).hasSize(1);
             assertThat(result.get(0).type()).isEqualTo(MergeType.MONTHLY);
@@ -227,7 +231,7 @@ class RecordQueryServiceTest {
             when(challengeMemberRepository.existsActiveMember(1L, 99L, ChallengeMemberStatus.ACTIVE))
                     .thenReturn(false);
 
-            assertThatThrownBy(() -> recordQueryService.getMergeList(1L, 99L))
+            assertThatThrownBy(() -> recordQueryService.getMergeList(1L, 99L, null, 20))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.ACCESS_DENIED);
@@ -453,14 +457,62 @@ class RecordQueryServiceTest {
                             monthlyMerge(6L, 2L, 3)));
             when(finalMergeRepository.findAllByChallengeIdIn(List.of(1L, 2L))).thenReturn(List.of(finalMerge(1L, 2L)));
 
-            List<ChallengeMergeOverviewResponse> result = recordQueryService.getMyChallengeMergeOverviews(1L);
+            List<ChallengeMergeOverviewResponse> result = recordQueryService
+                    .getMyChallengeMergeOverviews(1L, null, null, null, 20)
+                    .content();
 
+            // challengeId 내림차순(최근 챌린지가 먼저)으로 온다.
             assertThat(result).hasSize(2);
             assertThat(result)
                     .extracting(ChallengeMergeOverviewResponse::challengeId)
-                    .containsExactly(1L, 2L);
+                    .containsExactly(2L, 1L);
+            assertThat(result.get(0).groupName()).isEqualTo("매일 20분 독서");
+            assertThat(result.get(0).hasFinalMerge()).isTrue();
+            assertThat(result.get(1).groupName()).isEqualTo("오운완");
+        }
+
+        @Test
+        @DisplayName("카테고리로 필터링한다")
+        void filtersByCategory() {
+            Challenge challengeA = challenge(1L, 10L, LocalDate.of(2026, 8, 20), LocalDate.of(2027, 2, 15));
+            Challenge challengeB = challenge(2L, 20L, LocalDate.of(2026, 4, 1), LocalDate.of(2026, 6, 29));
+            ChallengeGroup groupA = challengeGroup(10L, "오운완", GroupCategory.EXERCISE);
+            ChallengeGroup groupB = challengeGroup(20L, "매일 20분 독서", GroupCategory.READING);
+            when(challengeMemberRepository.findAllByUserId(1L))
+                    .thenReturn(List.of(challengeMember(challengeA), challengeMember(challengeB)));
+            when(challengeRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(challengeA, challengeB));
+            when(challengeGroupRepository.findAllById(List.of(10L, 20L))).thenReturn(List.of(groupA, groupB));
+            when(monthlyMergeRepository.findAllByChallengeIdIn(List.of(1L, 2L))).thenReturn(List.of());
+            when(finalMergeRepository.findAllByChallengeIdIn(List.of(1L, 2L))).thenReturn(List.of());
+
+            List<ChallengeMergeOverviewResponse> result = recordQueryService
+                    .getMyChallengeMergeOverviews(1L, null, GroupCategory.EXERCISE, null, 20)
+                    .content();
+
+            assertThat(result).hasSize(1);
             assertThat(result.get(0).groupName()).isEqualTo("오운완");
-            assertThat(result.get(1).hasFinalMerge()).isTrue();
+        }
+
+        @Test
+        @DisplayName("키워드로 그룹 이름을 검색한다")
+        void filtersByKeyword() {
+            Challenge challengeA = challenge(1L, 10L, LocalDate.of(2026, 8, 20), LocalDate.of(2027, 2, 15));
+            Challenge challengeB = challenge(2L, 20L, LocalDate.of(2026, 4, 1), LocalDate.of(2026, 6, 29));
+            ChallengeGroup groupA = challengeGroup(10L, "오운완", GroupCategory.EXERCISE);
+            ChallengeGroup groupB = challengeGroup(20L, "매일 20분 독서", GroupCategory.READING);
+            when(challengeMemberRepository.findAllByUserId(1L))
+                    .thenReturn(List.of(challengeMember(challengeA), challengeMember(challengeB)));
+            when(challengeRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(challengeA, challengeB));
+            when(challengeGroupRepository.findAllById(List.of(10L, 20L))).thenReturn(List.of(groupA, groupB));
+            when(monthlyMergeRepository.findAllByChallengeIdIn(List.of(1L, 2L))).thenReturn(List.of());
+            when(finalMergeRepository.findAllByChallengeIdIn(List.of(1L, 2L))).thenReturn(List.of());
+
+            List<ChallengeMergeOverviewResponse> result = recordQueryService
+                    .getMyChallengeMergeOverviews(1L, "독서", null, null, 20)
+                    .content();
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).groupName()).isEqualTo("매일 20분 독서");
         }
     }
 

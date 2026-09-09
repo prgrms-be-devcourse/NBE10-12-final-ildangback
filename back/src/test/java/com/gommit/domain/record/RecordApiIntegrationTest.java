@@ -168,7 +168,7 @@ class RecordApiIntegrationTest extends IntegrationTestSupport {
 
             mockMvc.perform(withToken(get("/api/users/me/challenge-merge-overviews"), tokens.accessToken()))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.length()").value(1));
+                    .andExpect(jsonPath("$.content.length()").value(1));
         }
     }
 
@@ -263,8 +263,8 @@ class RecordApiIntegrationTest extends IntegrationTestSupport {
 
             mockMvc.perform(withToken(get("/api/challenges/" + challengeId + "/merges"), tokens.accessToken()))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.length()").value(2))
-                    .andExpect(jsonPath("$[0].type").value("FINAL"));
+                    .andExpect(jsonPath("$.content.length()").value(2))
+                    .andExpect(jsonPath("$.content[0].type").value("FINAL"));
         }
     }
 
