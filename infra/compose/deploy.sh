@@ -47,7 +47,7 @@ docker compose up -d
 # 5. 헬스 확인
 echo "waiting for health..."
 for i in $(seq 1 40); do
-  if curl -fsS http://localhost:8080/actuator/health >/dev/null 2>&1; then
+  if docker compose exec -T back curl -fsS http://localhost:8080/actuator/health >/dev/null 2>&1; then
     echo "healthy after $((i * 3))s"
     # 안 쓰는 이미지 정리. -a = 태그만 있고 컨테이너가 안 쓰는 것도 대상(옛 back:<sha>).
     # until=72h = 최근 3일치는 남겨 빠른 롤백 시 재pull 없이 되돌림. 실행 중 이미지는 항상 보호됨.
