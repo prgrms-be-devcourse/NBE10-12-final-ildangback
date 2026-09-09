@@ -298,6 +298,26 @@ class CheckInServiceTest {
             verify(mediaStore).delete(anyString());
             verify(personalPointService, never()).reward(anyLong(), anyLong(), anyInt(), any(), any());
         }
+
+        @Test
+        @DisplayName("포인트 적립이 실패하면 방금 올린 미디어를 정리하고 예외를 되던진다")
+        void cleansMediaWhenRewardFails() {
+            Challenge challenge = dailyChallenge(CHALLENGE_ID, 3);
+            givenActiveMemberAndValidDay(challenge);
+            when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
+                    .thenReturn(1);
+            when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
+            when(policy.checkInReward()).thenReturn(10);
+            when(checkInRepository.saveAndFlush(any(CheckIn.class))).thenAnswer(inv -> inv.getArgument(0));
+            doThrow(new IllegalStateException("적립 실패"))
+                    .when(personalPointService)
+                    .reward(anyLong(), anyLong(), anyInt(), any(), any());
+
+            assertThatThrownBy(() -> service.submit(USER_ID, CHALLENGE_ID, request(null), media()))
+                    .isInstanceOf(IllegalStateException.class);
+
+            verify(mediaStore).delete("check-ins/2026/09/uuid.png");
+        }
     }
 
     @Nested

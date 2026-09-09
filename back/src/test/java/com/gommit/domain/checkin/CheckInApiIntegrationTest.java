@@ -749,6 +749,8 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
             Integer pointRows = jdbcTemplate.queryForObject(
                     "select count(*) from user_points where user_id = ?", Integer.class, userId);
             assertThat(pointRows).isZero();
+            // 트랜잭션 롤백은 CheckIn 행만 지운다. 업로드된 파일은 서비스가 best-effort 로 정리해 orphan 이 없어야 한다.
+            assertThat(countMediaFiles()).isZero();
         }
     }
 }

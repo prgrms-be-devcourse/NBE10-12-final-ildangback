@@ -107,49 +107,52 @@ public class CheckInService {
             throw new BusinessException(ErrorCode.DAILY_LIMIT_EXCEEDED);
         }
 
-        // 포인트 적립 — 같은 트랜잭션. 실패 시 인증도 롤백된다.
-        // PersonalPointService.reward는 전달한 sourceName 을 그대로 저장. 포인트 이력 화면이 그룹명을 보여줘야 해서
-        // 챌린지가 속한 그룹명을 넘긴다. (그룹이 지워진 예외적 상황이면 고정 라벨로 폴백)
+        // 미디어는 이미 스토리지에 올라갔다. 아래 후처리에서 예외가 나면 @Transactional 이 CheckIn 행은 롤백하지만
+        // 파일은 남으므로, uk_check_ins 위반 처리와 같이 best-effort 로 정리하고 되던진다.
         String sourceName =
                 challengeGroupRepository.findNameById(challenge.getGroupId()).orElse("인증");
         int earnedUserPoints = policy.checkInReward();
         try {
+            // 포인트 적립 — 같은 트랜잭션. 실패 시 인증도 롤백된다.
+            // PersonalPointService.reward 는 전달한 sourceName 을 그대로 저장. 포인트 이력 화면이 그룹명을
+            // 보여줘야 해서 챌린지가 속한 그룹명을 넘긴다. (그룹이 지워진 예외적 상황이면 고정 라벨로 폴백)
             personalPointService.reward(userId, challengeId, earnedUserPoints, UserPointReason.CHECK_IN, sourceName);
+
+            String nickname = nicknameOf(userId, checkIn.getId());
+
+            // 이번 인증이 그날 목표를 채운 마지막 회차면 개인/그룹/유저 스트릭을 갱신한다. 같은 트랜잭션.
+            boolean dailyCompleted = roundNo >= target;
+            int currentStreak = 0;
+            int groupCompletedCount = 0;
+            int groupTotalCount = 0;
+            if (dailyCompleted) {
+                MemberCheckInResult streak =
+                        challengeStreakService.onMemberDailyComplete(challengeId, userId, businessDate);
+                currentStreak = streak.memberCurrentStreak();
+                groupCompletedCount = streak.groupCompletedCount();
+                groupTotalCount = streak.groupTotalCount();
+            }
+
+            return new CheckInResultResponse(
+                    CheckInResponse.of(checkIn, nickname),
+                    roundNo,
+                    target,
+                    dailyCompleted,
+                    earnedUserPoints,
+                    currentStreak,
+                    groupCompletedCount,
+                    groupTotalCount);
         } catch (RuntimeException e) {
             log.error(
-                    "포인트 적립 실패로 인증 롤백: challengeId={}, userId={}, roundNo={}, earnedUserPoints={}",
+                    "인증 후처리 실패로 롤백: challengeId={}, userId={}, roundNo={}, earnedUserPoints={}",
                     challengeId,
                     userId,
                     roundNo,
                     earnedUserPoints,
                     e);
+            deleteQuietly(mediaKey); // 롤백은 CheckIn 행만 지운다. 올라간 파일은 best-effort 로 정리
             throw e;
         }
-
-        String nickname = nicknameOf(userId, checkIn.getId());
-
-        // 이번 인증이 그날 목표를 채운 마지막 회차면 개인/그룹/유저 스트릭을 갱신한다. 같은 트랜잭션.
-        boolean dailyCompleted = roundNo >= target;
-        int currentStreak = 0;
-        int groupCompletedCount = 0;
-        int groupTotalCount = 0;
-        if (dailyCompleted) {
-            MemberCheckInResult streak =
-                    challengeStreakService.onMemberDailyComplete(challengeId, userId, businessDate);
-            currentStreak = streak.memberCurrentStreak();
-            groupCompletedCount = streak.groupCompletedCount();
-            groupTotalCount = streak.groupTotalCount();
-        }
-
-        return new CheckInResultResponse(
-                CheckInResponse.of(checkIn, nickname),
-                roundNo,
-                target,
-                dailyCompleted,
-                earnedUserPoints,
-                currentStreak,
-                groupCompletedCount,
-                groupTotalCount);
     }
 
     public CheckInCursorResponse getGallery(
