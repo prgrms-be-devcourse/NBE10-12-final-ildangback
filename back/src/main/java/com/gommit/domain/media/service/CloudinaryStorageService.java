@@ -58,7 +58,7 @@ public class CloudinaryStorageService implements StorageService {
                             file.getBytes(),
                             ObjectUtils.asMap(
                                     "folder",
-                                    policy.folder(),
+                                    uploadFolderFor(policy),
                                     "resource_type",
                                     contentType.isVideo() ? "video" : "image",
                                     "type",
@@ -88,7 +88,13 @@ public class CloudinaryStorageService implements StorageService {
             if (response.statusCode() != 200) {
                 throw new BusinessException(ErrorCode.MEDIA_NOT_FOUND);
             }
-            return new ByteArrayResource(response.body());
+            String filename = filenameOf(storageKey);
+            return new ByteArrayResource(response.body()) {
+                @Override
+                public String getFilename() {
+                    return filename;
+                }
+            };
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.MEDIA_STORAGE_FAILED);
         } catch (InterruptedException e) {
@@ -136,6 +142,17 @@ public class CloudinaryStorageService implements StorageService {
 
     private static String deliveryType(StoragePolicy policy) {
         return policy.isPublic() ? TYPE_PUBLIC : TYPE_PRIVATE;
+    }
+
+    // 업로드 시 Cloudinary 에 넘길 folder 파라미터 = rootFolder + "/" + policy.folder (rootFolder 비면 policy.folder 그대로)
+    private String uploadFolderFor(StoragePolicy policy) {
+        String root = properties.cloudinary().rootFolder();
+        return (root == null || root.isBlank()) ? policy.folder() : root + "/" + policy.folder();
+    }
+
+    // "go-mmit/check-ins/abc.jpg" -> "abc.jpg".
+    static String filenameOf(String storageKey) {
+        return storageKey.substring(storageKey.lastIndexOf('/') + 1);
     }
 
     // "{publicId}.{format}" -> [publicId, format]
