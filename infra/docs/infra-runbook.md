@@ -63,8 +63,16 @@ terraform apply
   dispatch 하면 `back:latest` 태그가 그 코드로 이동해 prod 포인터가 뒤로 갈 수 있다.
   승인 게이트가 그걸 막는 유일한 장치다. (롤백은 이 워크플로 대신 런북 3장의 SSM 직접 호출로 한다.)
 
-`GITHUB_TOKEN` 은 자동 제공. GHCR 패키지는 **public 으로 전환** 권장(Settings → Packages →
-change visibility) → EC2 에서 `docker login` 불필요. private 로 두려면 1-4 에서 로그인.
+`GITHUB_TOKEN` 은 자동 제공 (CI 의 GHCR push 용).
+
+GHCR 패키지는 **private 로 둔다.** 리포는 public 이지만 이미지에는 빌드 산출물·의존성이 들어가므로
+익명 pull 을 열지 않는다. EC2 에서 pull 하려면 자격증명이 필요하다:
+
+1. GitHub → Settings → Developer settings → Personal access tokens **(classic)** →
+   Generate → `read:packages` **스코프만** 체크.
+2. 만료일: 설정하면 만료 전 재발급 + EC2 재로그인 필요 (아래 §2 에 갱신 메모). 무기한 토큰은 지양.
+3. 토큰 문자열을 1-4 의 `docker login` 단계에서 쓴다. `~ec2-user/.docker/config.json` 에 저장돼
+   재부팅·재배포 후에도 유지된다.
 
 ### 1-4. EC2 최초 셋업 (SSM 세션으로)
 
@@ -86,7 +94,8 @@ cp src/infra/compose/.env.example .env
 vi .env                  # DB 비번, JWT_SECRET_KEY, Cloudinary, CORS 등
 chmod 600 .env
 
-# (GHCR private 인 경우만) 로그인 — config.json 에 저장돼 유지됨
+# GHCR 로그인 (패키지 private) — ec2-user 로 실행할 것. deploy.sh 도 ec2-user 로 돌기 때문.
+# config.json 에 저장돼 재부팅·재배포 후에도 유지됨. 토큰은 1-3 의 read:packages PAT.
 echo <GHCR_PAT> | docker login ghcr.io -u <github-user> --password-stdin
 
 # 최초 기동
@@ -124,6 +133,10 @@ open https://go-mmit.site                          # 프론트
 수동 실행: Actions → Deploy Backend → Run workflow.
 
 **배포 금지 시간대**: 03:30~04:30 (자동 start + 배치), 17:45~18:15 (루트 정지). 런북 상단 참고.
+
+**GHCR PAT 갱신**: 1-3 에서 만료일 있는 PAT 를 썼다면 만료 전에 새 토큰 발급 → EC2 에서
+`docker login` 다시 (1-4 명령 동일). 만료되면 `deploy.sh` 의 `docker compose pull` 이
+`denied` / `unauthorized` 로 실패한다.
 
 ---
 

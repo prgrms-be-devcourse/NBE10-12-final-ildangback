@@ -206,7 +206,7 @@ monorepo 안 `infra/` 디렉터리. `feat/infra-idk` → 다른 브랜치 머지
 | 보안그룹 | 443 = Cloudflare IP 대역만, 22 = 기본 미개방(배포·디버그 = SSM), `var.ssh_allowed_cidrs` 로 운영자 1인 `/32` 예외만 (Q14) | 오리진 우회 차단 |
 
 **Terraform 관리 대상**: VPC(1) / IGW / 퍼블릭 서브넷(1) / 라우트테이블 / EC2 / EIP /
-보안그룹 / IAM 역할(SSM, GHCR pull) / cloudflare DNS 레코드 / EventBridge Scheduler(03:30
+보안그룹 / IAM 역할(SSM) / cloudflare DNS 레코드 / EventBridge Scheduler(03:30
 start) / DLM(EBS 스냅샷). provider 블록에 `default_tags { tags = { Team = "devcos-team01" } }`
 → 모든 AWS 리소스에 태그 자동. (key pair 미사용 — SSM 이 기본. SSH 예외 1인은 authorized_keys 직접 등록, Q14 추가결정)
 
@@ -317,7 +317,7 @@ DB에 있고, 이게 날아가면 서비스가 끝난다. 데모/평가 중에 �
 
 ### Q9 — 이미지 빌드 + CD → 확정
 
-- 레지스트리: **GHCR** (무료).
+- 레지스트리: **GHCR** (무료). 패키지는 private — EC2에서 `read:packages` PAT로 1회 `docker login`.
 - `.github/workflows/deploy.yml`: `main` 머지 → 백엔드 `docker build`
   (Q3가 ARM이므로 `buildx --platform linux/arm64`) → GHCR push → EC2에서
   `docker compose pull && docker compose up -d` → `/actuator/health` 확인.
@@ -781,7 +781,8 @@ front/
   일괄 치환 (`variables.tf` `domain`, `nginx/conf.d/api.conf` `server_name`, `.env.example`
   `CORS_ALLOWED_ORIGINS`).
 - **미디어 설계 메모**: "동일 오리진 서빙" → "동일 site" 문구 조정 (쿠키 도입 시점).
-- **GHCR 패키지 visibility**: public 전환 권장(EC2 `docker login` 불필요) — runbook 1-3.
+- **GHCR 패키지 visibility**: **private 유지**. 리포는 public이지만 이미지에는 빌드 산출물·의존성이
+  담기므로 익명 pull을 열지 않는다. EC2는 `read:packages` PAT로 1회 `docker login` — runbook 1-3, 1-4.
 - **Cloudflare Origin CA 인증서**: 발급 후 EC2 `certs/` 에 배치 — runbook 1-1, 1-4.
 - **최초 배포**: runbook 1장 순서대로 (Terraform → Secrets → EC2 셋업 → Pages).
 - **SSH 예외 1인**: `ssh_allowed_cidrs` 에 그 사람 공인 IP `/32`, 공개키는 런북 "SSH 예외

@@ -8,7 +8,7 @@
 #   - /opt/team1-app/src        : 이 리포지토리 clone
 #   - /opt/team1-app/.env       : 시크릿 (chmod 600)
 #   - /opt/team1-app/certs/     : origin.pem, origin.key (Cloudflare Origin CA)
-#   - GHCR 패키지가 private 이면 `docker login ghcr.io` 1회
+#   - GHCR 패키지는 private → ec2-user 로 `docker login ghcr.io` 1회 (read:packages PAT)
 set -euo pipefail
 
 APP_DIR=/opt/team1-app
