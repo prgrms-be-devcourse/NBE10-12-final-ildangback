@@ -1,8 +1,10 @@
 package com.gommit.domain.challenge.entity;
 
+import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.global.base.BaseEntity;
 import jakarta.persistence.*;
 import java.time.LocalDate;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -103,6 +105,11 @@ public class Challenge extends BaseEntity {
         this.dailyCheckInCount = dailyCheckInCount;
         this.requiredDayCount = requiredDayCount;
         this.allowPhoto = allowPhoto;
+    }
+
+    // 이 챌린지가 허용하는 인증 방식 목록. 현재는 사진 허용 여부만 저장한다.
+    public List<CheckInType> allowedCheckInTypes() {
+        return allowPhoto ? List.of(CheckInType.PHOTO) : List.of();
     }
 
     public void activate() {

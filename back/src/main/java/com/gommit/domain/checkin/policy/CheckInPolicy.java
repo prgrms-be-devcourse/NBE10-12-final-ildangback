@@ -23,9 +23,8 @@ public class CheckInPolicy {
         return pointProperties.checkInReward(); // challenge 별/스트릭별로 가변이 되면 파라미터를 추가 필요
     }
 
-    // TODO: Challenge 도메인의 엔티티에서 제공시 교체
     public List<CheckInType> allowedTypes(Challenge challenge) {
-        return challenge.isAllowPhoto() ? List.of(CheckInType.PHOTO) : List.of();
+        return challenge.allowedCheckInTypes();
     }
 
     public void validateCheckInDay(Challenge challenge, LocalDate date) {

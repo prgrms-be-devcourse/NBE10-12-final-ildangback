@@ -184,9 +184,8 @@ public class ChallengeService {
         if (dailyCheckInCount < 1 || dailyCheckInCount > 10) {
             throw new BusinessException(ErrorCode.INVALID_DAILY_COUNT);
         }
-        List<CheckInType> allowedTypes = request.allowedTypes() != null
-                ? request.allowedTypes()
-                : challenge.isAllowPhoto() ? List.of(CheckInType.PHOTO) : List.of();
+        List<CheckInType> allowedTypes =
+                request.allowedTypes() != null ? request.allowedTypes() : challenge.allowedCheckInTypes();
         if (allowedTypes.isEmpty()) {
             throw new BusinessException(ErrorCode.NO_CHECK_IN_METHOD);
         }

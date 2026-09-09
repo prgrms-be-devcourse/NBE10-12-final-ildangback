@@ -6,7 +6,6 @@ import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.global.time.DaysOfWeek;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -57,12 +56,6 @@ public record ChallengeDetailResponse(
     }
 
     private static List<CheckInType> getAllowedTypes(Challenge challenge) {
-        List<CheckInType> allowedTypes = new ArrayList<>();
-
-        if (challenge.isAllowPhoto()) {
-            allowedTypes.add(CheckInType.PHOTO);
-        }
-
-        return allowedTypes;
+        return challenge.allowedCheckInTypes();
     }
 }

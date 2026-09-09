@@ -46,7 +46,7 @@ public record ChallengeSummaryResponse(
                 challenge.getFrequencyValue(),
                 parseDaysOfWeek(challenge.getDaysOfWeek()),
                 challenge.getDailyCheckInCount(),
-                challenge.isAllowPhoto() ? List.of(CheckInType.PHOTO) : List.of());
+                challenge.allowedCheckInTypes());
     }
 
     private static List<DaysOfWeek> parseDaysOfWeek(String daysOfWeek) {
