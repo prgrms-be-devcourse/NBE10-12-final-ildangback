@@ -59,12 +59,17 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
     }
 
     private long insertChallenge(long groupId, int dailyCheckInCount) {
+        return insertChallenge(groupId, dailyCheckInCount, "ACTIVE");
+    }
+
+    private long insertChallenge(long groupId, int dailyCheckInCount, String status) {
         jdbcTemplate.update(
                 "INSERT INTO challenges "
                         + "(group_id, seq_no, start_date, end_date, status, frequency_type, daily_check_in_count, "
                         + "required_day_count, group_current_streak, group_best_streak, allow_photo, created_at, updated_at) "
-                        + "VALUES (?, 1, '2026-01-01', '2026-12-31', 'ACTIVE', 'DAILY', ?, 30, 0, 0, TRUE, NOW(), NOW())",
+                        + "VALUES (?, 1, '2026-01-01', '2026-12-31', ?, 'DAILY', ?, 30, 0, 0, TRUE, NOW(), NOW())",
                 groupId,
+                status,
                 dailyCheckInCount);
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
@@ -82,6 +87,10 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
     }
 
     private void insertCheckIn(long challengeId, long userId, int roundNo) {
+        insertCheckIn(challengeId, userId, roundNo, businessDate());
+    }
+
+    private void insertCheckIn(long challengeId, long userId, int roundNo, LocalDate businessDate) {
         jdbcTemplate.update(
                 "INSERT INTO check_ins "
                         + "(challenge_id, user_id, round_no, check_in_type, media_key, media_type, business_date, "
@@ -90,7 +99,7 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
                 challengeId,
                 userId,
                 roundNo,
-                businessDate());
+                businessDate);
     }
 
     private long insertBareItem(String slot, String name, int price) {
@@ -393,6 +402,39 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.code").value("CHALLENGE_NOT_FOUND"));
         }
+
+        @Test
+        @DisplayName("어제 날짜 인증은 오늘 자세에 반영되지 않는다")
+        void yesterdayCheckInDoesNotCountForToday() throws Exception {
+            var tokens = loginAs();
+            long myId = getUserId("tester@example.com");
+
+            long groupId = insertGroup(myId, "GYM");
+            long challengeId = insertChallenge(groupId, 1);
+            insertChallengeMember(challengeId, myId, "OWNER", "ACTIVE");
+            insertCheckIn(challengeId, myId, 1, businessDate().minusDays(1));
+
+            mockMvc.perform(withToken(get("/api/challenges/" + challengeId + "/characters"), tokens.accessToken()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].pose").value("GYM_FAIL"));
+        }
+
+        @Test
+        @DisplayName("다른 챌린지의 인증은 이 챌린지 자세에 반영되지 않는다")
+        void checkInOfAnotherChallengeDoesNotCount() throws Exception {
+            var tokens = loginAs();
+            long myId = getUserId("tester@example.com");
+
+            long groupId = insertGroup(myId, "GYM");
+            long challengeId = insertChallenge(groupId, 1);
+            long otherChallengeId = insertChallenge(insertGroup(myId, "GYM"), 1);
+            insertChallengeMember(challengeId, myId, "OWNER", "ACTIVE");
+            insertCheckIn(otherChallengeId, myId, 1);
+
+            mockMvc.perform(withToken(get("/api/challenges/" + challengeId + "/characters"), tokens.accessToken()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].pose").value("GYM_FAIL"));
+        }
     }
 
     // ─── 자세별 이미지 선택 ───────────────────────────────────────────────────
@@ -522,6 +564,71 @@ class UserItemApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.slots.length()").value(ItemSlot.values().length))
                     .andExpect(jsonPath("$.slots.HEAD").value(nullValue()));
+        }
+
+        @Test
+        @DisplayName("종료된 챌린지는 인증이 없어도 SUCCESS 자세와 그 자세 이미지를 준다")
+        void endedChallengeGivesSuccessPoseAndImage() throws Exception {
+            var tokens = loginAs();
+            long myId = getUserId("tester@example.com");
+
+            long itemId = insertBareItem("HEAD", "초록 모자", 100);
+            insertItemImage(itemId, "DEFAULT", "character-store/hat-default.png");
+            insertItemImage(itemId, "GYM_FAIL", "character-store/hat-gym-fail.png");
+            insertItemImage(itemId, "GYM_SUCCESS", "character-store/hat-gym-success.png");
+            insertEquippedUserItem(myId, itemId, "HEAD");
+
+            long groupId = insertGroup(myId, "GYM");
+            long challengeId = insertChallenge(groupId, 2, "ENDED");
+            insertChallengeMember(challengeId, myId, "OWNER", "ACTIVE");
+
+            mockMvc.perform(withToken(get("/api/challenges/" + challengeId + "/characters"), tokens.accessToken()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].pose").value("GYM_SUCCESS"))
+                    .andExpect(jsonPath("$[0].slots.HEAD").value(endsWith("character-store/hat-gym-success.png")));
+        }
+    }
+
+    // ─── 여러 유저 캐릭터 조회 ─────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("여러 유저 캐릭터 조회 GET /api/users/characters")
+    class GetCharacters {
+
+        @Test
+        @DisplayName("미인증이면 401")
+        void unauthenticatedIsRejected() throws Exception {
+            mockMvc.perform(get("/api/users/characters").param("userIds", "1")).andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("userId 별로 DEFAULT 자세 슬롯 맵을 돌려준다")
+        void returnsDefaultPoseSlotsPerUser() throws Exception {
+            var tokens = loginAs();
+            long myId = getUserId("tester@example.com");
+            loginAs("mate@example.com", "메이트");
+            long mateId = getUserId("mate@example.com");
+
+            long itemId = insertBareItem("HEAD", "초록 모자", 100);
+            insertItemImage(itemId, "DEFAULT", "character-store/hat-default.png");
+            insertItemImage(itemId, "GYM_SUCCESS", "character-store/hat-gym-success.png");
+            insertEquippedUserItem(myId, itemId, "HEAD");
+
+            mockMvc.perform(withToken(
+                            get("/api/users/characters").param("userIds", myId + "," + mateId), tokens.accessToken()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$." + myId + ".HEAD").value(endsWith("character-store/hat-default.png")))
+                    .andExpect(jsonPath("$." + mateId + ".HEAD").value(nullValue()))
+                    .andExpect(jsonPath("$." + mateId + ".length()").value(ItemSlot.values().length));
+        }
+
+        @Test
+        @DisplayName("userIds 가 비면 400")
+        void emptyUserIdsIsRejected() throws Exception {
+            var tokens = loginAs();
+
+            mockMvc.perform(withToken(get("/api/users/characters").param("userIds", ""), tokens.accessToken()))
+                    .andExpect(status().isBadRequest());
         }
     }
 }

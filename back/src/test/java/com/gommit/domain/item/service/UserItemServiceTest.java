@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -13,6 +14,7 @@ import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.ChallengeMember;
 import com.gommit.domain.challenge.entity.ChallengeMemberRole;
 import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
+import com.gommit.domain.challenge.entity.ChallengeStatus;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.checkin.repository.CheckInRepository;
@@ -498,11 +500,73 @@ class UserItemServiceTest {
         assertThat(response.slots().get(ItemSlot.HEAD)).isEqualTo("http://localhost:8080/media/default.png");
     }
 
+    @Test
+    @DisplayName("종료된 챌린지는 인증을 조회하지 않고 전원 SUCCESS 자세로 반환된다")
+    void endedChallengeGivesSuccessPoseToEveryone() {
+        // given
+        givenChallengeWith(MapType.GYM, 2, ChallengeStatus.ENDED);
+        given(challengeMemberRepository.findByChallengeIdAndUserId(CHALLENGE_ID, USER_ID))
+                .willReturn(Optional.of(activeMember(USER_ID)));
+        given(challengeMemberRepository.findAllByChallengeIdAndStatus(CHALLENGE_ID, ChallengeMemberStatus.ACTIVE))
+                .willReturn(List.of(activeMember(USER_ID), activeMember(OTHER_USER_ID)));
+        given(userService.findNicknames(List.of(USER_ID, OTHER_USER_ID)))
+                .willReturn(Map.of(USER_ID, "테스터", OTHER_USER_ID, "다른사람"));
+        given(userItemRepository.findByUserIdInAndEquippedSlotNotNull(anyCollection()))
+                .willReturn(List.of());
+
+        // when
+        List<ChallengeCharacterResponse> responses = userItemService.getChallengeCharacters(CHALLENGE_ID, USER_ID);
+
+        // then
+        assertThat(responses).extracting(ChallengeCharacterResponse::pose).containsOnly(Pose.GYM_SUCCESS);
+        then(checkInRepository).should(never()).findCompletedUserIds(any(), any(), anyInt());
+    }
+
+    // ─────────────────────────────────────────────────
+    // getCharacters
+    // ─────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("여러 유저의 DEFAULT 자세 캐릭터를 userId 별로 묶어 반환한다")
+    void getCharactersReturnsDefaultPoseSlotsPerUser() {
+        // given
+        headItem.getImages().add(ItemImage.of(headItem, Pose.DEFAULT, "default.png"));
+        headItem.getImages().add(ItemImage.of(headItem, Pose.GYM_SUCCESS, "gym-success.png"));
+        given(userItemRepository.findByUserIdInAndEquippedSlotNotNull(List.of(USER_ID, OTHER_USER_ID)))
+                .willReturn(List.of(equippedUserItem));
+        given(storageService.publicUrl("default.png")).willReturn("http://localhost:8080/media/default.png");
+
+        // when
+        Map<Long, Map<ItemSlot, String>> characters = userItemService.getCharacters(List.of(USER_ID, OTHER_USER_ID));
+
+        // then
+        assertThat(characters).containsOnlyKeys(USER_ID, OTHER_USER_ID);
+        assertThat(characters.get(USER_ID).get(ItemSlot.HEAD)).isEqualTo("http://localhost:8080/media/default.png");
+        assertThat(characters.get(OTHER_USER_ID).values()).allMatch(url -> url == null);
+        assertThat(characters.get(OTHER_USER_ID)).hasSize(ItemSlot.values().length);
+    }
+
+    @Test
+    @DisplayName("빈 userId 목록이면 조회 없이 빈 맵을 반환한다")
+    void getCharactersReturnsEmptyMapForEmptyInput() {
+        // when
+        Map<Long, Map<ItemSlot, String>> characters = userItemService.getCharacters(List.of());
+
+        // then
+        assertThat(characters).isEmpty();
+        then(userItemRepository).should(never()).findByUserIdInAndEquippedSlotNotNull(any());
+    }
+
     private void givenChallengeWith(MapType mapType, int dailyCheckInCount) {
+        givenChallengeWith(mapType, dailyCheckInCount, ChallengeStatus.ACTIVE);
+    }
+
+    private void givenChallengeWith(MapType mapType, int dailyCheckInCount, ChallengeStatus status) {
         Challenge challenge = Challenge.builder()
                 .groupId(GROUP_ID)
                 .dailyCheckInCount(dailyCheckInCount)
                 .build();
+        ReflectionTestUtils.setField(challenge, "status", status);
         ChallengeGroup group = ChallengeGroup.builder().mapType(mapType).build();
         given(challengeRepository.findById(CHALLENGE_ID)).willReturn(Optional.of(challenge));
         given(challengeGroupRepository.findById(GROUP_ID)).willReturn(Optional.of(group));

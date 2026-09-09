@@ -3,6 +3,7 @@ package com.gommit.domain.item.service;
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.ChallengeMember;
 import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
+import com.gommit.domain.challenge.entity.ChallengeStatus;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.checkin.repository.CheckInRepository;
@@ -23,6 +24,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -141,8 +143,11 @@ public class UserItemService {
                         .sorted(Comparator.comparing(ChallengeMember::getId))
                         .map(ChallengeMember::getUserId)
                         .toList();
-        Set<Long> completedUserIds = new HashSet<>(
-                checkInRepository.findCompletedUserIds(challengeId, businessDate(), challenge.getDailyCheckInCount()));
+        boolean ended = challenge.getStatus() == ChallengeStatus.ENDED;
+        Set<Long> completedUserIds = ended
+                ? Set.of()
+                : new HashSet<>(checkInRepository.findCompletedUserIds(
+                        challengeId, businessDate(), challenge.getDailyCheckInCount()));
         Map<Long, String> nicknames = userService.findNicknames(userIds);
         Map<Long, List<UserItem>> equippedByUser =
                 userItemRepository.findByUserIdInAndEquippedSlotNotNull(userIds).stream()
@@ -150,7 +155,7 @@ public class UserItemService {
 
         List<ChallengeCharacterResponse> responseList = new ArrayList<>();
         for (Long userId : userIds) {
-            Pose pose = Pose.of(group.getMapType(), completedUserIds.contains(userId));
+            Pose pose = Pose.of(group.getMapType(), ended || completedUserIds.contains(userId));
             Map<ItemSlot, String> slots = toSlotMap(equippedByUser.getOrDefault(userId, List.of()), pose);
             responseList.add(new ChallengeCharacterResponse(userId, nicknames.get(userId), pose, slots));
         }
@@ -161,6 +166,24 @@ public class UserItemService {
     // TODO: 체크인 도메인이 머지되면 BusinessDateUtil 사용 예정
     private LocalDate businessDate() {
         return LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusHours(4).toLocalDate();
+    }
+
+    // 여러 유저 캐릭터 조회(DEFAULT 자세 고정)
+    public Map<Long, Map<ItemSlot, String>> getCharacters(Collection<Long> userIds) {
+        if (userIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, List<UserItem>> equippedByUser =
+                userItemRepository.findByUserIdInAndEquippedSlotNotNull(userIds).stream()
+                        .collect(Collectors.groupingBy(UserItem::getUserId));
+
+        Map<Long, Map<ItemSlot, String>> characters = new HashMap<>();
+        for (Long userId : userIds) {
+            characters.put(userId, toSlotMap(equippedByUser.getOrDefault(userId, List.of()), Pose.DEFAULT));
+        }
+
+        return characters;
     }
 
     private Map<ItemSlot, String> toSlotMap(List<UserItem> equippedItems, Pose pose) {

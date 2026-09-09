@@ -11,6 +11,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
+import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -19,20 +23,28 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "UserItem", description = "보유 아이템/캐릭터 API")
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/users/me")
+@RequestMapping("/api/users")
 @Validated
 public class UserItemController {
     private final UserItemService userItemService;
 
     // 내 캐릭터 조회
-    @GetMapping("/character")
+    @GetMapping("/me/character")
     @Operation(summary = "내 캐릭터 조회")
     public ResponseEntity<CharacterResponse> getMyCharacter(@CurrentUser SecurityUser actor) {
         return ResponseEntity.ok(userItemService.getMyCharacter(actor.getId()));
     }
 
+    // 여러 유저 캐릭터 조회
+    @GetMapping("/characters")
+    @Operation(summary = "여러 유저 캐릭터 조회")
+    public ResponseEntity<Map<Long, Map<ItemSlot, String>>> getCharacters(
+            @RequestParam @NotEmpty @Size(max = 30) List<Long> userIds) {
+        return ResponseEntity.ok(userItemService.getCharacters(userIds));
+    }
+
     // 보유 아이템 조회
-    @GetMapping("/items")
+    @GetMapping("/me/items")
     @Operation(summary = "보유 아이템 조회")
     public ResponseEntity<SliceResponse<UserItemResponse>> getMyItems(
             @RequestParam(required = false) ItemSlot slot,
@@ -43,14 +55,14 @@ public class UserItemController {
     }
 
     // 아이템 착용
-    @PutMapping("/items/{userItemId}/equip")
+    @PutMapping("/me/items/{userItemId}/equip")
     @Operation(summary = "아이템 착용")
     public ResponseEntity<UserItemResponse> equipItem(@PathVariable Long userItemId, @CurrentUser SecurityUser actor) {
         return ResponseEntity.ok(userItemService.equipItem(actor.getId(), userItemId));
     }
 
     // 아이템 착용 해제
-    @DeleteMapping("/items/{userItemId}/equip")
+    @DeleteMapping("/me/items/{userItemId}/equip")
     @Operation(summary = "아이템 착용 해제")
     public ResponseEntity<UserItemResponse> unequipItem(
             @PathVariable Long userItemId, @CurrentUser SecurityUser actor) {
