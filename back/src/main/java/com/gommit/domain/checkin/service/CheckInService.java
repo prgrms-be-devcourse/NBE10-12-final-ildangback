@@ -1,6 +1,7 @@
 package com.gommit.domain.checkin.service;
 
 import com.gommit.domain.challenge.entity.Challenge;
+import com.gommit.domain.challenge.service.ChallengeProgressCalculator;
 import com.gommit.domain.checkin.dto.request.SubmitCheckInRequest;
 import com.gommit.domain.checkin.dto.response.CheckInCursorResponse;
 import com.gommit.domain.checkin.dto.response.CheckInResponse;
@@ -50,6 +51,7 @@ public class CheckInService {
     private final CheckInRepository checkInRepository;
     private final CheckInPreconditions preconditions;
     private final CheckInPolicy policy;
+    private final ChallengeProgressCalculator progressCalculator;
     private final CheckInMediaStore mediaStore;
     private final PersonalPointService personalPointService;
     private final UserService userService;
@@ -64,7 +66,7 @@ public class CheckInService {
 
         return new TodayCheckInStatusResponse(
                 today,
-                policy.isCheckInDay(challenge, today),
+                progressCalculator.canCheckInOn(challenge, today),
                 current,
                 target,
                 current >= target,

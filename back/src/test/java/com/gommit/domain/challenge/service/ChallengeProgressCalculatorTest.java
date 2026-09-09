@@ -1,6 +1,7 @@
 package com.gommit.domain.challenge.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.FrequencyType;
@@ -8,6 +9,8 @@ import com.gommit.global.time.DaysOfWeek;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
@@ -15,6 +18,33 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 class ChallengeProgressCalculatorTest {
     private final ChallengeProgressCalculator calculator = new ChallengeProgressCalculator();
+
+    private static final LocalDate START = LocalDate.of(2026, 9, 1);
+
+    private Challenge challenge(FrequencyType type, Integer frequencyValue, String daysOfWeek, boolean active) {
+        Challenge challenge = Challenge.builder()
+                .groupId(12L)
+                .seqNo(1)
+                .startDate(START)
+                .endDate(START.plusDays(29))
+                .frequencyType(type)
+                .frequencyValue(frequencyValue)
+                .daysOfWeek(daysOfWeek)
+                .dailyCheckInCount(1)
+                .requiredDayCount(10)
+                .groupCurrentStreak(0)
+                .groupBestStreak(0)
+                .allowPhoto(true)
+                .build();
+        if (active) {
+            challenge.activate();
+        }
+        return challenge;
+    }
+
+    private static String enumNameOf(LocalDate date) {
+        return DaysOfWeek.getDaysOfWeek(date.getDayOfWeek()).name();
+    }
 
     @ParameterizedTest
     @CsvSource({"2026-09-01,2026-09-30,30", "2026-09-01,2026-09-01,1"})
@@ -78,6 +108,97 @@ class ChallengeProgressCalculatorTest {
 
         // then
         assertThat(currentDay).isZero();
+    }
+
+    @Nested
+    @DisplayName("isCheckInDay — 순수 달력 규칙 (챌린지 status 는 보지 않는다)")
+    class IsCheckInDay {
+
+        @Test
+        @DisplayName("기간 밖(시작 전/종료 후)은 대상일이 아니다")
+        void outsideRange() {
+            Challenge challenge = challenge(FrequencyType.DAILY, null, null, true);
+            assertThat(calculator.isCheckInDay(challenge, START.minusDays(1))).isFalse();
+            assertThat(calculator.isCheckInDay(challenge, START.plusDays(30))).isFalse();
+        }
+
+        @Test
+        @DisplayName("DAILY 는 기간 내 모든 날이 대상일 (시작일 당일 포함)")
+        void daily() {
+            Challenge challenge = challenge(FrequencyType.DAILY, null, null, true);
+            assertThat(calculator.isCheckInDay(challenge, START)).isTrue();
+            assertThat(calculator.isCheckInDay(challenge, START.plusDays(15))).isTrue();
+        }
+
+        @Test
+        @DisplayName("DAYS_OF_WEEK 는 지정 요일만 대상일 (정규 enum명 MON..SUN)")
+        void daysOfWeek() {
+            LocalDate day = START.plusDays(9);
+            Challenge challenge = challenge(FrequencyType.DAYS_OF_WEEK, null, enumNameOf(day), true);
+            assertThat(calculator.isCheckInDay(challenge, day)).isTrue();
+            assertThat(calculator.isCheckInDay(challenge, day.plusDays(1))).isFalse();
+        }
+
+        @Test
+        @DisplayName("DAYS_OF_WEEK CSV 중 하나만 맞아도 대상일")
+        void daysOfWeekCsv() {
+            LocalDate day = START.plusDays(9);
+            Challenge challenge = challenge(FrequencyType.DAYS_OF_WEEK, null, "SUN," + enumNameOf(day) + ",WED", true);
+            assertThat(calculator.isCheckInDay(challenge, day)).isTrue();
+        }
+
+        @Test
+        @DisplayName("DAYS_OF_WEEK 토큰이 정규 enum명이 아니면(예: MONDAY) 예외 — 저장 포맷은 항상 MON..SUN")
+        void daysOfWeekRejectsNonCanonicalToken() {
+            LocalDate day = START.plusDays(9);
+            Challenge challenge = challenge(
+                    FrequencyType.DAYS_OF_WEEK, null, day.getDayOfWeek().name(), true);
+            assertThatThrownBy(() -> calculator.isCheckInDay(challenge, day))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        @DisplayName("EVERY_N_DAYS 는 시작일로부터 N일 간격만 대상일 (N=3, 0일차 포함)")
+        void everyNDays() {
+            Challenge challenge = challenge(FrequencyType.EVERY_N_DAYS, 3, null, true);
+            assertThat(calculator.isCheckInDay(challenge, START)).isTrue();
+            assertThat(calculator.isCheckInDay(challenge, START.plusDays(1))).isFalse();
+            assertThat(calculator.isCheckInDay(challenge, START.plusDays(3))).isTrue();
+            assertThat(calculator.isCheckInDay(challenge, START.plusDays(6))).isTrue();
+        }
+
+        @Test
+        @DisplayName("READY 챌린지여도 스케줄상 맞으면 true (status 무관)")
+        void ignoresStatus() {
+            Challenge challenge = challenge(FrequencyType.DAILY, null, null, false);
+            assertThat(calculator.isCheckInDay(challenge, START.plusDays(5))).isTrue();
+        }
+    }
+
+    @Nested
+    @DisplayName("canCheckInOn — 예정일 + 챌린지 ACTIVE")
+    class CanCheckInOn {
+
+        @Test
+        @DisplayName("ACTIVE + 예정일 → true")
+        void activeAndCheckInDay() {
+            Challenge challenge = challenge(FrequencyType.DAILY, null, null, true);
+            assertThat(calculator.canCheckInOn(challenge, START.plusDays(5))).isTrue();
+        }
+
+        @Test
+        @DisplayName("스케줄상 예정일이어도 챌린지가 ACTIVE 가 아니면 false")
+        void notActive() {
+            Challenge challenge = challenge(FrequencyType.DAILY, null, null, false);
+            assertThat(calculator.canCheckInOn(challenge, START.plusDays(5))).isFalse();
+        }
+
+        @Test
+        @DisplayName("ACTIVE 여도 예정일이 아니면 false")
+        void activeButNotCheckInDay() {
+            Challenge challenge = challenge(FrequencyType.EVERY_N_DAYS, 3, null, true);
+            assertThat(calculator.canCheckInOn(challenge, START.plusDays(1))).isFalse();
+        }
     }
 
     @ParameterizedTest

@@ -28,7 +28,8 @@ public class PointPeriodCalculator {
         }
         if (from != null) {
             return new LocalDateTime[] {
-                BusinessDayCutoff.startTimeOfBusinessDate(from), BusinessDayCutoff.startTimeOfBusinessDate(to.plusDays(1))
+                BusinessDayCutoff.startTimeOfBusinessDate(from),
+                BusinessDayCutoff.startTimeOfBusinessDate(to.plusDays(1))
             };
         }
 

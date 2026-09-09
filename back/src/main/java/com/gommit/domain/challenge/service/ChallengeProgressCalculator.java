@@ -102,4 +102,45 @@ public class ChallengeProgressCalculator {
             }
         };
     }
+
+    // date 가 이 챌린지의 인증 예정일인가 — 순수 달력 규칙(기간 + frequency). 챌린지 status 는 보지 않는다.
+    // status 는 "지금" 속성이고 date 는 임의 값으로 분리. status 가 필요시 canCheckInOn 사용.
+    public boolean isCheckInDay(Challenge challenge, LocalDate date) {
+        if (date.isBefore(challenge.getStartDate()) || date.isAfter(challenge.getEndDate())) {
+            return false;
+        }
+        return switch (challenge.getFrequencyType()) {
+            case DAILY -> true;
+            case DAYS_OF_WEEK -> matchesDayOfWeek(challenge, date);
+            case EVERY_N_DAYS -> matchesEveryNDays(challenge, date);
+        };
+    }
+
+    // date 시점에 실제로 인증 가능한 상태인가 — 예정일이면서 챌린지가 ACTIVE. 표시/게이트용.
+    public boolean canCheckInOn(Challenge challenge, LocalDate date) {
+        return challenge.getStatus() == ChallengeStatus.ACTIVE && isCheckInDay(challenge, date);
+    }
+
+    private boolean matchesDayOfWeek(Challenge challenge, LocalDate date) {
+        String csv = challenge.getDaysOfWeek();
+        if (csv == null || csv.isBlank()) {
+            return false;
+        }
+        DaysOfWeek target = DaysOfWeek.getDaysOfWeek(date.getDayOfWeek());
+        return Arrays.stream(csv.split(","))
+                .map(String::trim)
+                .filter(token -> !token.isEmpty())
+                .map(DaysOfWeek::valueOf)
+                .anyMatch(day -> day == target);
+    }
+
+    // 시작일로부터 frequencyValue 일 간격의 날(0일차 포함)만 대상일.
+    private boolean matchesEveryNDays(Challenge challenge, LocalDate date) {
+        Integer n = challenge.getFrequencyValue();
+        if (n == null || n <= 0) {
+            return false;
+        }
+        long elapsed = ChronoUnit.DAYS.between(challenge.getStartDate(), date);
+        return elapsed >= 0 && elapsed % n == 0;
+    }
 }

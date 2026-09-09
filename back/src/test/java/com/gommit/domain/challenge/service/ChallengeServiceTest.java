@@ -417,16 +417,10 @@ class ChallengeServiceTest {
         }
 
         @Test
-        @DisplayName("오늘이 요일 인증일이면 isCheckInDay=true를 반환한다")
-        void returnsTrueWhenTodayMatchesDaysOfWeek() {
+        @DisplayName("canCheckInOn=true 면 isCheckInDay=true 를 반환한다")
+        void returnsCheckInDayFromCanCheckInOn() {
             // given
-            LocalDate today = LocalDate.now();
-            DaysOfWeek todayOfWeek = DaysOfWeek.getDaysOfWeek(today.getDayOfWeek());
             Challenge challenge = challenge(50L, ChallengeStatus.ACTIVE);
-            ReflectionTestUtils.setField(challenge, "startDate", today.minusDays(1));
-            ReflectionTestUtils.setField(challenge, "endDate", today.plusDays(1));
-            ReflectionTestUtils.setField(challenge, "frequencyType", FrequencyType.DAYS_OF_WEEK);
-            ReflectionTestUtils.setField(challenge, "daysOfWeek", todayOfWeek.name());
             ChallengeMember member = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
             ChallengeMember owner = challengeMember(71L, challenge, 1L, ChallengeMemberRole.OWNER);
             when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
@@ -437,6 +431,7 @@ class ChallengeServiceTest {
                     .thenReturn(2L);
             doReturn(1).when(challengeProgressCalculator).calculateCurrentDay(eq(challenge), any(LocalDate.class));
             when(challengeProgressCalculator.calculatePeriodProgressRate(1, 7)).thenReturn(14.3);
+            doReturn(true).when(challengeProgressCalculator).canCheckInOn(eq(challenge), any(LocalDate.class));
 
             // when
             var response = challengeService.getChallengeStatus(50L, 2L);
@@ -446,15 +441,10 @@ class ChallengeServiceTest {
         }
 
         @Test
-        @DisplayName("오늘이 N일마다 인증일이 아니면 isCheckInDay=false를 반환한다")
-        void returnsFalseWhenTodayDoesNotMatchEveryNDays() {
+        @DisplayName("canCheckInOn=false 면 isCheckInDay=false 를 반환한다 (비인증일 또는 챌린지 비ACTIVE)")
+        void returnsFalseWhenCannotCheckIn() {
             // given
-            LocalDate today = LocalDate.now();
             Challenge challenge = challenge(50L, ChallengeStatus.ACTIVE);
-            ReflectionTestUtils.setField(challenge, "startDate", today.minusDays(1));
-            ReflectionTestUtils.setField(challenge, "endDate", today.plusDays(1));
-            ReflectionTestUtils.setField(challenge, "frequencyType", FrequencyType.EVERY_N_DAYS);
-            ReflectionTestUtils.setField(challenge, "frequencyValue", 2);
             ChallengeMember member = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
             ChallengeMember owner = challengeMember(71L, challenge, 1L, ChallengeMemberRole.OWNER);
             when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
@@ -465,6 +455,7 @@ class ChallengeServiceTest {
                     .thenReturn(2L);
             doReturn(1).when(challengeProgressCalculator).calculateCurrentDay(eq(challenge), any(LocalDate.class));
             when(challengeProgressCalculator.calculatePeriodProgressRate(1, 7)).thenReturn(14.3);
+            doReturn(false).when(challengeProgressCalculator).canCheckInOn(eq(challenge), any(LocalDate.class));
 
             // when
             var response = challengeService.getChallengeStatus(50L, 2L);

@@ -18,7 +18,6 @@ import com.gommit.global.exception.ErrorCode;
 import com.gommit.global.time.BusinessClock;
 import com.gommit.global.time.DaysOfWeek;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -86,7 +85,7 @@ public class ChallengeService {
         LocalDate today = businessClock.today();
         int currentDay = challengeProgressCalculator.calculateCurrentDay(challenge, today);
         double periodProgressRate = challengeProgressCalculator.calculatePeriodProgressRate(currentDay, totalDays);
-        boolean checkInDay = isCheckInDay(challenge, today);
+        boolean checkInDay = challengeProgressCalculator.canCheckInOn(challenge, today);
         ChallengeDetailResponse challengeDetailResponse = new ChallengeDetailResponse(challenge, owner.getUserId());
         int myCurrentCount = checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challengeId, userId, today);
         boolean myCompleted = myCurrentCount >= challenge.getDailyCheckInCount();
@@ -300,25 +299,5 @@ public class ChallengeService {
         if (allowedTypes == null || allowedTypes.isEmpty()) {
             throw new BusinessException(ErrorCode.NO_CHECK_IN_METHOD);
         }
-    }
-
-    private boolean isCheckInDay(Challenge challenge, LocalDate today) {
-        if (challenge.getStatus() != ChallengeStatus.ACTIVE) {
-            return false;
-        }
-        if (today.isBefore(challenge.getStartDate()) || today.isAfter(challenge.getEndDate())) {
-            return false;
-        }
-        return switch (challenge.getFrequencyType()) {
-            case DAILY -> true;
-            case DAYS_OF_WEEK ->
-                Arrays.stream(challenge.getDaysOfWeek().split(","))
-                        .map(DaysOfWeek::valueOf)
-                        .anyMatch(daysOfWeek -> daysOfWeek == DaysOfWeek.getDaysOfWeek(today.getDayOfWeek()));
-            case EVERY_N_DAYS -> {
-                long days = ChronoUnit.DAYS.between(challenge.getStartDate(), today);
-                yield days % challenge.getFrequencyValue() == 0;
-            }
-        };
     }
 }

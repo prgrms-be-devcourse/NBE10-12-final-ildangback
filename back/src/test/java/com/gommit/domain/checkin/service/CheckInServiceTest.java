@@ -18,6 +18,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.gommit.domain.challenge.entity.Challenge;
+import com.gommit.domain.challenge.service.ChallengeProgressCalculator;
 import com.gommit.domain.checkin.dto.request.SubmitCheckInRequest;
 import com.gommit.domain.checkin.dto.response.CheckInCursorResponse;
 import com.gommit.domain.checkin.dto.response.CheckInResponse;
@@ -82,6 +83,9 @@ class CheckInServiceTest {
     private CheckInPolicy policy;
 
     @Mock
+    private ChallengeProgressCalculator progressCalculator;
+
+    @Mock
     private CheckInMediaStore mediaStore;
 
     @Mock
@@ -100,6 +104,7 @@ class CheckInServiceTest {
                 checkInRepository,
                 preconditions,
                 policy,
+                progressCalculator,
                 mediaStore,
                 personalPointService,
                 userService,
@@ -273,7 +278,7 @@ class CheckInServiceTest {
                     .thenReturn(challenge);
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(2);
-            when(policy.isCheckInDay(challenge, TODAY)).thenReturn(true);
+            when(progressCalculator.canCheckInOn(challenge, TODAY)).thenReturn(true);
             when(policy.allowedTypes(challenge)).thenReturn(List.of(CheckInType.PHOTO));
 
             TodayCheckInStatusResponse status = service.getTodayStatus(USER_ID, CHALLENGE_ID);

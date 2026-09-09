@@ -13,8 +13,9 @@ import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-// TODO: challenge 도메인에 접근 제어가 생기면 이관
 // 인증 API 공통 전제조건 — 챌린지 존재(404) / 참여 자격(403) 확인.
+// TODO: 이 클래스는 challenge에서 참여로 판정되는 자격 조건을 재구현하고 있음 (ChallengeService 담당)
+//  challenge 도메인이 ChallengeParticipation 등의 클래스로 액티브 멤버, 멤버의 조회 가능 시간 범위를 제공시 해당 클래스로 대체한다.
 @Component
 @RequiredArgsConstructor
 public class CheckInPreconditions {

@@ -1,117 +1,38 @@
 package com.gommit.domain.checkin.policy;
 
-import static com.gommit.domain.checkin.CheckInFixture.END;
 import static com.gommit.domain.checkin.CheckInFixture.START;
 import static com.gommit.domain.checkin.CheckInFixture.challenge;
 import static com.gommit.domain.checkin.CheckInFixture.dailyChallenge;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.when;
 
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.FrequencyType;
+import com.gommit.domain.challenge.service.ChallengeProgressCalculator;
 import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
-import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-@DisplayName("CheckInPolicy — 인증 대상일/허용 방식 판정")
+@ExtendWith(MockitoExtension.class)
+@DisplayName("CheckInPolicy — 허용 방식 / 인증일 검증(위임)")
 class CheckInPolicyTest {
 
-    private final CheckInPolicy policy = new CheckInPolicy();
+    @Mock
+    private ChallengeProgressCalculator progressCalculator;
 
-    @Nested
-    @DisplayName("isCheckInDay — 기간 경계")
-    class Range {
+    private CheckInPolicy policy;
 
-        @Test
-        @DisplayName("시작일 이전은 대상일이 아니다")
-        void beforeStart() {
-            assertThat(policy.isCheckInDay(dailyChallenge(1L, 1), START.minusDays(1)))
-                    .isFalse();
-        }
-
-        @Test
-        @DisplayName("종료일 이후는 대상일이 아니다")
-        void afterEnd() {
-            assertThat(policy.isCheckInDay(dailyChallenge(1L, 1), END.plusDays(1)))
-                    .isFalse();
-        }
-
-        @Test
-        @DisplayName("시작일 당일은 대상일이다")
-        void startInclusive() {
-            assertThat(policy.isCheckInDay(dailyChallenge(1L, 1), START)).isTrue();
-        }
-    }
-
-    @Nested
-    @DisplayName("isCheckInDay — DAILY")
-    class Daily {
-
-        @Test
-        @DisplayName("기간 내 모든 날이 대상일")
-        void everyDay() {
-            Challenge challenge = dailyChallenge(1L, 1);
-            assertThat(policy.isCheckInDay(challenge, START.plusDays(10))).isTrue();
-            assertThat(policy.isCheckInDay(challenge, START.plusDays(11))).isTrue();
-        }
-    }
-
-    @Nested
-    @DisplayName("isCheckInDay — DAYS_OF_WEEK")
-    class DaysOfWeek {
-
-        @Test
-        @DisplayName("지정 요일만 대상일 (약어 MON/TUE...)")
-        void abbreviation() {
-            LocalDate day = START.plusDays(14);
-            String token = day.getDayOfWeek().name().substring(0, 3); // 예: "TUE"
-            Challenge challenge = challenge(1L, FrequencyType.DAYS_OF_WEEK, null, token, 1, true);
-
-            assertThat(policy.isCheckInDay(challenge, day)).isTrue();
-            assertThat(policy.isCheckInDay(challenge, day.plusDays(1))).isFalse();
-        }
-
-        @Test
-        @DisplayName("풀네임(MONDAY 등)도 인식한다")
-        void fullName() {
-            LocalDate day = START.plusDays(14);
-            String token = day.getDayOfWeek().name(); // 예: "TUESDAY"
-            Challenge challenge = challenge(1L, FrequencyType.DAYS_OF_WEEK, null, token, 1, true);
-
-            assertThat(policy.isCheckInDay(challenge, day)).isTrue();
-        }
-
-        @Test
-        @DisplayName("여러 요일 CSV 중 하나만 맞아도 대상일")
-        void csv() {
-            LocalDate day = START.plusDays(14);
-            String token = day.getDayOfWeek().name().substring(0, 3);
-            Challenge challenge = challenge(1L, FrequencyType.DAYS_OF_WEEK, null, "SUN," + token + ",WED", 1, true);
-
-            assertThat(policy.isCheckInDay(challenge, day)).isTrue();
-        }
-    }
-
-    @Nested
-    @DisplayName("isCheckInDay — EVERY_N_DAYS")
-    class EveryNDays {
-
-        @Test
-        @DisplayName("시작일로부터 N일 간격만 대상일 (N=3)")
-        void everyThirdDay() {
-            Challenge challenge = challenge(1L, FrequencyType.EVERY_N_DAYS, 3, null, 1, true);
-
-            assertThat(policy.isCheckInDay(challenge, START)).isTrue(); // 0일차
-            assertThat(policy.isCheckInDay(challenge, START.plusDays(1))).isFalse();
-            assertThat(policy.isCheckInDay(challenge, START.plusDays(2))).isFalse();
-            assertThat(policy.isCheckInDay(challenge, START.plusDays(3))).isTrue();
-            assertThat(policy.isCheckInDay(challenge, START.plusDays(6))).isTrue();
-        }
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        policy = new CheckInPolicy(progressCalculator);
     }
 
     @Nested
@@ -121,8 +42,7 @@ class CheckInPolicyTest {
         @Test
         @DisplayName("allowPhoto 면 PHOTO 만 허용")
         void photoAllowed() {
-            Challenge challenge = dailyChallenge(1L, 1);
-            assertThat(policy.allowedTypes(challenge)).containsExactly(CheckInType.PHOTO);
+            assertThat(policy.allowedTypes(dailyChallenge(1L, 1))).containsExactly(CheckInType.PHOTO);
         }
 
         @Test
@@ -134,21 +54,34 @@ class CheckInPolicyTest {
     }
 
     @Nested
-    @DisplayName("validateCheckInDay / validateAllowedType")
-    class Validations {
+    @DisplayName("validateCheckInDay — ChallengeProgressCalculator.isCheckInDay 에 위임")
+    class ValidateCheckInDay {
 
         @Test
-        @DisplayName("대상일이면 통과, 아니면 NOT_CHECK_IN_DAY")
-        void validateCheckInDay() {
+        @DisplayName("대상일이면 통과")
+        void passesOnCheckInDay() {
             Challenge challenge = dailyChallenge(1L, 1);
+            when(progressCalculator.isCheckInDay(challenge, START)).thenReturn(true);
 
-            policy.validateCheckInDay(challenge, START); // 통과 — 예외 없음
+            policy.validateCheckInDay(challenge, START); // 예외 없음
+        }
 
-            assertThatThrownBy(() -> policy.validateCheckInDay(challenge, START.minusDays(1)))
+        @Test
+        @DisplayName("대상일이 아니면 NOT_CHECK_IN_DAY")
+        void throwsWhenNotCheckInDay() {
+            Challenge challenge = dailyChallenge(1L, 1);
+            when(progressCalculator.isCheckInDay(challenge, START)).thenReturn(false);
+
+            assertThatThrownBy(() -> policy.validateCheckInDay(challenge, START))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.NOT_CHECK_IN_DAY);
         }
+    }
+
+    @Nested
+    @DisplayName("validateAllowedType")
+    class ValidateAllowedType {
 
         @Test
         @DisplayName("허용된 방식이면 통과, 아니면 CHECK_IN_TYPE_NOT_ALLOWED")
@@ -156,7 +89,7 @@ class CheckInPolicyTest {
             Challenge photoAllowed = dailyChallenge(1L, 1);
             Challenge nothingAllowed = challenge(1L, FrequencyType.DAILY, null, null, 1, false);
 
-            policy.validateAllowedType(photoAllowed, CheckInType.PHOTO); // 통과 — 예외 없음
+            policy.validateAllowedType(photoAllowed, CheckInType.PHOTO); // 예외 없음
 
             assertThatThrownBy(() -> policy.validateAllowedType(nothingAllowed, CheckInType.PHOTO))
                     .isInstanceOf(BusinessException.class)
