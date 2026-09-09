@@ -38,10 +38,12 @@ import com.gommit.domain.user.entity.User;
 import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import com.gommit.global.time.BusinessClock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -51,6 +53,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -84,8 +87,16 @@ class GroupServiceTest {
     @Mock
     private ChallengeProgressCalculator challengeProgressCalculator;
 
+    @Mock
+    private BusinessClock businessClock;
+
     @InjectMocks
     private GroupService groupService;
+
+    @BeforeEach
+    void stubBusinessClock() {
+        Mockito.lenient().when(businessClock.today()).thenReturn(LocalDate.of(2026, 9, 9));
+    }
 
     private GroupCreateRequest createRequest(GroupCategory category, MapType mapType) {
         return new GroupCreateRequest("오운완 모임", "매일 운동 인증", category, mapType, Visibility.PUBLIC, 6, initialSetting());
@@ -790,6 +801,32 @@ class GroupServiceTest {
             assertThat(response.content().get(0).groupId()).isEqualTo(12L);
             assertThat(response.content().get(0).participantCount()).isEqualTo(3);
             assertThat(response.hasNext()).isFalse();
+        }
+
+        @Test
+        @DisplayName("ACTIVE 시즌은 오늘 businessDate 인증 횟수로 todayCompleted 를 계산한다")
+        void computesTodayCompletedFromCheckInCount() {
+            // given
+            ChallengeGroup group = group(12L, "오운완 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            Challenge challenge = challenge(50L, 12L, ChallengeStatus.ACTIVE);
+            ChallengeMember member = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
+            when(challengeMemberRepository.findAllByUserIdAndStatus(2L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(List.of(member));
+            when(challengeGroupRepository.findAllById(List.of(12L))).thenReturn(List.of(group));
+            when(challengeMemberRepository.countByChallengeIdAndStatus(50L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(1L);
+            when(challengeProgressCalculator.calculateCurrentDay(eq(challenge), any(LocalDate.class)))
+                    .thenReturn(1);
+            when(challengeProgressCalculator.calculatePeriodProgressRate(1, 7)).thenReturn(14.3);
+            when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(50L, 2L, LocalDate.of(2026, 9, 9)))
+                    .thenReturn(1);
+
+            // when
+            var response = groupService.getMyGroups(2L, null, null, 20);
+
+            // then
+            assertThat(response.content().get(0).todayCheckInCount()).isEqualTo(1);
+            assertThat(response.content().get(0).todayCompleted()).isTrue();
         }
 
         @Test
