@@ -1,7 +1,6 @@
 package com.gommit.domain.checkin.controller;
 
 import com.gommit.domain.checkin.dto.request.SubmitCheckInRequest;
-import com.gommit.domain.checkin.dto.response.CheckInCursorResponse;
 import com.gommit.domain.checkin.dto.response.CheckInResponse;
 import com.gommit.domain.checkin.dto.response.CheckInResultResponse;
 import com.gommit.domain.checkin.dto.response.RecentCheckInResponse;
@@ -9,6 +8,7 @@ import com.gommit.domain.checkin.dto.response.TodayCheckInStatusResponse;
 import com.gommit.domain.checkin.entity.CheckIn;
 import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.domain.checkin.service.CheckInService;
+import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.security.CurrentUser;
 import com.gommit.global.security.SecurityUser;
 import io.swagger.v3.oas.annotations.Operation;
@@ -65,7 +65,7 @@ public class CheckInController {
 
     @Operation(summary = "인증 기록 목록 조회 (갤러리)")
     @GetMapping
-    public ResponseEntity<CheckInCursorResponse> getGallery(
+    public ResponseEntity<SliceResponse<CheckInResponse>> getGallery(
             @CurrentUser SecurityUser actor,
             @PathVariable Long challengeId,
             @RequestParam(required = false)

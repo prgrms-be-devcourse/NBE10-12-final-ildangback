@@ -5,13 +5,10 @@ import com.gommit.domain.challenge.service.ChallengeProgressCalculator;
 import com.gommit.domain.challenge.service.ChallengeStreakService;
 import com.gommit.domain.challenge.service.MemberCheckInResult;
 import com.gommit.domain.checkin.dto.request.SubmitCheckInRequest;
-import com.gommit.domain.checkin.dto.response.CheckInCursorResponse;
 import com.gommit.domain.checkin.dto.response.CheckInResponse;
 import com.gommit.domain.checkin.dto.response.CheckInResultResponse;
-import com.gommit.domain.checkin.dto.response.CursorPageMeta;
-import com.gommit.domain.checkin.dto.response.MyCheckInCursorResponse;
-import com.gommit.domain.checkin.dto.response.MyCheckInPageMeta;
 import com.gommit.domain.checkin.dto.response.MyCheckInResponse;
+import com.gommit.domain.checkin.dto.response.MyCheckInSliceResponse;
 import com.gommit.domain.checkin.dto.response.RecentCheckInResponse;
 import com.gommit.domain.checkin.dto.response.RecentCheckInResponse.RecentCheckInItem;
 import com.gommit.domain.checkin.dto.response.TodayCheckInStatusResponse;
@@ -160,7 +157,7 @@ public class CheckInService {
         }
     }
 
-    public CheckInCursorResponse getGallery(
+    public SliceResponse<CheckInResponse> getGallery(
             Long userId,
             Long challengeId,
             YearMonth month,
@@ -189,7 +186,7 @@ public class CheckInService {
                 .map(c -> CheckInResponse.of(c, nicknames.get(c.getUserId())))
                 .toList();
 
-        return new CheckInCursorResponse(content, new CursorPageMeta(page.nextCursor(), page.hasNext(), size));
+        return new SliceResponse<>(content, page.hasNext(), page.nextCursor());
     }
 
     // 최근 인증 로그 한줄보기
@@ -228,7 +225,7 @@ public class CheckInService {
         return CheckInResponse.of(checkIn, nicknameOf(checkIn.getUserId(), checkIn.getId()));
     }
 
-    public MyCheckInCursorResponse getMyCheckIns(
+    public MyCheckInSliceResponse getMyCheckIns(
             Long userId, Long challengeId, CheckInType checkInType, YearMonth month, Long cursor, int size) {
         if (challengeId != null) {
             preconditions.getChallenge(challengeId); // 존재하지 않으면 404
@@ -247,8 +244,7 @@ public class CheckInService {
                 .map(c -> MyCheckInResponse.of(c, nicknames.get(c.getUserId())))
                 .toList();
 
-        return new MyCheckInCursorResponse(
-                content, new MyCheckInPageMeta(page.nextCursor(), page.hasNext(), size, totalCount));
+        return MyCheckInSliceResponse.of(new SliceResponse<>(content, page.hasNext(), page.nextCursor()), totalCount);
     }
 
     // 엔티티 조회·인가만 하고 스토리지에서 바이트를 읽어 온다. Cloudinary 등 원격 스토리지의 load 는

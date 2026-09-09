@@ -486,8 +486,8 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content.length()").value(2))
                     .andExpect(jsonPath("$.content[0].id").value(ids.get(2)))
-                    .andExpect(jsonPath("$.meta.hasNext").value(true))
-                    .andExpect(jsonPath("$.meta.nextCursor").value(expectedNextCursor));
+                    .andExpect(jsonPath("$.hasNext").value(true))
+                    .andExpect(jsonPath("$.nextCursor").value(expectedNextCursor));
 
             mockMvc.perform(withToken(
                             get("/api/challenges/{id}/check-ins", challengeId)
@@ -496,8 +496,8 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
                             tokens.accessToken()))
                     .andExpect(jsonPath("$.content.length()").value(1))
                     .andExpect(jsonPath("$.content[0].id").value(ids.get(0)))
-                    .andExpect(jsonPath("$.meta.hasNext").value(false))
-                    .andExpect(jsonPath("$.meta.nextCursor").value(Matchers.nullValue()));
+                    .andExpect(jsonPath("$.hasNext").value(false))
+                    .andExpect(jsonPath("$.nextCursor").value(Matchers.nullValue()));
         }
 
         @Test
@@ -647,7 +647,7 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content.length()").value(2))
                     .andExpect(jsonPath("$.content[0].challengeId").value(challengeId))
-                    .andExpect(jsonPath("$.meta.totalCount").value(2));
+                    .andExpect(jsonPath("$.totalCount").value(2));
         }
 
         @Test

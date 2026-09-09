@@ -24,10 +24,9 @@ import com.gommit.domain.challenge.service.ChallengeProgressCalculator;
 import com.gommit.domain.challenge.service.ChallengeStreakService;
 import com.gommit.domain.challenge.service.MemberCheckInResult;
 import com.gommit.domain.checkin.dto.request.SubmitCheckInRequest;
-import com.gommit.domain.checkin.dto.response.CheckInCursorResponse;
 import com.gommit.domain.checkin.dto.response.CheckInResponse;
 import com.gommit.domain.checkin.dto.response.CheckInResultResponse;
-import com.gommit.domain.checkin.dto.response.MyCheckInCursorResponse;
+import com.gommit.domain.checkin.dto.response.MyCheckInSliceResponse;
 import com.gommit.domain.checkin.dto.response.RecentCheckInResponse;
 import com.gommit.domain.checkin.dto.response.TodayCheckInStatusResponse;
 import com.gommit.domain.checkin.entity.CheckIn;
@@ -42,6 +41,7 @@ import com.gommit.domain.point.config.PointProperties;
 import com.gommit.domain.point.entity.UserPointReason;
 import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.domain.user.service.UserService;
+import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import com.gommit.global.time.BusinessClock;
@@ -411,11 +411,12 @@ class CheckInServiceTest {
                             eq(CHALLENGE_ID), any(), any(), any(), any(), eq(null), any(), any(Pageable.class)))
                     .thenReturn(List.of(checkInRow(3L), checkInRow(2L), checkInRow(1L))); // size(2)+1
 
-            CheckInCursorResponse response = service.getGallery(USER_ID, CHALLENGE_ID, null, null, null, null, 2);
+            SliceResponse<CheckInResponse> response =
+                    service.getGallery(USER_ID, CHALLENGE_ID, null, null, null, null, 2);
 
             assertThat(response.content()).hasSize(2);
-            assertThat(response.meta().hasNext()).isTrue();
-            assertThat(response.meta().nextCursor()).isEqualTo(2L);
+            assertThat(response.hasNext()).isTrue();
+            assertThat(response.nextCursor()).isEqualTo(2L);
         }
 
         @Test
@@ -527,11 +528,11 @@ class CheckInServiceTest {
             when(checkInRepository.countMine(eq(USER_ID), eq(null), any(), any(), any()))
                     .thenReturn(7L);
 
-            MyCheckInCursorResponse response = service.getMyCheckIns(USER_ID, null, null, null, null, 20);
+            MyCheckInSliceResponse response = service.getMyCheckIns(USER_ID, null, null, null, null, 20);
 
             assertThat(response.content()).hasSize(1);
             assertThat(response.content().get(0).challengeId()).isEqualTo(CHALLENGE_ID);
-            assertThat(response.meta().totalCount()).isEqualTo(7L);
+            assertThat(response.totalCount()).isEqualTo(7L);
         }
 
         @Test

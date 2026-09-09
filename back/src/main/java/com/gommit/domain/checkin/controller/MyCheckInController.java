@@ -1,6 +1,6 @@
 package com.gommit.domain.checkin.controller;
 
-import com.gommit.domain.checkin.dto.response.MyCheckInCursorResponse;
+import com.gommit.domain.checkin.dto.response.MyCheckInSliceResponse;
 import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.domain.checkin.service.CheckInService;
 import com.gommit.global.security.CurrentUser;
@@ -12,6 +12,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import java.time.YearMonth;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,7 +30,7 @@ public class MyCheckInController {
 
     @Operation(summary = "내 인증 모아보기 (무한스크롤)")
     @GetMapping
-    public MyCheckInCursorResponse getMyCheckIns(
+    public ResponseEntity<MyCheckInSliceResponse> getMyCheckIns(
             @CurrentUser SecurityUser actor,
             @RequestParam(required = false) Long challengeId,
             @RequestParam(required = false) CheckInType checkInType,
@@ -40,6 +41,7 @@ public class MyCheckInController {
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
 
         YearMonth yearMonth = (month == null) ? null : YearMonth.parse(month);
-        return checkInService.getMyCheckIns(actor.getId(), challengeId, checkInType, yearMonth, cursor, size);
+        return ResponseEntity.ok(
+                checkInService.getMyCheckIns(actor.getId(), challengeId, checkInType, yearMonth, cursor, size));
     }
 }
