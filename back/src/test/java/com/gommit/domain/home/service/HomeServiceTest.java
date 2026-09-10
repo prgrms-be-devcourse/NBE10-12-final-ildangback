@@ -20,7 +20,6 @@ import com.gommit.domain.home.dto.response.ActivityListResponse;
 import com.gommit.domain.home.dto.response.GrassResponse;
 import com.gommit.domain.home.dto.response.HomeResponse;
 import com.gommit.domain.item.dto.response.CharacterResponse;
-import com.gommit.domain.item.entity.CheckInState;
 import com.gommit.domain.item.entity.ItemSlot;
 import com.gommit.domain.item.service.UserItemService;
 import com.gommit.domain.point.dto.response.PointBalanceResponse;
@@ -76,7 +75,7 @@ class HomeServiceTest {
     private CharacterResponse emptyCharacter() {
         Map<ItemSlot, String> slots = new EnumMap<>(ItemSlot.class);
         for (ItemSlot slot : ItemSlot.values()) slots.put(slot, null);
-        return new CharacterResponse(slots, CheckInState.NOT_DONE);
+        return new CharacterResponse(slots);
     }
 
     private UserProfileResponse stubProfile() {
@@ -165,7 +164,7 @@ class HomeServiceTest {
         @Test
         @DisplayName("이력이 없으면 빈 content가 반환된다")
         void t6() {
-            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(10)))
+            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(3)))
                     .willReturn(sliceOf(List.of()));
 
             ActivityListResponse result = homeService.getActivities(USER_ID);
@@ -176,7 +175,7 @@ class HomeServiceTest {
         @Test
         @DisplayName("CHECK_IN + challengeId 없으면 feat: 접두사를 가진다")
         void t7() {
-            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(10)))
+            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(3)))
                     .willReturn(sliceOf(List.of(history(UserPointReason.CHECK_IN, null))));
 
             ActivityListResponse result = homeService.getActivities(USER_ID);
@@ -187,7 +186,7 @@ class HomeServiceTest {
         @Test
         @DisplayName("ITEM_PURCHASE는 chore: 접두사를 가진다")
         void t8() {
-            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(10)))
+            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(3)))
                     .willReturn(sliceOf(List.of(history(UserPointReason.ITEM_PURCHASE, null))));
 
             ActivityListResponse result = homeService.getActivities(USER_ID);
@@ -198,7 +197,7 @@ class HomeServiceTest {
         @Test
         @DisplayName("CHALLENGE_BONUS는 feat: 접두사를 가진다")
         void t9() {
-            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(10)))
+            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(3)))
                     .willReturn(sliceOf(List.of(history(UserPointReason.CHALLENGE_BONUS, null))));
 
             ActivityListResponse result = homeService.getActivities(USER_ID);
@@ -209,7 +208,7 @@ class HomeServiceTest {
         @Test
         @DisplayName("WITHDRAWAL_PENALTY는 fix: 접두사를 가진다")
         void t10() {
-            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(10)))
+            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(3)))
                     .willReturn(sliceOf(List.of(history(UserPointReason.WITHDRAWAL_PENALTY, null))));
 
             ActivityListResponse result = homeService.getActivities(USER_ID);
@@ -220,7 +219,7 @@ class HomeServiceTest {
         @Test
         @DisplayName("MONTHLY_MERGE_BONUS는 feat: 접두사를 가진다")
         void t11() {
-            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(10)))
+            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(3)))
                     .willReturn(sliceOf(List.of(history(UserPointReason.MONTHLY_MERGE_BONUS, null))));
 
             ActivityListResponse result = homeService.getActivities(USER_ID);
@@ -234,7 +233,7 @@ class HomeServiceTest {
             Long challengeId = 100L;
             Long groupId = 200L;
 
-            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(10)))
+            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(3)))
                     .willReturn(sliceOf(List.of(history(UserPointReason.CHECK_IN, challengeId))));
 
             Challenge challenge = Challenge.builder()
@@ -273,7 +272,7 @@ class HomeServiceTest {
             Long challengeId = 101L;
             Long groupId = 201L;
 
-            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(10)))
+            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(3)))
                     .willReturn(sliceOf(List.of(history(UserPointReason.CHECK_IN, challengeId))));
 
             Challenge challenge = Challenge.builder()
@@ -312,7 +311,7 @@ class HomeServiceTest {
             Long challengeId = 102L;
             Long groupId = 202L;
 
-            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(10)))
+            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(3)))
                     .willReturn(sliceOf(List.of(history(UserPointReason.CHECK_IN, challengeId))));
 
             Challenge challenge = Challenge.builder()
@@ -358,7 +357,7 @@ class HomeServiceTest {
         @DisplayName("정상 호출 시 유저 정보와 포인트 잔액이 담긴 HomeResponse를 반환한다")
         void t15() {
             given(userService.getMyProfile(USER_ID)).willReturn(stubProfile());
-            given(userItemService.getMyCharacter(USER_ID, null)).willReturn(emptyCharacter());
+            given(userItemService.getMyCharacter(USER_ID)).willReturn(emptyCharacter());
             given(groupService.getMyGroups(eq(USER_ID), eq(GroupStatus.ACTIVE), any(), eq(100)))
                     .willReturn(new SliceResponse<>(List.of(), false, null));
             given(pointService.getMyBalance(USER_ID)).willReturn(new PointBalanceResponse(500, 0, 0, 0));
@@ -374,7 +373,7 @@ class HomeServiceTest {
         @DisplayName("오늘 완료한 챌린지 수와 전체 챌린지 수를 정확히 집계한다")
         void t16() {
             given(userService.getMyProfile(USER_ID)).willReturn(stubProfile());
-            given(userItemService.getMyCharacter(USER_ID, null)).willReturn(emptyCharacter());
+            given(userItemService.getMyCharacter(USER_ID)).willReturn(emptyCharacter());
             given(pointService.getMyBalance(USER_ID)).willReturn(new PointBalanceResponse(0, 0, 0, 0));
 
             // todayCompleted=true 1개, false 2개

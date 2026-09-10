@@ -48,7 +48,7 @@ public class HomeService {
     public HomeResponse getHome(Long userId) {
         UserProfileResponse userProfile = userService.getMyProfile(userId);
         // 아이템 도메인 머지 후 getMyCharacter 수정
-        CharacterResponse character = userItemService.getMyCharacter(userId, null);
+        CharacterResponse character = userItemService.getMyCharacter(userId);
         String statusMessage = userProfile.introduction();
 
         // TODO Phase1: CheckIn 연동 후 교체
@@ -118,7 +118,7 @@ public class HomeService {
     // 최근 활동 조회
     public ActivityListResponse getActivities(Long userId) {
         SliceResponse<UserPointHistoryResponse> histories =
-                pointService.getMyHistories(userId, null, null, null, null, null, null, 10);
+                pointService.getMyHistories(userId, null, null, null, null, null, null, 3);
 
         // CHECK_IN인 항목의 challengeId만 수집
         List<Long> challengeIds = histories.content().stream()
