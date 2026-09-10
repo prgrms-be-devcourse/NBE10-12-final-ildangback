@@ -2,13 +2,13 @@ package com.gommit.domain.home.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
+import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.group.entity.ChallengeGroup;
 import com.gommit.domain.group.entity.GroupCategory;
 import com.gommit.domain.group.entity.GroupStatus;
@@ -31,11 +31,14 @@ import com.gommit.domain.user.service.UserService;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import com.gommit.global.time.BusinessClock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -43,6 +46,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -66,6 +71,12 @@ class HomeServiceTest {
 
     @Mock
     private ChallengeGroupRepository challengeGroupRepository;
+
+    @Mock
+    private CheckInRepository checkInRepository;
+
+    @Mock
+    private BusinessClock businessClock;
 
     @InjectMocks
     private HomeService homeService;
@@ -96,7 +107,14 @@ class HomeServiceTest {
 
     @Nested
     @DisplayName("getGrass")
+    @MockitoSettings(strictness = Strictness.LENIENT)
     class GetGrass {
+
+        @BeforeEach
+        void setUp() {
+            given(checkInRepository.countByUserIdGroupByDateBetween(eq(USER_ID), any(), any()))
+                    .willReturn(List.of());
+        }
 
         @Test
         @DisplayName("from이 to보다 늦으면 INVALID_INPUT_VALUE 예외가 발생한다")
@@ -150,6 +168,34 @@ class HomeServiceTest {
 
             assertThat(result.get(0).checkInCount()).isEqualTo(0);
             assertThat(result.get(0).level()).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("체크인이 2건이면 checkInCount=2, level=2이다")
+        void t5GrassCheckIn2() {
+            LocalDate date = LocalDate.of(2025, 6, 1);
+
+            given(checkInRepository.countByUserIdGroupByDateBetween(USER_ID, date, date))
+                    .willReturn(Collections.singletonList(new Object[] {date, 2L}));
+
+            List<GrassResponse> result = homeService.getGrass(USER_ID, date, date);
+
+            assertThat(result.get(0).checkInCount()).isEqualTo(2);
+            assertThat(result.get(0).level()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("체크인이 5건 이상이면 level은 최대 4이다")
+        void t5GrassCheckIn5() {
+            LocalDate date = LocalDate.of(2025, 6, 1);
+
+            given(checkInRepository.countByUserIdGroupByDateBetween(USER_ID, date, date))
+                    .willReturn(Collections.singletonList(new Object[] {date, 5L}));
+
+            List<GrassResponse> result = homeService.getGrass(USER_ID, date, date);
+
+            assertThat(result.get(0).checkInCount()).isEqualTo(5);
+            assertThat(result.get(0).level()).isEqualTo(4);
         }
     }
 
@@ -361,6 +407,12 @@ class HomeServiceTest {
             given(groupService.getMyGroups(eq(USER_ID), eq(GroupStatus.ACTIVE), any(), eq(100)))
                     .willReturn(new SliceResponse<>(List.of(), false, null));
             given(pointService.getMyBalance(USER_ID)).willReturn(new PointBalanceResponse(500, 0, 0, 0));
+            given(checkInRepository.countMine(eq(USER_ID), isNull(), isNull(), any(), any()))
+                    .willReturn(5L);
+            given(checkInRepository.countDistinctDatesByUserIdBetween(eq(USER_ID), any(), any()))
+                    .willReturn(3L);
+            given(businessClock.today()).willReturn(LocalDate.of(2025, 6, 15));
+            given(businessClock.firstDayOfBusinessMonth()).willReturn(LocalDate.of(2025, 6, 1));
 
             HomeResponse result = homeService.getHome(USER_ID);
 
@@ -375,6 +427,8 @@ class HomeServiceTest {
             given(userService.getMyProfile(USER_ID)).willReturn(stubProfile());
             given(userItemService.getMyCharacter(USER_ID)).willReturn(emptyCharacter());
             given(pointService.getMyBalance(USER_ID)).willReturn(new PointBalanceResponse(0, 0, 0, 0));
+            given(businessClock.today()).willReturn(LocalDate.of(2025, 6, 15));
+            given(businessClock.firstDayOfBusinessMonth()).willReturn(LocalDate.of(2025, 6, 1));
 
             // todayCompleted=true 1개, false 2개
             var completed = myGroup(1L, 1L, true);
@@ -394,7 +448,7 @@ class HomeServiceTest {
             return new com.gommit.domain.group.dto.response.MyGroupSummaryResponse(
                     groupId,
                     challengeId,
-                    "��룹",
+                    "그룹",
                     GroupCategory.STUDY,
                     GroupStatus.ACTIVE,
                     com.gommit.domain.challenge.entity.ChallengeStatus.ACTIVE,

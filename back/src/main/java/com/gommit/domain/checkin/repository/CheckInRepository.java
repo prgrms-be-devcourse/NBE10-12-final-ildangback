@@ -104,4 +104,23 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
             @Param("checkInType") CheckInType checkInType,
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
+
+    @Query("""
+            SELECT c.businessDate, COUNT(c)
+            FROM CheckIn c
+            WHERE c.userId = :userId
+                AND c.businessDate BETWEEN :from AND :to
+            GROUP BY c.businessDate
+            """)
+    List<Object[]> countByUserIdGroupByDateBetween(
+            @Param("userId") Long userId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    @Query("""
+        SELECT COUNT(DISTINCT c.businessDate)
+        FROM CheckIn c
+        WHERE c.userId = :userId
+            AND c.businessDate BETWEEN :from AND :to
+        """)
+    long countDistinctDatesByUserIdBetween(
+            @Param("userId") Long userId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 }

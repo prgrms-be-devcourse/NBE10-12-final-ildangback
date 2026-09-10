@@ -3,6 +3,7 @@ package com.gommit.domain.home.service;
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.ChallengeStatus;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
+import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.group.entity.ChallengeGroup;
 import com.gommit.domain.group.entity.GroupCategory;
 import com.gommit.domain.group.entity.GroupStatus;
@@ -19,9 +20,8 @@ import com.gommit.domain.user.service.UserService;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import com.gommit.global.time.BusinessClock;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,20 +42,25 @@ public class HomeService {
     private final GroupService groupService;
     private final ChallengeRepository challengeRepository;
     private final ChallengeGroupRepository challengeGroupRepository;
-    // TODO Phase1: private final CheckInService checkInService;
+    private final CheckInRepository checkInRepository;
+    private final BusinessClock businessClock;
 
     // 홈 화면 조회
     public HomeResponse getHome(Long userId) {
         UserProfileResponse userProfile = userService.getMyProfile(userId);
-        // 아이템 도메인 머지 후 getMyCharacter 수정
         CharacterResponse character = userItemService.getMyCharacter(userId);
         String statusMessage = userProfile.introduction();
 
-        // TODO Phase1: CheckIn 연동 후 교체
-        int monthlyCheckInCount = 0;
-        int monthlyCompletionRate = 0;
+        LocalDate firstDayOfMonth = businessClock.firstDayOfBusinessMonth();
+        LocalDate businessDate = businessClock.today();
+
+        long monthlyCheckInCount = checkInRepository.countMine(userId, null, null, firstDayOfMonth, businessDate);
+        long activeDays = checkInRepository.countDistinctDatesByUserIdBetween(userId, firstDayOfMonth, businessDate);
+        long elapsedDays = ChronoUnit.DAYS.between(firstDayOfMonth, businessDate) + 1;
+
+        int monthlyCompletionRate = elapsedDays == 0 ? 0 : (int) (activeDays * 100 / elapsedDays);
         HomeSummaryResponse summary =
-                new HomeSummaryResponse(userProfile.personalStreak(), monthlyCheckInCount, monthlyCompletionRate);
+                new HomeSummaryResponse(userProfile.personalStreak(), (int) monthlyCheckInCount, monthlyCompletionRate);
 
         List<TodayChallengeResponse> todayChallenges =
                 groupService.getMyGroups(userId, GroupStatus.ACTIVE, null, 100).content().stream()
@@ -75,8 +80,6 @@ public class HomeService {
                 .count();
 
         boolean hasUnreadNotification = false;
-        LocalDate businessDate =
-                LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusHours(4).toLocalDate();
         int pointBalance = pointService.getMyBalance(userId).balance();
 
         return new HomeResponse(
@@ -97,8 +100,8 @@ public class HomeService {
         if (from.isAfter(to)) throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         if (ChronoUnit.DAYS.between(from, to) > 366) throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
 
-        // TODO Phase1: CheckIn 연동 후 교체 - 날짜별 체크인 횟수
-        Map<LocalDate, Long> countByDate = Map.of();
+        Map<LocalDate, Long> countByDate = checkInRepository.countByUserIdGroupByDateBetween(userId, from, to).stream()
+                .collect(Collectors.toMap(row -> (LocalDate) row[0], row -> (Long) row[1]));
 
         List<GrassResponse> result = new ArrayList<>();
         LocalDate date = from;
