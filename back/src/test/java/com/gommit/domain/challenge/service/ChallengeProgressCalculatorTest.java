@@ -272,5 +272,46 @@ class ChallengeProgressCalculatorTest {
                             challenge(FrequencyType.EVERY_N_DAYS, 3, null), LocalDate.of(2026, 9, 10)))
                     .isEqualTo(LocalDate.of(2026, 9, 7));
         }
+
+        @Test
+        @DisplayName("EVERY_N_DAYS — 대상일 사이 businessDate 는 직전 대상일로 내림 (N=3, 9/6 → 9/4)")
+        void everyNDaysBetweenTargets() {
+            assertThat(calculator.previousCheckInDay(
+                            challenge(FrequencyType.EVERY_N_DAYS, 3, null), LocalDate.of(2026, 9, 6)))
+                    .isEqualTo(LocalDate.of(2026, 9, 4));
+        }
+
+        @Test
+        @DisplayName("EVERY_N_DAYS — 시작일 다음 날이면 직전은 시작일")
+        void everyNDaysStartPlusOne() {
+            assertThat(calculator.previousCheckInDay(
+                            challenge(FrequencyType.EVERY_N_DAYS, 3, null), LocalDate.of(2026, 9, 2)))
+                    .isEqualTo(LocalDate.of(2026, 9, 1));
+        }
+
+        @Test
+        @DisplayName("DAYS_OF_WEEK — 직전 스케줄일이 여러 날 전 (월요일 businessDate 의 직전은 금)")
+        void daysOfWeekMultipleDaysBack() {
+            // 2026-09-14(월)의 직전 스케줄일은 2026-09-11(금)
+            assertThat(calculator.previousCheckInDay(
+                            challenge(FrequencyType.DAYS_OF_WEEK, null, "WED,FRI"), LocalDate.of(2026, 9, 14)))
+                    .isEqualTo(LocalDate.of(2026, 9, 11));
+        }
+
+        @Test
+        @DisplayName("종료일 뒤 businessDate — 종료일까지로 클램프 (DAILY → 종료일)")
+        void clampsAfterEndDateDaily() {
+            assertThat(calculator.previousCheckInDay(
+                            challenge(FrequencyType.DAILY, null, null), LocalDate.of(2026, 10, 5)))
+                    .isEqualTo(LocalDate.of(2026, 9, 30));
+        }
+
+        @Test
+        @DisplayName("종료일 뒤 businessDate — EVERY_N_DAYS 는 종료일 이하 마지막 대상일 (N=7 → 9/29)")
+        void clampsAfterEndDateEveryN() {
+            assertThat(calculator.previousCheckInDay(
+                            challenge(FrequencyType.EVERY_N_DAYS, 7, null), LocalDate.of(2026, 10, 10)))
+                    .isEqualTo(LocalDate.of(2026, 9, 29));
+        }
     }
 }

@@ -7,7 +7,9 @@ import com.gommit.global.time.DaysOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -27,17 +29,35 @@ public class ChallengeProgressCalculator {
         };
     }
 
-    // businessDate 직전의 인증 대상일. 없으면(시작일 이전) null.
-    // 판정은 isCheckInDay 단일 규칙으로 — frequency 별 분기 없이 하루씩 되짚는다(범위가 작다: DAILY 1회,
-    // DAYS_OF_WEEK 최대 7회, EVERY_N_DAYS 최대 N회).
+    // businessDate 직전의 인증 대상일. 시작일 이전이면 null. 종료일 뒤 businessDate 는 종료일까지로 제한한다.
     public LocalDate previousCheckInDay(Challenge challenge, LocalDate businessDate) {
         LocalDate start = challenge.getStartDate();
-        for (LocalDate date = businessDate.minusDays(1); !date.isBefore(start); date = date.minusDays(1)) {
-            if (isCheckInDay(challenge, date)) {
-                return date;
-            }
+        LocalDate prev = businessDate.minusDays(1);
+        if (prev.isBefore(start)) {
+            return null;
         }
-        return null;
+        LocalDate ref = prev.isAfter(challenge.getEndDate()) ? challenge.getEndDate() : prev;
+        return switch (challenge.getFrequencyType()) {
+            case DAILY -> ref;
+            case EVERY_N_DAYS -> {
+                Integer n = challenge.getFrequencyValue();
+                if (n == null || n <= 0) {
+                    yield null;
+                }
+                long elapsed = ChronoUnit.DAYS.between(start, ref);
+                yield start.plusDays(Math.floorDiv(elapsed, n) * (long) n);
+            }
+            case DAYS_OF_WEEK -> {
+                Set<DaysOfWeek> scheduled = parseDaysOfWeek(challenge.getDaysOfWeek());
+                LocalDate date = ref;
+                for (int i = 0; i < 7 && !date.isBefore(start); i++, date = date.minusDays(1)) {
+                    if (scheduled.contains(DaysOfWeek.getDaysOfWeek(date.getDayOfWeek()))) {
+                        yield date;
+                    }
+                }
+                yield null;
+            }
+        };
     }
 
     public double calculatePeriodProgressRate(int currentDay, int totalDays) {
@@ -135,16 +155,21 @@ public class ChallengeProgressCalculator {
     }
 
     private boolean matchesDayOfWeek(Challenge challenge, LocalDate date) {
-        String csv = challenge.getDaysOfWeek();
+        return parseDaysOfWeek(challenge.getDaysOfWeek()).contains(DaysOfWeek.getDaysOfWeek(date.getDayOfWeek()));
+    }
+
+    // daysOfWeek CSV(저장 포맷은 항상 MON..SUN) 를 파싱한다. null/blank 면 빈 집합.
+    private Set<DaysOfWeek> parseDaysOfWeek(String csv) {
+        EnumSet<DaysOfWeek> days = EnumSet.noneOf(DaysOfWeek.class);
         if (csv == null || csv.isBlank()) {
-            return false;
+            return days;
         }
-        DaysOfWeek target = DaysOfWeek.getDaysOfWeek(date.getDayOfWeek());
-        return Arrays.stream(csv.split(","))
+        Arrays.stream(csv.split(","))
                 .map(String::trim)
                 .filter(token -> !token.isEmpty())
                 .map(DaysOfWeek::valueOf)
-                .anyMatch(day -> day == target);
+                .forEach(days::add);
+        return days;
     }
 
     // 시작일로부터 frequencyValue 일 간격의 날(0일차 포함)만 대상일.
