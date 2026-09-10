@@ -13,7 +13,6 @@ import static org.mockito.Mockito.when;
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
-import com.gommit.domain.checkin.dto.response.DailyLogCursorResponse;
 import com.gommit.domain.checkin.dto.response.DailyLogResponse;
 import com.gommit.domain.checkin.entity.DailyLog;
 import com.gommit.domain.checkin.event.DailyLogCompletedEvent;
@@ -22,6 +21,7 @@ import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.checkin.repository.DailyLogRepository;
 import com.gommit.domain.checkin.support.CheckInPreconditions;
 import com.gommit.domain.checkin.support.CheckInPreconditions.ReadDateAccess;
+import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import java.time.LocalDate;
@@ -106,7 +106,7 @@ class DailyLogServiceTest {
                     .thenReturn(List.of(logWithId(2L, CHALLENGE_ID, DATE)));
             givenSnapshotTotal(2, List.of(10L, 11L), 2L);
 
-            DailyLogCursorResponse result = service.getDailyLogs(USER_ID, CHALLENGE_ID, null, 20);
+            SliceResponse<DailyLogResponse> result = service.getDailyLogs(USER_ID, CHALLENGE_ID, null, 20);
 
             assertThat(result.content()).hasSize(1);
             DailyLogResponse response = result.content().get(0);
@@ -115,7 +115,7 @@ class DailyLogServiceTest {
             assertThat(response.completedCount()).isEqualTo(2);
             assertThat(response.totalCount()).isEqualTo(2);
             assertThat(response.videoUrl()).isNull(); // videoKey 없음
-            assertThat(result.meta().hasNext()).isFalse();
+            assertThat(result.hasNext()).isFalse();
         }
 
         @Test
@@ -155,13 +155,13 @@ class DailyLogServiceTest {
         }
 
         @Test
-        @DisplayName("이탈일 이후 조회는 row 존재와 무관하게 NOT_CHALLENGE_MEMBER")
+        @DisplayName("이탈일 이후 조회는 row 존재와 무관하게 CHALLENGE_NOT_MEMBER")
         void forbiddenAfterLeftDate() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
             when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID))
                     .thenReturn(new ReadDateAccess(challenge, DATE.minusDays(1)));
 
-            assertBusiness(() -> service.getDailyLog(USER_ID, CHALLENGE_ID, DATE), ErrorCode.NOT_CHALLENGE_MEMBER);
+            assertBusiness(() -> service.getDailyLog(USER_ID, CHALLENGE_ID, DATE), ErrorCode.CHALLENGE_NOT_MEMBER);
         }
 
         @Test
@@ -278,14 +278,14 @@ class DailyLogServiceTest {
         }
 
         @Test
-        @DisplayName("이탈일 이후면 NOT_CHALLENGE_MEMBER")
+        @DisplayName("이탈일 이후면 CHALLENGE_NOT_MEMBER")
         void forbiddenAfterLeftDate() {
             when(dailyLogRepository.findById(7L)).thenReturn(Optional.of(logWithId(7L, CHALLENGE_ID, DATE)));
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
             when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID))
                     .thenReturn(new ReadDateAccess(challenge, DATE.minusDays(1)));
 
-            assertBusiness(() -> service.loadMedia(USER_ID, 7L), ErrorCode.NOT_CHALLENGE_MEMBER);
+            assertBusiness(() -> service.loadMedia(USER_ID, 7L), ErrorCode.CHALLENGE_NOT_MEMBER);
         }
 
         @Test

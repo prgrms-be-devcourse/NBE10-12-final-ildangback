@@ -3,8 +3,6 @@ package com.gommit.domain.checkin.service;
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
-import com.gommit.domain.checkin.dto.response.CursorPageMeta;
-import com.gommit.domain.checkin.dto.response.DailyLogCursorResponse;
 import com.gommit.domain.checkin.dto.response.DailyLogResponse;
 import com.gommit.domain.checkin.entity.DailyLog;
 import com.gommit.domain.checkin.event.DailyLogCompletedEvent;
@@ -13,6 +11,7 @@ import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.checkin.repository.DailyLogRepository;
 import com.gommit.domain.checkin.support.CheckInPreconditions;
 import com.gommit.domain.checkin.support.CheckInPreconditions.ReadDateAccess;
+import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import java.time.LocalDate;
@@ -53,25 +52,25 @@ public class DailyLogService {
     }
 
     // 일일로그 목록 조회 (무한스크롤) — 활동 있던 날(row 존재)만 나열.
-    public DailyLogCursorResponse getDailyLogs(Long userId, Long challengeId, Long cursor, int size) {
+    public SliceResponse<DailyLogResponse> getDailyLogs(Long userId, Long challengeId, Long cursor, int size) {
         ReadDateAccess access = preconditions.resolveReadDateAccess(challengeId, userId);
 
         List<DailyLog> rows =
                 dailyLogRepository.findLogs(challengeId, access.maxBusinessDate(), cursor, PageRequest.of(0, size + 1));
 
-        CursorPage page = CursorPage.of(rows, size);
+        SliceResponse<DailyLog> page = SliceResponse.ofCursor(rows, size, DailyLog::getId);
         List<DailyLogResponse> content = page.content().stream()
                 .map(row -> toResponse(row, access.challenge()))
                 .toList();
 
-        return new DailyLogCursorResponse(content, new CursorPageMeta(page.nextCursor(), page.hasNext(), size));
+        return new SliceResponse<>(content, page.hasNext(), page.nextCursor());
     }
 
     // 일일로그 단건 조회 — row 없으면 무조건 404(휴무일/무기록을 구분하지 않는다).
     public DailyLogResponse getDailyLog(Long userId, Long challengeId, LocalDate date) {
         ReadDateAccess access = preconditions.resolveReadDateAccess(challengeId, userId);
         if (!access.allows(date)) {
-            throw new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER);
+            throw new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER);
         }
 
         DailyLog dailyLog = dailyLogRepository
@@ -87,7 +86,7 @@ public class DailyLogService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.DAILY_LOG_NOT_FOUND));
         ReadDateAccess access = preconditions.resolveReadDateAccess(dailyLog.getChallengeId(), userId);
         if (!access.allows(dailyLog.getLogDate())) {
-            throw new BusinessException(ErrorCode.NOT_CHALLENGE_MEMBER);
+            throw new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER);
         }
         if (dailyLog.getVideoKey() == null) {
             throw new BusinessException(ErrorCode.MEDIA_NOT_FOUND);
@@ -136,15 +135,4 @@ public class DailyLogService {
     }
 
     private record Counts(int completed, int total) {}
-
-    private record CursorPage(List<DailyLog> content, boolean hasNext, Long nextCursor) {
-
-        static CursorPage of(List<DailyLog> rows, int size) {
-            boolean hasNext = rows.size() > size;
-            List<DailyLog> content = hasNext ? rows.subList(0, size) : rows;
-            Long nextCursor =
-                    content.isEmpty() ? null : content.get(content.size() - 1).getId();
-            return new CursorPage(content, hasNext, hasNext ? nextCursor : null);
-        }
-    }
 }

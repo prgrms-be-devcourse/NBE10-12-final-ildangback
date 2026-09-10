@@ -1,8 +1,8 @@
 package com.gommit.domain.checkin.controller;
 
-import com.gommit.domain.checkin.dto.response.DailyLogCursorResponse;
 import com.gommit.domain.checkin.dto.response.DailyLogResponse;
 import com.gommit.domain.checkin.service.DailyLogService;
+import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.security.CurrentUser;
 import com.gommit.global.security.SecurityUser;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,7 +31,7 @@ public class DailyLogController {
 
     @Operation(summary = "일일로그 목록 조회 (무한스크롤)")
     @GetMapping
-    public ResponseEntity<DailyLogCursorResponse> getDailyLogs(
+    public ResponseEntity<SliceResponse<DailyLogResponse>> getDailyLogs(
             @CurrentUser SecurityUser actor,
             @PathVariable Long challengeId,
             @RequestParam(required = false) Long cursor,
