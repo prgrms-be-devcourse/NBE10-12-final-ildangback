@@ -21,6 +21,8 @@ logging:
 media:
   storage:
     provider: ${MEDIA_STORAGE_PROVIDER:cloudinary}
+    cloudinary:
+      root-folder: ${MEDIA_CLOUDINARY_ROOT_FOLDER:go-mmit}
 
 auth-token:
   secret-key: ${JWT_SECRET_KEY}

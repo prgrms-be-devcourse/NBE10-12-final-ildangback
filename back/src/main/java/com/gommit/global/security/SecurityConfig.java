@@ -79,6 +79,8 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers(MONITORING_ENDPOINTS)
                         .permitAll()
+                        .requestMatchers("/api/admin/**")
+                        .hasRole("ADMIN")
                         .anyRequest()
                         .authenticated())
                 .exceptionHandling(handler -> handler.authenticationEntryPoint(authenticationEntryPoint)
