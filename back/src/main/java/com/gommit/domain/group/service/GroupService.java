@@ -20,6 +20,7 @@ import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import com.gommit.global.time.BusinessClock;
 import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.util.Comparator;
@@ -43,6 +44,7 @@ public class GroupService {
     private final CheckInRepository checkInRepository;
     private final ChallengeMemberService challengeMemberService;
     private final ChallengeProgressCalculator challengeProgressCalculator;
+    private final BusinessClock businessClock;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final String INVITE_CODE_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final int INVITE_CODE_LENGTH = 6;
@@ -382,15 +384,14 @@ public class GroupService {
         Challenge challenge = member.getChallenge();
         int participantCount = (int)
                 challengeMemberRepository.countByChallengeIdAndStatus(challenge.getId(), ChallengeMemberStatus.ACTIVE);
-        LocalDate today = LocalDate.now();
+        LocalDate today = businessClock.today();
         int currentDay = challengeProgressCalculator.calculateCurrentDay(challenge, today);
         int totalDays = challenge.getRequiredDayCount();
         double periodProgressRate = challengeProgressCalculator.calculatePeriodProgressRate(currentDay, totalDays);
         int todayCheckInCount = 0;
         if (challenge.getStatus() == ChallengeStatus.ACTIVE) {
-            // TODO: CheckInRepository 연동 후 실제 값으로 변경
-            //            todayCheckInCount = (int)
-            // checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challenge.getId(), userId, today);
+            todayCheckInCount =
+                    checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challenge.getId(), userId, today);
         }
         boolean todayCompleted = challenge.getStatus() == ChallengeStatus.ACTIVE
                 && todayCheckInCount >= challenge.getDailyCheckInCount();

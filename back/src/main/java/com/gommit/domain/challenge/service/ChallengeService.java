@@ -15,8 +15,9 @@ import com.gommit.domain.user.entity.User;
 import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import com.gommit.global.time.BusinessClock;
+import com.gommit.global.time.DaysOfWeek;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ public class ChallengeService {
     private final ChallengeGroupRepository challengeGroupRepository;
     private final ChallengeMemberService challengeMemberService;
     private final ChallengeProgressCalculator challengeProgressCalculator;
+    private final BusinessClock businessClock;
 
     @Transactional
     public Challenge createInitialChallenge(Long groupId, Long userId, InitialChallengeSettingRequest setting) {
@@ -80,12 +82,15 @@ public class ChallengeService {
         long participantCount =
                 challengeMemberRepository.countByChallengeIdAndStatus(challengeId, ChallengeMemberStatus.ACTIVE);
         int totalDays = challenge.getRequiredDayCount();
-        LocalDate today = LocalDate.now();
+        LocalDate today = businessClock.today();
         int currentDay = challengeProgressCalculator.calculateCurrentDay(challenge, today);
         double periodProgressRate = challengeProgressCalculator.calculatePeriodProgressRate(currentDay, totalDays);
-        boolean checkInDay = isCheckInDay(challenge, today);
-        ChallengeDetailResponse challengeDetailResponse = new ChallengeDetailResponse(challenge, owner.getUserId());
-        int myCurrentCount = 0; // TODO: CheckIn 연동
+        boolean checkInDay = challengeProgressCalculator.canCheckInOn(challenge, today);
+        LocalDate previousCheckInDay = challengeProgressCalculator.previousCheckInDay(challenge, today);
+        int groupCurrentStreak = challenge.groupCurrentStreakAsOf(today, previousCheckInDay);
+        ChallengeDetailResponse challengeDetailResponse =
+                new ChallengeDetailResponse(challenge, owner.getUserId(), groupCurrentStreak);
+        int myCurrentCount = checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challengeId, userId, today);
         boolean myCompleted = myCurrentCount >= challenge.getDailyCheckInCount();
         // TODO: 연장 가능 기간 정책 적용
         boolean extensionAvailable = false;
@@ -112,18 +117,13 @@ public class ChallengeService {
         List<Long> userIds = members.stream().map(ChallengeMember::getUserId).toList();
         List<User> users = userRepository.findAllByIdIn(userIds);
         Map<Long, User> userMap = users.stream().collect(Collectors.toMap(User::getId, user -> user));
-        LocalDate today = LocalDate.now();
+        LocalDate today = businessClock.today();
         return members.stream()
                 .map(member -> {
                     User user = userMap.get(member.getUserId());
-                    // 오늘 인증 횟수 조회
-                    // TODO: CheckInRepository 연동 후 실제 값으로 변경
-                    long todayCheckInCount = 0;
-                    //            long todayCheckInCount =
-                    // checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challengeId, member.getUserId(),
-                    // today);
-                    return new MemberTodayStatusResponse(
-                            member.getUserId(), user.getNickname(), (int) todayCheckInCount);
+                    int todayCheckInCount = checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(
+                            challengeId, member.getUserId(), today);
+                    return new MemberTodayStatusResponse(member.getUserId(), user.getNickname(), todayCheckInCount);
                 })
                 .toList();
     }
@@ -146,7 +146,7 @@ public class ChallengeService {
         }
         LocalDate startDate = request.startDate() != null ? request.startDate() : challenge.getStartDate();
         LocalDate endDate = request.endDate() != null ? request.endDate() : challenge.getEndDate();
-        if (!startDate.isAfter(LocalDate.now())) {
+        if (!startDate.isAfter(businessClock.today())) {
             throw new BusinessException(ErrorCode.START_DATE_INVALID);
         }
         if (endDate.isBefore(startDate)) {
@@ -187,9 +187,8 @@ public class ChallengeService {
         if (dailyCheckInCount < 1 || dailyCheckInCount > 10) {
             throw new BusinessException(ErrorCode.INVALID_DAILY_COUNT);
         }
-        List<CheckInType> allowedTypes = request.allowedTypes() != null
-                ? request.allowedTypes()
-                : challenge.isAllowPhoto() ? List.of(CheckInType.PHOTO) : List.of();
+        List<CheckInType> allowedTypes =
+                request.allowedTypes() != null ? request.allowedTypes() : challenge.allowedCheckInTypes();
         if (allowedTypes.isEmpty()) {
             throw new BusinessException(ErrorCode.NO_CHECK_IN_METHOD);
         }
@@ -273,7 +272,7 @@ public class ChallengeService {
     }
 
     private void validateStartDate(LocalDate startDate) {
-        if (!startDate.isAfter(LocalDate.now())) {
+        if (!startDate.isAfter(businessClock.today())) {
             throw new BusinessException(ErrorCode.START_DATE_INVALID);
         }
     }
@@ -302,25 +301,5 @@ public class ChallengeService {
         if (allowedTypes == null || allowedTypes.isEmpty()) {
             throw new BusinessException(ErrorCode.NO_CHECK_IN_METHOD);
         }
-    }
-
-    private boolean isCheckInDay(Challenge challenge, LocalDate today) {
-        if (challenge.getStatus() != ChallengeStatus.ACTIVE) {
-            return false;
-        }
-        if (today.isBefore(challenge.getStartDate()) || today.isAfter(challenge.getEndDate())) {
-            return false;
-        }
-        return switch (challenge.getFrequencyType()) {
-            case DAILY -> true;
-            case DAYS_OF_WEEK ->
-                Arrays.stream(challenge.getDaysOfWeek().split(","))
-                        .map(DaysOfWeek::valueOf)
-                        .anyMatch(daysOfWeek -> daysOfWeek == DaysOfWeek.getDaysOfWeek(today.getDayOfWeek()));
-            case EVERY_N_DAYS -> {
-                long days = ChronoUnit.DAYS.between(challenge.getStartDate(), today);
-                yield days % challenge.getFrequencyValue() == 0;
-            }
-        };
     }
 }

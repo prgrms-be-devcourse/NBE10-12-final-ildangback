@@ -10,6 +10,7 @@ import com.gommit.domain.group.entity.ChallengeGroup;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import com.gommit.global.time.BusinessClock;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.function.Function;
@@ -24,10 +25,11 @@ public class ChallengeLifecycleService {
     private final ChallengeRepository challengeRepository;
     private final ChallengeMemberRepository challengeMemberRepository;
     private final ChallengeGroupRepository challengeGroupRepository;
+    private final BusinessClock businessClock;
 
     @Transactional
     public void activateChallengesDueToday() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = businessClock.today();
         List<Challenge> readyChallenges = challengeRepository.findAllByStatus(ChallengeStatus.READY);
         List<Challenge> challengesDueToday = readyChallenges.stream()
                 .filter(challenge -> challenge.getStartDate().equals(today))
@@ -56,7 +58,7 @@ public class ChallengeLifecycleService {
 
     @Transactional
     public void endChallengesDueToday() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = businessClock.today();
         List<Challenge> activeChallenges = challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE);
         List<Challenge> challengesDueToday = activeChallenges.stream()
                 .filter(challenge -> challenge.getEndDate().plusDays(1).equals(today))
