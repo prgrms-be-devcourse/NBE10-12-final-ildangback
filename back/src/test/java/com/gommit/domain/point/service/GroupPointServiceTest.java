@@ -15,7 +15,11 @@ import com.gommit.domain.point.repository.GroupPointHistoryRepository;
 import com.gommit.domain.point.repository.GroupPointRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import com.gommit.global.time.BusinessClock;
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,8 +44,11 @@ class GroupPointServiceTest {
 
     @BeforeEach
     void setUp() {
-        groupPointService =
-                new GroupPointService(groupPointHistoryRepository, groupPointRepository, new PointPeriodCalculator());
+        groupPointService = new GroupPointService(
+                groupPointHistoryRepository,
+                groupPointRepository,
+                new PointPeriodCalculator(new BusinessClock(Clock.fixed(
+                        LocalDateTime.of(2026, 9, 15, 14, 0).toInstant(ZoneOffset.UTC), ZoneId.of("UTC")))));
     }
 
     private GroupPoint groupPoint(int balance) {

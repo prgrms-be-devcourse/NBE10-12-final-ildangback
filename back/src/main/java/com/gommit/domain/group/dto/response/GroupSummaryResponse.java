@@ -1,11 +1,11 @@
 package com.gommit.domain.group.dto.response;
 
 import com.gommit.domain.challenge.entity.Challenge;
-import com.gommit.domain.challenge.entity.DaysOfWeek;
 import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.group.entity.ChallengeGroup;
 import com.gommit.domain.group.entity.GroupCategory;
 import com.gommit.domain.group.entity.GroupStatus;
+import com.gommit.global.time.DaysOfWeek;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
