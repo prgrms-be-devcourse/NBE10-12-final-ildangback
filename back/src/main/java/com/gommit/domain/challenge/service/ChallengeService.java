@@ -123,7 +123,8 @@ public class ChallengeService {
                     User user = userMap.get(member.getUserId());
                     int todayCheckInCount = checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(
                             challengeId, member.getUserId(), today);
-                    return new MemberTodayStatusResponse(member.getUserId(), user.getNickname(), todayCheckInCount);
+                    return new MemberTodayStatusResponse(
+                            member.getUserId(), user.getNickname(), todayCheckInCount, member.getExtensionChoice());
                 })
                 .toList();
     }

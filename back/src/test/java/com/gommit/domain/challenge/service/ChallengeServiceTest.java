@@ -18,6 +18,7 @@ import com.gommit.domain.challenge.entity.ChallengeMember;
 import com.gommit.domain.challenge.entity.ChallengeMemberRole;
 import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.entity.ChallengeStatus;
+import com.gommit.domain.challenge.entity.ExtensionChoice;
 import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
@@ -509,9 +510,10 @@ class ChallengeServiceTest {
     @DisplayName("getMemberTodayStatuses - 시즌 멤버 오늘 인증 현황")
     class GetMemberTodayStatuses {
 
-        @Test
-        @DisplayName("참여 중인 멤버들의 닉네임과 오늘 인증 횟수를 반환한다")
-        void returnsMemberTodayStatuses() {
+        @ParameterizedTest
+        @EnumSource(ExtensionChoice.class)
+        @DisplayName("참여 멤버의 실제 인증 횟수와 연장 투표 선택을 함께 반환한다")
+        void returnsMemberTodayStatuses(ExtensionChoice choice) {
             // given
             Challenge challenge = challenge(50L, ChallengeStatus.ACTIVE);
             ChallengeMember requester = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
@@ -522,6 +524,12 @@ class ChallengeServiceTest {
                     .thenReturn(List.of(requester, member));
             when(userRepository.findAllByIdIn(List.of(1L, 2L))).thenReturn(List.of(user(1L, "방장"), user(2L, "멤버")));
 
+            member.changeExtensionChoice(choice);
+            when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(50L, 1L, businessClock.today()))
+                    .thenReturn(0);
+            when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(50L, 2L, businessClock.today()))
+                    .thenReturn(2);
+
             // when
             var response = challengeService.getMemberTodayStatuses(50L, 1L);
 
@@ -530,6 +538,9 @@ class ChallengeServiceTest {
             assertThat(response.get(0).nickname()).isEqualTo("방장");
             assertThat(response.get(0).todayCheckInCount()).isZero();
             assertThat(response.get(1).nickname()).isEqualTo("멤버");
+            assertThat(response.get(1).todayCheckInCount()).isEqualTo(2);
+            assertThat(response.get(0).extensionChoice()).isEqualTo(ExtensionChoice.PENDING);
+            assertThat(response.get(1).extensionChoice()).isEqualTo(choice);
         }
 
         @Test
