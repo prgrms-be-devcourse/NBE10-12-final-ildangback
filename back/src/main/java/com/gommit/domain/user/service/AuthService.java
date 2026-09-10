@@ -4,7 +4,6 @@ import com.gommit.domain.user.dto.request.LoginRequest;
 import com.gommit.domain.user.dto.request.SignUpRequest;
 import com.gommit.domain.user.dto.response.LoginResponse;
 import com.gommit.domain.user.dto.response.TokenResponse;
-import com.gommit.domain.user.dto.response.UserProfileResponse;
 import com.gommit.domain.user.dto.response.UserSummaryResponse;
 import com.gommit.domain.user.entity.User;
 import com.gommit.domain.user.repository.UserRepository;
@@ -28,6 +27,7 @@ public class AuthService {
     private final EmailVerificationService emailVerificationService;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
+    private final UserService userService;
 
     // 회원가입
     @Transactional
@@ -65,7 +65,7 @@ public class AuthService {
         }
 
         TokenResponse tokens = new TokenResponse(issueAccessToken(user), refreshTokenService.issue(user));
-        return new LoginResponse(tokens, new UserProfileResponse(user), false);
+        return new LoginResponse(tokens, userService.toUserProfileResponse(user), false);
     }
 
     // 토큰 재발급

@@ -1,5 +1,6 @@
 package com.gommit.domain.user.service;
 
+import com.gommit.domain.challenge.service.ChallengeMemberService;
 import com.gommit.domain.group.service.GroupService;
 import com.gommit.domain.user.dto.request.ChangePasswordRequest;
 import com.gommit.domain.user.dto.request.DeleteAccountRequest;
@@ -11,6 +12,7 @@ import com.gommit.domain.user.repository.AuthIdentityRepository;
 import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import com.gommit.global.time.BusinessClock;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Map;
@@ -31,10 +33,12 @@ public class UserService {
     private final EmailTokenService emailTokenService;
     private final GroupService groupService;
     private final PasswordEncoder passwordEncoder;
+    private final ChallengeMemberService challengeMemberService;
+    private final BusinessClock businessClock;
 
     // 내 정보 조회
     public UserProfileResponse getMyProfile(Long userId) {
-        return new UserProfileResponse(findNotDeleted(userId));
+        return toUserProfileResponse(findNotDeleted(userId));
     }
 
     // 내 정보 수정
@@ -56,7 +60,7 @@ public class UserService {
             user.updateIntroduction(request.introduction().isBlank() ? null : request.introduction());
         }
 
-        return new UserProfileResponse(user);
+        return toUserProfileResponse(user);
     }
 
     // 비밀번호 변경
@@ -115,16 +119,18 @@ public class UserService {
         }
     }
 
-    // 스트릭 저장
-    @Transactional
-    public void updateStreak(Long userId, int personalStreak, LocalDate lastCheckedInDate) {
-        findNotDeleted(userId).updateStreak(personalStreak, lastCheckedInDate);
+    // 프로필 응답 조립
+    UserProfileResponse toUserProfileResponse(User user) {
+        LocalDate today = businessClock.today();
+        LocalDate lastRequiredCheckInDay = challengeMemberService.findLastRequiredCheckInDay(user.getId(), today);
+        return new UserProfileResponse(user, user.calculateStreak(today, lastRequiredCheckInDay));
     }
 
-    // 스트릭 초기화
+    // 하루 인증 목표 완료 시 스트릭 갱신
     @Transactional
-    public void resetStreak(Long userId) {
-        findNotDeleted(userId).resetStreak();
+    public void updateStreak(Long userId, LocalDate businessDate) {
+        LocalDate lastRequiredCheckInDay = challengeMemberService.findLastRequiredCheckInDay(userId, businessDate);
+        findNotDeleted(userId).updateStreak(businessDate, lastRequiredCheckInDay);
     }
 
     // 닉네임 일괄 조회

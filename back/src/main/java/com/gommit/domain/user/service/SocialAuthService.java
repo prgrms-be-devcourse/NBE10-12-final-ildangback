@@ -3,7 +3,6 @@ package com.gommit.domain.user.service;
 import com.gommit.domain.user.dto.request.OAuthLoginRequest;
 import com.gommit.domain.user.dto.response.LoginResponse;
 import com.gommit.domain.user.dto.response.TokenResponse;
-import com.gommit.domain.user.dto.response.UserProfileResponse;
 import com.gommit.domain.user.entity.AuthIdentity;
 import com.gommit.domain.user.entity.OAuthProvider;
 import com.gommit.domain.user.entity.User;
@@ -36,6 +35,7 @@ public class SocialAuthService {
     private final RefreshTokenService refreshTokenService;
     private final JwtProvider jwtProvider;
     private final OAuthProperties oAuthProperties;
+    private final UserService userService;
 
     public SocialAuthService(
             List<OAuthClient> oAuthClients,
@@ -43,13 +43,15 @@ public class SocialAuthService {
             AuthIdentityRepository authIdentityRepository,
             RefreshTokenService refreshTokenService,
             JwtProvider jwtProvider,
-            OAuthProperties oAuthProperties) {
+            OAuthProperties oAuthProperties,
+            UserService userService) {
         oAuthClients.forEach(client -> clients.put(client.provider(), client));
         this.userRepository = userRepository;
         this.authIdentityRepository = authIdentityRepository;
         this.refreshTokenService = refreshTokenService;
         this.jwtProvider = jwtProvider;
         this.oAuthProperties = oAuthProperties;
+        this.userService = userService;
     }
 
     // 소셜 로그인
@@ -106,6 +108,6 @@ public class SocialAuthService {
     private LoginResponse issue(User user, boolean newUser) {
         String accessToken = jwtProvider.issue(user.getId(), user.getRole().name());
         TokenResponse tokens = new TokenResponse(accessToken, refreshTokenService.issue(user));
-        return new LoginResponse(tokens, new UserProfileResponse(user), newUser);
+        return new LoginResponse(tokens, userService.toUserProfileResponse(user), newUser);
     }
 }

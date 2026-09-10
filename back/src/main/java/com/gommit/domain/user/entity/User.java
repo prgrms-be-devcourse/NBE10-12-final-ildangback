@@ -84,13 +84,27 @@ public class User extends BaseEntity {
         this.deletedAt = LocalDateTime.now();
     }
 
-    public void updateStreak(int personalStreak, LocalDate lastCheckedInDate) {
-        this.personalStreak = personalStreak;
-        this.bestStreak = Math.max(this.bestStreak, personalStreak);
-        this.lastCheckedInDate = lastCheckedInDate;
+    public void updateStreak(LocalDate businessDate, LocalDate lastRequiredCheckInDay) {
+        if (businessDate.equals(this.lastCheckedInDate)) {
+            return;
+        }
+        this.personalStreak = isUnbroken(lastRequiredCheckInDay) ? this.personalStreak + 1 : 1;
+        this.bestStreak = Math.max(this.bestStreak, this.personalStreak);
+        this.lastCheckedInDate = businessDate;
     }
 
-    public void resetStreak() {
-        this.personalStreak = 0;
+    public int calculateStreak(LocalDate businessDate, LocalDate lastRequiredCheckInDay) {
+        if (this.lastCheckedInDate == null) {
+            return 0;
+        }
+        if (this.lastCheckedInDate.equals(businessDate)) {
+            return this.personalStreak;
+        }
+        return isUnbroken(lastRequiredCheckInDay) ? this.personalStreak : 0;
+    }
+
+    private boolean isUnbroken(LocalDate lastRequiredCheckInDay) {
+        return this.lastCheckedInDate != null
+                && (lastRequiredCheckInDay == null || !this.lastCheckedInDate.isBefore(lastRequiredCheckInDay));
     }
 }

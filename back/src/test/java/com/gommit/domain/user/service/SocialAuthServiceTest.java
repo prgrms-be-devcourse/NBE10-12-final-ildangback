@@ -49,6 +49,9 @@ class SocialAuthServiceTest {
     @Mock
     private JwtProvider jwtProvider;
 
+    @Mock
+    private UserService userService;
+
     private StubOAuthClient googleClient;
     private SocialAuthService socialAuthService;
 
@@ -65,7 +68,8 @@ class SocialAuthServiceTest {
                 authIdentityRepository,
                 refreshTokenService,
                 jwtProvider,
-                properties);
+                properties,
+                userService);
     }
 
     @Nested
