@@ -7,7 +7,7 @@ spring:
 
   servlet:
     multipart:
-      # 사용자 업로드 경로(CHECKIN/ITEM, 이미지)만 커버. DAILYLOG 는 서버 생성이라 무관.
+      # 사용자 업로드(CHECKIN/ITEM). 앱단 검증(5MB)보다 높게 잡아 5~12MB 는 FILE_TOO_LARGE(413) 로 떨어진다.
       max-file-size: 12MB
       max-request-size: 15MB
 
@@ -34,12 +34,32 @@ springdoc:
     tags-sorter: alpha
     operations-sorter: method
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+point: # [임시값] 기획 확정 시 조정. 없으면 PointProperties 의 @DefaultValue 로 뜬다.
+  check-in-reward: 10          # 개인 인증 1건
+  group-daily-all-complete: 5  # 그룹 ACTIVE 전원이 그날 목표 달성
+
 auth-token:
   access-token:
     expiration: 15m
   refresh-token:
     expiration: 30d
     reuse-grace-period: 30s
+
+app:
+  time-zone: Asia/Seoul # 인증 businessDate('오늘') 판정에 쓰는 Clock 빈의 기준 타임존
+  frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+  api-base-url: ${API_BASE_URL:http://localhost:8080}
 
 media:
   storage:
