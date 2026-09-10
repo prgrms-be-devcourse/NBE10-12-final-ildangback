@@ -353,6 +353,34 @@ class ChallengeServiceTest {
     class GetChallengeStatus {
 
         @Test
+        @DisplayName("주입된 businessDate로 진행일과 인증 가능일 및 내 인증 횟수를 계산한다")
+        void usesInjectedBusinessDateForStatus() {
+            LocalDate today = LocalDate.of(2026, 9, 10);
+            when(businessClock.today()).thenReturn(today);
+            Challenge challenge = challenge(50L, ChallengeStatus.ACTIVE);
+            ReflectionTestUtils.setField(challenge, "startDate", today.minusDays(1));
+            ReflectionTestUtils.setField(challenge, "endDate", today.plusDays(5));
+            ReflectionTestUtils.setField(challenge, "frequencyType", FrequencyType.DAILY);
+            ChallengeMember member = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
+            ChallengeMember owner = challengeMember(71L, challenge, 1L, ChallengeMemberRole.OWNER);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(member));
+            when(challengeMemberRepository.findByChallengeIdAndRole(50L, ChallengeMemberRole.OWNER))
+                    .thenReturn(Optional.of(owner));
+            when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(50L, 2L, today))
+                    .thenReturn(1);
+
+            var response = challengeService.getChallengeStatus(50L, 2L);
+
+            assertThat(response.currentDay()).isEqualTo(2);
+            assertThat(response.isCheckInDay()).isTrue();
+            assertThat(response.myCurrentCount()).isEqualTo(1);
+            verify(challengeProgressCalculator).calculateCurrentDay(challenge, today);
+            verify(challengeProgressCalculator).canCheckInOn(challenge, today);
+            verify(checkInRepository).countByChallengeIdAndUserIdAndBusinessDate(50L, 2L, today);
+        }
+
+        @Test
         @DisplayName("챌린지와 멤버 권한을 확인하고 진행 현황을 반환한다")
         void returnsChallengeStatus() {
             // given
@@ -524,6 +552,7 @@ class ChallengeServiceTest {
                     .thenReturn(List.of(requester, member));
             when(userRepository.findAllByIdIn(List.of(1L, 2L))).thenReturn(List.of(user(1L, "방장"), user(2L, "멤버")));
 
+            when(businessClock.today()).thenReturn(LocalDate.of(2026, 9, 10));
             member.changeExtensionChoice(choice);
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(50L, 1L, businessClock.today()))
                     .thenReturn(0);

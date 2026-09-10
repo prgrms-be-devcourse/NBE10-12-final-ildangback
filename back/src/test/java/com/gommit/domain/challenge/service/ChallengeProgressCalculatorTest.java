@@ -5,12 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.FrequencyType;
-import com.gommit.global.time.BusinessClock;
 import com.gommit.global.time.DaysOfWeek;
-import java.time.Clock;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -48,28 +44,6 @@ class ChallengeProgressCalculatorTest {
 
     private static String enumNameOf(LocalDate date) {
         return DaysOfWeek.getDaysOfWeek(date.getDayOfWeek()).name();
-    }
-
-    @ParameterizedTest
-    @CsvSource({
-        "2026-09-02T00:00:00, 2026-09-01, 1",
-        "2026-09-02T03:59:59, 2026-09-01, 1",
-        "2026-09-02T04:00:00, 2026-09-02, 2"
-    })
-    @DisplayName("KST BusinessClock의 04:00 경계가 DAILY 진행일과 진행률에 적용된다")
-    void dailyProgressUsesBusinessClock(LocalDateTime now, LocalDate expectedDate, int expectedDay) {
-        ZoneId kst = ZoneId.of("Asia/Seoul");
-        BusinessClock businessClock =
-                new BusinessClock(Clock.fixed(now.atZone(kst).toInstant(), kst));
-        Challenge challenge = challenge(FrequencyType.DAILY, null, null, true);
-
-        LocalDate today = businessClock.today();
-        int currentDay = calculator.calculateCurrentDay(challenge, today);
-
-        assertThat(today).isEqualTo(expectedDate);
-        assertThat(currentDay).isEqualTo(expectedDay);
-        assertThat(calculator.calculatePeriodProgressRate(currentDay, challenge.getRequiredDayCount()))
-                .isEqualTo(expectedDay * 10.0);
     }
 
     @ParameterizedTest
