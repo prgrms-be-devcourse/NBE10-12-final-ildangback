@@ -140,7 +140,7 @@ class ChallengeStreakServiceTest {
             MemberCheckInResult result = service.onMemberDailyComplete(CHALLENGE_ID, 1L, TODAY);
 
             assertThat(result.memberCurrentStreak()).isEqualTo(5);
-            assertThat(me.getCurrentStreak()).isEqualTo(5);
+            assertThat(me.currentStreakAsOf(TODAY, TODAY.minusDays(1))).isEqualTo(5);
             assertThat(me.getBestStreak()).isEqualTo(5);
         }
 
@@ -195,7 +195,8 @@ class ChallengeStreakServiceTest {
             assertThat(result.groupCompletedCount()).isEqualTo(2);
             assertThat(result.groupTotalCount()).isEqualTo(2);
             assertThat(result.groupJustCompleted()).isTrue();
-            assertThat(challenge.getGroupCurrentStreak()).isEqualTo(1);
+            assertThat(challenge.groupCurrentStreakAsOf(TODAY, TODAY.minusDays(1)))
+                    .isEqualTo(1);
             verify(groupPointService)
                     .reward(challenge.getGroupId(), 5, GroupPointReason.DAILY_ALL_COMPLETE, "전원 하루 인증 완료");
         }
@@ -245,7 +246,8 @@ class ChallengeStreakServiceTest {
 
             assertThat(result.groupCompletedCount()).isEqualTo(1);
             assertThat(result.groupJustCompleted()).isFalse();
-            assertThat(challenge.getGroupCurrentStreak()).isZero();
+            assertThat(challenge.groupCurrentStreakAsOf(TODAY, TODAY.minusDays(1)))
+                    .isZero();
             verify(groupPointService, never()).reward(anyLong(), anyInt(), any(), anyString());
         }
     }

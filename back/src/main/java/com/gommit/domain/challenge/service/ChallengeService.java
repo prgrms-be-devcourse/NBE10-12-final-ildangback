@@ -86,7 +86,10 @@ public class ChallengeService {
         int currentDay = challengeProgressCalculator.calculateCurrentDay(challenge, today);
         double periodProgressRate = challengeProgressCalculator.calculatePeriodProgressRate(currentDay, totalDays);
         boolean checkInDay = challengeProgressCalculator.canCheckInOn(challenge, today);
-        ChallengeDetailResponse challengeDetailResponse = new ChallengeDetailResponse(challenge, owner.getUserId());
+        LocalDate previousCheckInDay = challengeProgressCalculator.previousCheckInDay(challenge, today);
+        int groupCurrentStreak = challenge.groupCurrentStreakAsOf(today, previousCheckInDay);
+        ChallengeDetailResponse challengeDetailResponse =
+                new ChallengeDetailResponse(challenge, owner.getUserId(), groupCurrentStreak);
         int myCurrentCount = checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challengeId, userId, today);
         boolean myCompleted = myCurrentCount >= challenge.getDailyCheckInCount();
         // TODO: 연장 가능 기간 정책 적용

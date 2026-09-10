@@ -85,6 +85,9 @@ public class ChallengeStreakService {
         }
 
         return new MemberCheckInResult(
-                member.getCurrentStreak(), groupCompletedCount, groupTotalCount, groupJustCompleted);
+                member.currentStreakAsOf(businessDate, previousCheckInDay),
+                groupCompletedCount,
+                groupTotalCount,
+                groupJustCompleted);
     }
 }

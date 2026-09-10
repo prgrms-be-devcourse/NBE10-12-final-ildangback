@@ -37,13 +37,16 @@ public class ChallengeMember extends BaseEntity {
     @Column(nullable = false, length = 20)
     private ChallengeMemberStatus status;
 
+    @Getter(AccessLevel.PACKAGE) // 저장값. 체크인시의 값이 갱신되어 끊긴 날 0으로 바뀌지 않는다. currentStreakAsOf()로 읽어 보정.
     @Column(nullable = false)
     private int currentStreak;
 
     @Column(nullable = false)
     private int bestStreak;
 
-    private LocalDate lastCompletedDate; // streak 연속성 판정에 사용
+    // streak 연속성 판정 + currentStreakAsOf 보정 쓰는 내부 상태.
+    @Getter(AccessLevel.PACKAGE)
+    private LocalDate lastCompletedDate;
 
     private LocalDateTime leftAt;
 

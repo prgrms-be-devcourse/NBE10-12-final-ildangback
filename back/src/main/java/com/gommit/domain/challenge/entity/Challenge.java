@@ -47,6 +47,7 @@ public class Challenge extends BaseEntity {
     @Column(nullable = false)
     private int requiredDayCount;
 
+    @Getter(AccessLevel.PACKAGE) // 저장값. 체크인시의 값이 갱신되어 끊긴 날 0으로 바뀌지 않는다. groupCurrentStreakAsOf()로 읽어 보정.
     @Column(nullable = false)
     private int groupCurrentStreak;
 
@@ -130,5 +131,20 @@ public class Challenge extends BaseEntity {
         this.groupCurrentStreak = consecutive ? this.groupCurrentStreak + 1 : 1;
         this.groupBestStreak = Math.max(this.groupBestStreak, this.groupCurrentStreak);
         this.groupLastCompletedDate = businessDate;
+    }
+
+    // 조회 시점(businessDate) 기준 현재 그룹 스트릭.
+    // groupCurrentStreak 값은 마지막 전원완료일에 갱신되어, 인증을 건너 뛰었을 떄 0을 반환해주는 것이 필요.
+    public int groupCurrentStreakAsOf(LocalDate businessDate, LocalDate previousCheckInDay) {
+        if (this.groupLastCompletedDate == null) {
+            return 0;
+        }
+        if (this.groupLastCompletedDate.equals(businessDate)) {
+            return this.groupCurrentStreak;
+        }
+        if (previousCheckInDay != null && !this.groupLastCompletedDate.isBefore(previousCheckInDay)) {
+            return this.groupCurrentStreak;
+        }
+        return 0;
     }
 }
