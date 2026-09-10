@@ -57,8 +57,8 @@ export function GroupManagement({ detail }: { detail: GroupDetailResponse }) {
       {owner && (
         <p className="text-xs leading-relaxed text-gray-500">
           그룹장은 그룹장 권한을 위임한 뒤 나갈 수 있어요. 첫 시즌 또는 진행
-          중인 시즌에서 시즌장을 위임하면 그룹장도 변경됩니다. 이후 시즌의 시작
-          대기 상태에서는 시즌장만 변경돼요.
+          중인 시즌에서 위임하면 그룹 전체의 관리 권한도 함께 이전됩니다. 이후
+          시즌의 시작 대기 상태에서는 해당 시즌의 그룹장 권한만 이전돼요.
         </p>
       )}
       {leaving && (

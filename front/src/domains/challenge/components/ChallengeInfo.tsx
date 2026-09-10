@@ -67,6 +67,7 @@ export function ChallengeRulesCard({
             ? "사진"
             : "지원되는 인증 방식 없음"}
         </InfoRow>
+        <InfoRow label="인증 가능 시간">04:00 ~ 익일 03:59 (KST)</InfoRow>
       </dl>
       <p className="mt-2 text-[11px] text-purple-500">
         인증 규칙은 시작 후 변경할 수 없어요.

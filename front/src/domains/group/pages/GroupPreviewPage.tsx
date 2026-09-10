@@ -1,3 +1,6 @@
+import groupIllustration from "../../../assets/icons/image_119.webp";
+import { CharacterRenderer } from "../../user/components/CharacterRenderer";
+import { getUserCharacters } from "../../user/api";
 import peopleIcon from "../../../assets/icons/people.webp";
 import { useCallback, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
@@ -53,6 +56,23 @@ function GroupPreview({ id }: { id: number }) {
     }
   };
   const data = resource.data;
+  const characterLoader = useCallback(
+    () =>
+      getUserCharacters(
+        data?.members
+          .filter((member) => member.status === "ACTIVE")
+          .map((member) => member.userId) ?? [],
+      ),
+    [data?.members],
+  );
+  const characters = useResource(characterLoader);
+  const memberCharacters = data?.members
+    .filter((member) => member.status === "ACTIVE")
+    .map((member) => ({
+      member,
+      slots: characters.data?.[String(member.userId)],
+    }));
+
   const joined = data?.members.some((member) => member.userId === user?.id);
   const canJoin =
     data?.group.visibility === "PUBLIC" &&
@@ -80,27 +100,34 @@ function GroupPreview({ id }: { id: number }) {
         )}
         {data && (
           <>
-            <section className="space-y-3 px-2">
-              <div className="flex items-center gap-2">
-                <span className="rounded-md border border-purple-300 px-2 py-1 text-xs text-purple-500">
-                  {data.group.visibility === "PUBLIC"
-                    ? "공개 그룹"
-                    : "비공개 그룹"}
-                </span>
-                <StatusBadge status={data.group.status} />
-              </div>
-              <h1 className="text-2xl font-bold wrap-anywhere">
-                {data.group.name}
-              </h1>
-              <p className="text-sm text-gray-500">
-                {CATEGORY_LABEL[data.group.category]} ·{" "}
-                {data.group.currentMembers} / {data.group.maxMembers}명
-              </p>
-              {data.group.description && (
-                <p className="text-sm leading-relaxed wrap-anywhere whitespace-pre-wrap">
-                  {data.group.description}
+            <section className="flex items-start gap-3 px-1">
+              <div className="min-w-0 flex-1 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-md border border-purple-300 px-2 py-1 text-xs text-purple-500">
+                    {data.group.visibility === "PUBLIC"
+                      ? "공개 그룹"
+                      : "비공개 그룹"}
+                  </span>
+                  <StatusBadge status={data.group.status} />
+                </div>
+                <h1 className="text-2xl font-bold wrap-anywhere">
+                  {data.group.name}
+                </h1>
+                <p className="text-sm text-gray-500">
+                  {CATEGORY_LABEL[data.group.category]} ·{" "}
+                  {data.group.currentMembers} / {data.group.maxMembers}명
                 </p>
-              )}
+                {data.group.description && (
+                  <p className="text-sm leading-relaxed wrap-anywhere whitespace-pre-wrap">
+                    {data.group.description}
+                  </p>
+                )}
+              </div>
+              <img
+                src={groupIllustration}
+                alt=""
+                className="mt-5 w-24 shrink-0 object-contain min-[400px]:w-28 sm:w-36"
+              />
             </section>
             {data.currentChallenge && (
               <ChallengeRulesCard settings={data.currentChallenge} />
@@ -117,17 +144,38 @@ function GroupPreview({ id }: { id: number }) {
                 함께할 멤버 {data.group.currentMembers} /{" "}
                 {data.group.maxMembers}
               </h2>
-              <ul className="mt-4 flex flex-wrap gap-2">
-                {data.members.map((member) => (
+              {characters.loading && (
+                <p role="status" className="mt-2 text-xs text-gray-500">
+                  캐릭터 정보를 불러오는 중…
+                </p>
+              )}
+              {characters.error && (
+                <div className="mt-2 space-y-2">
+                  <p role="alert" className="text-xs text-gray-500">
+                    캐릭터 정보를 불러오지 못했어요.
+                  </p>
+                  <Button variant="secondary" onClick={characters.retry}>
+                    캐릭터 다시 불러오기
+                  </Button>
+                </div>
+              )}
+              <ul className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
+                {memberCharacters?.map(({ member, slots }) => (
                   <li
                     key={member.id}
-                    className="max-w-full rounded-xl bg-purple-50 px-3 py-2 text-sm wrap-anywhere"
+                    className="flex min-w-0 flex-col items-center gap-1 rounded-xl bg-purple-50 px-1 py-3 text-center text-sm wrap-anywhere"
                   >
-                    {member.nickname}
+                    {slots && (
+                      <CharacterRenderer
+                        pose="DEFAULT"
+                        slots={slots}
+                        label={`${member.nickname} 캐릭터`}
+                        className="h-16 w-16"
+                      />
+                    )}
+                    <span className="w-full">{member.nickname}</span>
                     {member.userId === data.group.ownerId && (
-                      <span className="ml-2 text-xs text-purple-500">
-                        그룹장
-                      </span>
+                      <span className="text-xs text-purple-500">그룹장</span>
                     )}
                   </li>
                 ))}

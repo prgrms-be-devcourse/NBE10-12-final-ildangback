@@ -18,7 +18,12 @@ import { getGroup, getGroupChallenges, kickGroupMember } from "../../group/api";
 import { ConfirmActionDialog } from "../../group/components/ConfirmActionDialog";
 import { GroupManagement } from "../../group/components/GroupManagement";
 import { useResource } from "../../group/hooks/useResource";
-import { getChallenge, getChallengeMembers, delegateOwner } from "../api";
+import {
+  getChallenge,
+  getChallengeMembers,
+  getChallengeCharacters,
+  delegateOwner,
+} from "../api";
 import { ChallengeSettingsEditor } from "../components/ChallengeSettingsEditor";
 import { ExtensionChoicePanel } from "../components/ExtensionChoicePanel";
 import { ChallengeRulesCard } from "../components/ChallengeInfo";
@@ -216,6 +221,12 @@ function ChallengeContent({
     [challenge.id],
   );
   const members = useResource(membersLoader);
+  const charactersLoader = useCallback(
+    () => getChallengeCharacters(challenge.id),
+    [challenge.id],
+  );
+  const characters = useResource(charactersLoader);
+  // After a future check-in succeeds, call characters.retry() independently of members.retry().
   const canDelegate =
     owner &&
     (challenge.status === "READY" || challenge.status === "ACTIVE") &&
@@ -304,6 +315,7 @@ function ChallengeContent({
           name={group.data?.group.name ?? `시즌 ${challenge.seqNo}`}
           mapType={group.data?.group.mapType}
           members={members.data ?? null}
+          characters={characters.data ?? null}
           onDelegate={
             canDelegate
               ? (member) =>
@@ -315,6 +327,23 @@ function ChallengeContent({
               : undefined
           }
         />
+      )}
+      {!showDetails && (
+        <div className="space-y-2">
+          {characters.loading && (
+            <p role="status" className="text-sm text-gray-500">
+              캐릭터 정보를 불러오는 중…
+            </p>
+          )}
+          {characters.error && (
+            <p role="alert" className="text-sm text-gray-500">
+              캐릭터 정보를 불러오지 못했어요.
+            </p>
+          )}
+          <Button variant="secondary" onClick={characters.retry}>
+            캐릭터 정보 새로고침
+          </Button>
+        </div>
       )}
       {!showDetails && members.loading && (
         <p role="status" className="text-sm text-gray-500">
@@ -404,7 +433,7 @@ function ChallengeContent({
                     {member.nickname}
                     {member.userId === challenge.ownerId && (
                       <span className="ml-2 text-xs text-purple-500">
-                        시즌장
+                        그룹장
                       </span>
                     )}
                     {canDelegate && member.userId !== user?.id && (
@@ -419,7 +448,7 @@ function ChallengeContent({
                           })
                         }
                       >
-                        시즌장 위임
+                        그룹장 위임
                       </button>
                     )}
                     {isCurrent &&
@@ -476,12 +505,12 @@ function ChallengeContent({
         <ConfirmActionDialog
           title={
             action.type === "delegate"
-              ? "시즌장을 위임할까요?"
+              ? "그룹장을 위임할까요?"
               : "그룹원을 강퇴할까요?"
           }
           description={
             action.type === "delegate"
-              ? `${action.nickname} 님에게 시즌장 권한을 넘깁니다. 첫 시즌 또는 진행 중인 시즌에서는 그룹장도 변경됩니다.`
+              ? `${action.nickname} 님에게 그룹장 권한을 넘깁니다. 첫 시즌 또는 진행 중인 시즌에서는 그룹 전체의 관리 권한도 함께 이전됩니다.`
               : `${action.nickname} 님의 그룹 및 현재 시즌 참여를 종료합니다. 다시 가입할 수 없어요.`
           }
           confirmLabel={action.type === "delegate" ? "위임하기" : "강퇴하기"}
@@ -491,12 +520,13 @@ function ChallengeContent({
               await delegateOwner(challenge.id, {
                 targetUserId: action.userId,
               });
-              showToast("시즌장을 위임했어요.");
+              showToast("그룹장을 위임했어요.");
             } else {
               await kickGroupMember(challenge.groupId, action.userId);
               showToast("그룹원을 내보냈어요.");
             }
             members.retry();
+            characters.retry();
             group.retry();
             onChanged();
           }}

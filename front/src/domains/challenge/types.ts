@@ -1,3 +1,5 @@
+import type { CharacterPose, CharacterSlots } from "../user/types";
+
 export type ChallengeStatus = "READY" | "ACTIVE" | "ENDED";
 export type FrequencyType = "DAILY" | "EVERY_N_DAYS" | "DAYS_OF_WEEK";
 export type DaysOfWeek = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
@@ -73,4 +75,11 @@ export interface ExtensionChoiceResponse {
   pendingCount: number;
   extendCount: number;
   declineCount: number;
+}
+
+export interface ChallengeCharacterResponse {
+  userId: number;
+  nickname: string;
+  pose: CharacterPose;
+  slots: CharacterSlots;
 }

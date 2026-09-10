@@ -1,10 +1,9 @@
+import { CharacterRenderer } from "../../user/components/CharacterRenderer";
 import { useToast } from "../../../shared/lib/useToast";
 import { frequencyLabel } from "../presentation";
 import { useState } from "react";
 import studyMap from "../../../assets/icons/studyMap.webp";
 import sportsMap from "../../../assets/icons/sportsMap.webp";
-import studyChar from "../../../assets/icons/studyChar.webp";
-import sportChar from "../../../assets/icons/sportChar.webp";
 import people from "../../../assets/icons/people.webp";
 import calendar from "../../../assets/icons/griddy_icons_calendar_purple.webp";
 import camera from "../../../assets/icons/iconoir_camera.webp";
@@ -12,6 +11,7 @@ import check from "../../../assets/icons/ei_check.webp";
 import type { MapType } from "../../group/types";
 import type {
   ChallengeStatusResponse,
+  ChallengeCharacterResponse,
   MemberTodayStatusResponse,
 } from "../types";
 import { ChallengeProgress, StatusBadge } from "./ChallengeInfo";
@@ -21,6 +21,7 @@ export function ChallengeDashboard({
   name,
   mapType,
   members,
+  characters,
   isCurrent,
   currentKnown,
   onDelegate,
@@ -29,6 +30,7 @@ export function ChallengeDashboard({
   name: string;
   mapType?: MapType;
   members: MemberTodayStatusResponse[] | null;
+  characters: ChallengeCharacterResponse[] | null;
   isCurrent: boolean;
   currentKnown: boolean;
   onDelegate?: (member: MemberTodayStatusResponse) => void;
@@ -126,19 +128,20 @@ export function ChallengeDashboard({
                   alt={gym ? "운동 챌린지 공간" : "공부 챌린지 공간"}
                   className="aspect-[4/3] w-full object-cover"
                 />
-                <div className="absolute inset-x-4 bottom-5 flex flex-wrap items-end justify-center gap-x-5 gap-y-2">
-                  {members?.map((member) => (
+                <div className="absolute bottom-5 left-1/2 flex w-[min(16rem,calc(100%-2rem))] -translate-x-1/2 flex-wrap items-end justify-center gap-x-2 gap-y-2 min-[400px]:gap-x-3">
+                  {characters?.map((character) => (
                     <div
-                      key={member.userId}
-                      className="flex flex-col items-center gap-1"
+                      key={character.userId}
+                      className="flex w-[calc((100%-1.5rem)/3)] min-w-0 flex-col items-center gap-1"
                     >
-                      <img
-                        src={gym ? sportChar : studyChar}
-                        alt=""
-                        className="h-10 w-10 object-contain [image-rendering:pixelated]"
+                      <CharacterRenderer
+                        pose={character.pose}
+                        slots={character.slots}
+                        label={`${character.nickname} 캐릭터`}
+                        className="h-12 w-12 min-[360px]:h-13 min-[360px]:w-13 min-[400px]:h-14 min-[400px]:w-14 sm:h-16 sm:w-16"
                       />
-                      <span className="max-w-20 truncate rounded bg-white/90 px-2 py-1 text-[10px] text-gray-900">
-                        {member.nickname}
+                      <span className="max-w-full truncate rounded bg-white/90 px-2 py-1 text-[10px] text-gray-900">
+                        {character.nickname}
                       </span>
                     </div>
                   ))}
