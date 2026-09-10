@@ -38,6 +38,7 @@ export function App() {
         <Route path="challenges" element={<GroupHomePage />} />
         <Route path="challenges/join" element={<GroupInvitePreviewPage />} />
         <Route element={<RequireAuth />}>
+          <Route path="join-by-code" element={<GroupJoinByCodePage />} />
           <Route
             path="challenges/groups/join"
             element={<GroupJoinByCodePage />}

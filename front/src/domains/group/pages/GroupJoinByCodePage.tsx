@@ -4,7 +4,7 @@ import rightCharacter from "../../../assets/icons/image_104.webp";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { z } from "zod";
 import { applyApiError } from "../../../shared/lib/applyApiError";
 import { useToast } from "../../../shared/lib/useToast";
@@ -22,14 +22,23 @@ const schema = z.object({
     ),
 });
 export function GroupJoinByCodePage() {
+  const [params] = useSearchParams();
+  const code = (params.get("code") ?? "").toUpperCase();
+  const initialCode = /^[A-Z0-9]{6}$/.test(code) ? code : "";
+  return <GroupJoinByCodeForm key={initialCode} initialCode={initialCode} />;
+}
+
+function GroupJoinByCodeForm({ initialCode }: { initialCode: string }) {
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
-    defaultValues: { inviteCode: "" },
+    defaultValues: { inviteCode: initialCode },
   });
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const lock = useRef(false);
-  const [digits, setDigits] = useState<string[]>(Array(6).fill(""));
+  const [digits, setDigits] = useState<string[]>(() =>
+    initialCode ? initialCode.split("") : Array(6).fill(""),
+  );
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const updateDigits = (next: string[]) => {
     setDigits(next);
