@@ -32,6 +32,13 @@ public class SecurityConfig {
         "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**",
     };
 
+    // 인프라(nginx / Docker HEALTHCHECK / deploy.sh / deploy.yml)는 전부 GET /actuator/health 만
+    // 호출한다. health 그룹 하위 경로(liveness 등)는 아무도 안 쓰므로 와일드카드를 배제하고
+    // 정확히 한 경로만 공개한다(심층방어 — exposure.include=health 와 이중).
+    private static final String[] MONITORING_ENDPOINTS = {
+        "/actuator/health",
+    };
+
     private static final String H2_CONSOLE = "/h2-console/**";
 
     // PUBLIC 미디어 정적 서빙 (media.storage.local.base-url 의 path). GET 만 공개, 인증 불필요.
@@ -69,6 +76,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, MEDIA_PUBLIC)
                         .permitAll()
                         .requestMatchers(DOCS_ENDPOINTS)
+                        .permitAll()
+                        .requestMatchers(MONITORING_ENDPOINTS)
                         .permitAll()
                         .requestMatchers("/api/admin/**")
                         .hasRole("ADMIN")
