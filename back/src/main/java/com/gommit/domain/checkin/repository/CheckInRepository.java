@@ -15,6 +15,17 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
 
     int countByChallengeIdAndUserIdAndBusinessDate(Long challengeId, Long userId, LocalDate businessDate);
 
+    @Query("""
+            select c.userId from CheckIn c
+            where c.challengeId = :challengeId and c.businessDate = :businessDate
+            group by c.userId
+            having count(c) >= :target
+            """)
+    List<Long> findCompletedUserIds(
+            @Param("challengeId") Long challengeId,
+            @Param("businessDate") LocalDate businessDate,
+            @Param("target") int target);
+
     // 그룹 하루 전원 완료 판정용. userIds 중 businessDate 에 목표(target 회차)를 채운 유저.
     // 다른 멤버가 방금 커밋한 인증까지 보려면 새 트랜잭션(새 스냅샷)에서 호출해야 한다(GroupDailyCompletionReader).
     @Query("select c.userId from CheckIn c "

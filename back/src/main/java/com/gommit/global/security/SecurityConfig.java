@@ -70,6 +70,8 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers(DOCS_ENDPOINTS)
                         .permitAll()
+                        .requestMatchers("/api/admin/**")
+                        .hasRole("ADMIN")
                         .anyRequest()
                         .authenticated())
                 .exceptionHandling(handler -> handler.authenticationEntryPoint(authenticationEntryPoint)

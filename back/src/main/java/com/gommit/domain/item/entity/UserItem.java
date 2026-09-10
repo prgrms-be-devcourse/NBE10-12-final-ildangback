@@ -29,4 +29,27 @@ public class UserItem extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     private ItemSlot equippedSlot;
+
+    public boolean isOwnedBy(Long userId) {
+        return this.userId.equals(userId);
+    }
+
+    public boolean isEquipped() {
+        return this.equippedSlot != null;
+    }
+
+    public void equip() {
+        this.equippedSlot = this.item.getSlot();
+    }
+
+    public void unequip() {
+        this.equippedSlot = null;
+    }
+
+    public static UserItem of(Long userId, Item item) {
+        UserItem userItem = new UserItem();
+        userItem.userId = userId;
+        userItem.item = item;
+        return userItem;
+    }
 }
