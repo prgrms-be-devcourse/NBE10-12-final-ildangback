@@ -87,11 +87,7 @@ export function GroupJoinByCodePage() {
           className="mx-auto mt-8 mb-7 flex items-end justify-center gap-3"
           aria-hidden="true"
         >
-          <img
-            src={leftCharacter}
-            alt=""
-            className="h-14 w-8 object-contain"
-          />
+          <img src={leftCharacter} alt="" className="h-14 w-8 object-contain" />
           <img src={lockIcon} alt="" className="h-24 w-24 object-contain" />
           <img
             src={rightCharacter}
