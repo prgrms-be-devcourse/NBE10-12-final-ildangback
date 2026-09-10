@@ -31,7 +31,7 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
     @Query("select c.userId from CheckIn c "
             + "where c.challengeId = :challengeId and c.businessDate = :businessDate and c.userId in :userIds "
             + "group by c.userId having count(c) >= :target")
-    List<Long> findCompletedUserIds(
+    List<Long> findCompletedUserIdsAmong(
             @Param("challengeId") Long challengeId,
             @Param("businessDate") LocalDate businessDate,
             @Param("target") int target,

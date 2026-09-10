@@ -26,6 +26,6 @@ public class GroupDailyCompletionReader {
         if (memberIds.isEmpty()) {
             return Set.of();
         }
-        return new HashSet<>(checkInRepository.findCompletedUserIds(challengeId, businessDate, target, memberIds));
+        return new HashSet<>(checkInRepository.findCompletedUserIdsAmong(challengeId, businessDate, target, memberIds));
     }
 }
