@@ -88,21 +88,28 @@ function SeasonBrowser({
   const [chosenChallengeId, setSelectedChallengeId] = useState<number | null>(
     null,
   );
-  const selectedChallengeId =
-    chosenChallengeId ??
-    group.data?.currentChallenge?.id ??
-    initialData.challenge.id;
   const seasonLoader = useCallback(
     () => getGroupChallenges(initialData.challenge.groupId),
     [initialData.challenge.groupId],
   );
   const seasons = useResource(seasonLoader);
+  const selectedChallengeId =
+    chosenChallengeId ??
+    group.data?.currentChallenge?.id ??
+    seasons.data?.[0]?.id ??
+    initialData.challenge.id;
+  // Wait for the list before choosing a fallback when no current season exists.
+  const selectingInitialSeason =
+    group.loading ||
+    (chosenChallengeId === null &&
+      !group.data?.currentChallenge &&
+      seasons.loading);
   const detailLoader = useCallback(
     () =>
-      group.loading
+      selectingInitialSeason
         ? Promise.resolve(undefined)
         : getChallenge(selectedChallengeId),
-    [selectedChallengeId, group.loading],
+    [selectedChallengeId, selectingInitialSeason],
   );
   const detail = useResource(detailLoader);
   const currentId = group.data?.currentChallenge?.id;
@@ -117,7 +124,7 @@ function SeasonBrowser({
       <select
         id="challenge-season"
         value={selectedChallengeId}
-        disabled={group.loading || !seasons.data?.length}
+        disabled={selectingInitialSeason || !seasons.data?.length}
         onChange={(event) => setSelectedChallengeId(Number(event.target.value))}
         className="min-h-11 rounded-lg border border-purple-200 bg-white px-3 text-sm font-bold text-purple-700 disabled:opacity-60"
       >
@@ -160,7 +167,7 @@ function SeasonBrowser({
   ) : (
     <>
       {selection}
-      {(group.loading || detail.loading) && (
+      {(selectingInitialSeason || detail.loading) && (
         <p role="status" className="py-10 text-center text-sm text-gray-500">
           선택한 시즌을 불러오는 중…
         </p>
@@ -209,6 +216,10 @@ function ChallengeContent({
     [challenge.id],
   );
   const members = useResource(membersLoader);
+  const canDelegate =
+    owner &&
+    (challenge.status === "READY" || challenge.status === "ACTIVE") &&
+    !!members.data?.some((member) => member.userId !== user?.id);
   return (
     <>
       <header className="relative flex h-12 items-center justify-between gap-3">
@@ -293,6 +304,16 @@ function ChallengeContent({
           name={group.data?.group.name ?? `시즌 ${challenge.seqNo}`}
           mapType={group.data?.group.mapType}
           members={members.data ?? null}
+          onDelegate={
+            canDelegate
+              ? (member) =>
+                  setAction({
+                    type: "delegate",
+                    userId: member.userId,
+                    nickname: member.nickname,
+                  })
+              : undefined
+          }
         />
       )}
       {!showDetails && members.loading && (
@@ -386,24 +407,21 @@ function ChallengeContent({
                         시즌장
                       </span>
                     )}
-                    {isCurrent &&
-                      owner &&
-                      member.userId !== user?.id &&
-                      challenge.status !== "ENDED" && (
-                        <button
-                          type="button"
-                          className="ml-2 py-1 text-xs text-purple-700 underline"
-                          onClick={() =>
-                            setAction({
-                              type: "delegate",
-                              userId: member.userId,
-                              nickname: member.nickname,
-                            })
-                          }
-                        >
-                          시즌장 위임
-                        </button>
-                      )}
+                    {canDelegate && member.userId !== user?.id && (
+                      <button
+                        type="button"
+                        className="ml-2 py-1 text-xs text-purple-700 underline"
+                        onClick={() =>
+                          setAction({
+                            type: "delegate",
+                            userId: member.userId,
+                            nickname: member.nickname,
+                          })
+                        }
+                      >
+                        시즌장 위임
+                      </button>
+                    )}
                     {isCurrent &&
                       group.data &&
                       group.data.group.ownerId === user?.id &&
@@ -449,6 +467,9 @@ function ChallengeContent({
         <ExtensionChoicePanel
           challengeId={challenge.id}
           endDate={challenge.endDate}
+          members={members.data}
+          currentUserId={user?.id}
+          onSaved={members.retry}
         />
       )}
       {action && (
@@ -475,6 +496,8 @@ function ChallengeContent({
               await kickGroupMember(challenge.groupId, action.userId);
               showToast("그룹원을 내보냈어요.");
             }
+            members.retry();
+            group.retry();
             onChanged();
           }}
         />

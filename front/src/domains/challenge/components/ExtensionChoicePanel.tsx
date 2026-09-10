@@ -6,16 +6,56 @@ import { Button } from "../../../shared/ui/Button";
 import { FormAlert } from "../../../shared/ui/FormAlert";
 import { groupErrorMessage } from "../../group/errors";
 import { chooseExtension } from "../api";
-import type { ExtensionChoiceRequest, ExtensionChoiceResponse } from "../types";
+import type {
+  ExtensionChoice,
+  ExtensionChoiceRequest,
+  MemberTodayStatusResponse,
+} from "../types";
 
 export function ExtensionChoicePanel({
   challengeId,
   endDate,
+  members,
+  currentUserId,
+  onSaved,
 }: {
   challengeId: number;
   endDate: string;
+  members?: MemberTodayStatusResponse[];
+  currentUserId?: number;
+  onSaved: () => void;
 }) {
-  const [result, setResult] = useState<ExtensionChoiceResponse | null>(null);
+  const validChoice = (value: unknown): value is ExtensionChoice =>
+    value === "PENDING" || value === "EXTEND" || value === "DECLINE";
+  const memberChoice = members?.find(
+    (member) => member.userId === currentUserId,
+  )?.extensionChoice;
+  const serverChoice = validChoice(memberChoice) ? memberChoice : undefined;
+  const serverCounts =
+    members?.length &&
+    members.every((member) => validChoice(member.extensionChoice))
+      ? {
+          extendCount: members.filter(
+            (member) => member.extensionChoice === "EXTEND",
+          ).length,
+          declineCount: members.filter(
+            (member) => member.extensionChoice === "DECLINE",
+          ).length,
+          pendingCount: members.filter(
+            (member) => member.extensionChoice === "PENDING",
+          ).length,
+        }
+      : undefined;
+  const result = serverCounts;
+  const currentChoice = serverChoice;
+  const choiceLabel =
+    currentChoice === "EXTEND"
+      ? "찬성"
+      : currentChoice === "DECLINE"
+        ? "반대"
+        : currentChoice === "PENDING"
+          ? "선택 안 함"
+          : "확인 불가";
   const [pending, setPending] = useState(false);
   const [closed, setClosed] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,14 +77,16 @@ export function ExtensionChoicePanel({
   const today = new Date();
   const todayLabel = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   const available = deadlineLabel !== null && todayLabel <= deadlineLabel;
-  const canChoose = available && !closed && !pending;
+  const canChoose =
+    available && !closed && !pending && currentChoice !== undefined;
   const save = async (choice: ExtensionChoiceRequest["choice"]) => {
     if (busy.current || !canChoose) return;
     busy.current = true;
     setPending(true);
     setError(null);
     try {
-      setResult(await chooseExtension(challengeId, { choice }));
+      await chooseExtension(challengeId, { choice });
+      onSaved();
       showToast("연장 의사를 저장했어요.");
     } catch (err) {
       setError(groupErrorMessage(err));
@@ -71,7 +113,6 @@ export function ExtensionChoicePanel({
       )}
       {result && (
         <div className="space-y-2">
-          <p className="text-xs text-gray-500">마지막 저장 시점의 투표 현황</p>
           <progress
             aria-label="연장 투표 참여율"
             value={voted}
@@ -82,10 +123,18 @@ export function ExtensionChoicePanel({
             {voted} / {total}
           </p>
           <p role="status" className="text-xs text-purple-700">
-            내 선택: {result.choice === "EXTEND" ? "찬성" : "반대"} · 찬성{" "}
-            {result.extendCount}명 · 반대 {result.declineCount}명
+            찬성 {result.extendCount}명 · 반대 {result.declineCount}명 · 선택 안
+            함 {result.pendingCount}명
           </p>
         </div>
+      )}
+      <p role="status" className="text-sm font-semibold text-purple-700">
+        내 선택: {choiceLabel}
+      </p>
+      {currentChoice === undefined && (
+        <p className="text-xs text-gray-500">
+          저장된 투표 상태를 확인할 수 없어요.
+        </p>
       )}
       <p className="text-xs leading-relaxed text-gray-500">
         {!available || closed
@@ -94,16 +143,16 @@ export function ExtensionChoicePanel({
       </p>
       <div className="grid grid-cols-2 gap-3">
         <Button
-          variant={result?.choice === "EXTEND" ? "primary" : "secondary"}
-          aria-pressed={result?.choice === "EXTEND"}
+          variant={currentChoice === "EXTEND" ? "primary" : "secondary"}
+          aria-pressed={currentChoice === "EXTEND"}
           disabled={!canChoose}
           onClick={() => void save("EXTEND")}
         >
           찬성
         </Button>
         <Button
-          variant={result?.choice === "DECLINE" ? "primary" : "secondary"}
-          aria-pressed={result?.choice === "DECLINE"}
+          variant={currentChoice === "DECLINE" ? "primary" : "secondary"}
+          aria-pressed={currentChoice === "DECLINE"}
           disabled={!canChoose}
           onClick={() => void save("DECLINE")}
         >

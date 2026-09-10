@@ -1,4 +1,3 @@
-import type { ChallengeSummary } from "../challenge/types";
 import { apiFetch } from "../../shared/api/client";
 import type {
   GroupCreateRequest,
@@ -11,6 +10,7 @@ import type {
   GroupSummary,
   MyGroupSummary,
   SliceResponse,
+  SeasonSummary,
 } from "./types";
 
 export function getPublicGroups(query: PublicGroupQuery, cursor?: number) {
@@ -59,7 +59,7 @@ export function kickGroupMember(id: number, userId: number) {
 }
 
 export async function getGroupChallenges(groupId: number) {
-  const seasons = await apiFetch<ChallengeSummary[]>(
+  const seasons = await apiFetch<SeasonSummary[]>(
     `/api/groups/${groupId}/challenges`,
   );
   if (
@@ -70,7 +70,8 @@ export async function getGroupChallenges(groupId: number) {
         !Number.isSafeInteger(season.id) ||
         season.id <= 0 ||
         !Number.isSafeInteger(season.seqNo) ||
-        season.seqNo <= 0,
+        season.seqNo <= 0 ||
+        !["READY", "ACTIVE", "ENDED"].includes(season.status),
     )
   ) {
     throw new Error("invalid season list");

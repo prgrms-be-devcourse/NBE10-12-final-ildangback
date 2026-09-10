@@ -107,3 +107,10 @@ export interface GroupCreateRequest {
     allowedTypes: "PHOTO"[];
   };
 }
+
+/** GET /api/groups/{groupId}/challenges returns a plain array of these items. */
+export interface SeasonSummary {
+  id: number;
+  seqNo: number;
+  status: ChallengeStatus;
+}

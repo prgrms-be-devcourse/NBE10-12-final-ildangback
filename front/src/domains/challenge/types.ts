@@ -41,6 +41,7 @@ export interface MemberTodayStatusResponse {
   userId: number;
   nickname: string;
   todayCheckInCount: number;
+  extensionChoice: ExtensionChoice;
 }
 export interface ChallengeUpdateRequest {
   startDate?: string | null;

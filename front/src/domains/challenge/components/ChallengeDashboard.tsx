@@ -23,6 +23,7 @@ export function ChallengeDashboard({
   members,
   isCurrent,
   currentKnown,
+  onDelegate,
 }: {
   data: ChallengeStatusResponse;
   name: string;
@@ -30,6 +31,7 @@ export function ChallengeDashboard({
   members: MemberTodayStatusResponse[] | null;
   isCurrent: boolean;
   currentKnown: boolean;
+  onDelegate?: (member: MemberTodayStatusResponse) => void;
 }) {
   const { showToast } = useToast();
   const [tab, setTab] = useState("현황");
@@ -151,9 +153,21 @@ export function ChallengeDashboard({
               <ul className="grid grid-cols-3 gap-4 bg-white p-4">
                 {members.map((member) => (
                   <li key={member.userId} className="min-w-0 text-center">
-                    <p className="truncate text-xs font-semibold">
-                      {member.nickname}
-                    </p>
+                    <div className="flex flex-wrap items-center justify-center gap-x-1">
+                      <span className="min-w-0 truncate text-xs font-semibold">
+                        {member.nickname}
+                      </span>
+                      {onDelegate && member.userId !== challenge.ownerId && (
+                        <button
+                          type="button"
+                          onClick={() => onDelegate(member)}
+                          aria-label={`${member.nickname} 님에게 위임하기`}
+                          className="min-h-9 rounded px-1 text-xs text-purple-700 underline hover:bg-purple-50"
+                        >
+                          위임하기
+                        </button>
+                      )}
+                    </div>
                     {challenge.status === "ACTIVE" && data.isCheckInDay && (
                       <p className="mt-1 flex items-center justify-center gap-1 text-xs text-purple-500">
                         {member.todayCheckInCount}/{challenge.dailyCheckInCount}
