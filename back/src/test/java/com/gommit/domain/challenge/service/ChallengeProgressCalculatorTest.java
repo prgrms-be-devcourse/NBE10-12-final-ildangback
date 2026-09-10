@@ -313,5 +313,16 @@ class ChallengeProgressCalculatorTest {
                             challenge(FrequencyType.EVERY_N_DAYS, 7, null), LocalDate.of(2026, 10, 10)))
                     .isEqualTo(LocalDate.of(2026, 9, 29));
         }
+
+        @Test
+        @DisplayName("EVERY_N_DAYS 인데 frequencyValue 가 0 이하/null 이면 null (misconfig 방어)")
+        void everyNDaysWithInvalidFrequencyValue() {
+            assertThat(calculator.previousCheckInDay(
+                            challenge(FrequencyType.EVERY_N_DAYS, 0, null), LocalDate.of(2026, 9, 10)))
+                    .isNull();
+            assertThat(calculator.previousCheckInDay(
+                            challenge(FrequencyType.EVERY_N_DAYS, null, null), LocalDate.of(2026, 9, 10)))
+                    .isNull();
+        }
     }
 }

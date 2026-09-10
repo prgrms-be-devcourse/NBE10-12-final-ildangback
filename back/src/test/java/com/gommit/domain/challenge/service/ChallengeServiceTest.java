@@ -463,6 +463,46 @@ class ChallengeServiceTest {
             // then
             assertThat(response.isCheckInDay()).isFalse();
         }
+
+        @Test
+        @DisplayName("그룹이 직전 대상일 전원완료를 놓쳤으면 응답 groupCurrentStreak 은 저장값이 아니라 보정된 0")
+        void returnsCorrectedGroupStreak() {
+            // given — 저장값 5 이지만 마지막 전원완료가 5일 전(직전 대상일=어제 이전)
+            LocalDate start = LocalDate.now().minusDays(10);
+            Challenge challenge = Challenge.builder()
+                    .groupId(12L)
+                    .seqNo(1)
+                    .startDate(start)
+                    .endDate(LocalDate.now().plusDays(20))
+                    .frequencyType(FrequencyType.DAILY)
+                    .frequencyValue(null)
+                    .daysOfWeek(null)
+                    .dailyCheckInCount(1)
+                    .requiredDayCount(30)
+                    .groupCurrentStreak(5)
+                    .groupBestStreak(5)
+                    .allowPhoto(true)
+                    .build();
+            challenge.activate();
+            ReflectionTestUtils.setField(
+                    challenge, "groupLastCompletedDate", LocalDate.now().minusDays(5));
+            setBaseFields(challenge, 50L);
+            ChallengeMember member = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
+            ChallengeMember owner = challengeMember(71L, challenge, 1L, ChallengeMemberRole.OWNER);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(member));
+            when(challengeMemberRepository.findByChallengeIdAndRole(50L, ChallengeMemberRole.OWNER))
+                    .thenReturn(Optional.of(owner));
+            when(challengeMemberRepository.countByChallengeIdAndStatus(50L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(2L);
+
+            // when
+            var response = challengeService.getChallengeStatus(50L, 2L);
+
+            // then
+            assertThat(response.challenge().groupCurrentStreak()).isZero();
+            assertThat(response.challenge().groupBestStreak()).isEqualTo(5);
+        }
     }
 
     @Nested
