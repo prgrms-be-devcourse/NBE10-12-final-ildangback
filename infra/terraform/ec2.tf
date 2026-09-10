@@ -38,8 +38,7 @@ resource "aws_instance" "app" {
     volume_size = var.root_volume_size
     encrypted   = true
     tags = {
-      Name   = "${var.name_prefix}-app-root"
-      Backup = "true" # DLM 스냅샷 대상
+      Name = "${var.name_prefix}-app-root"
     }
   }
 

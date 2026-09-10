@@ -201,13 +201,13 @@ monorepo 안 `infra/` 디렉터리. `feat/infra-idk` → 다른 브랜치 머지
 | AMI | **Amazon Linux 2023 (arm64)** | EC2에 최적화, dnf/systemd, 무료, 규칙상 허용 |
 | Instance | **`t4g.small`** (2 vCPU, 2GB, ARM/Graviton) | small은 즉시 허가. ARM이 x86 대비 ~20% 저렴. Java 25·nginx·MySQL·ffmpeg 모두 arm64 지원 |
 | Swap | 파일 스왑 2GB | 2GB RAM에 JVM+MySQL+ffmpeg 동시 부하 대비 |
-| EBS | 루트 gp3 30GB 단일 + docker `mysql-data` named volume (Q13) | 별도 볼륨은 안 씀 — 단순. 백업은 mysqldump + DLM 스냅샷 |
+| EBS | 루트 gp3 30GB 단일 + docker `mysql-data` named volume (Q13) | 별도 볼륨은 안 씀 — 단순. 백업은 야간 mysqldump. 볼륨 스냅샷은 필요 시 수동(자동 DLM 은 부수 서비스 결재 회피로 제외) |
 | EIP | 1개, 인스턴스에 attach | 18:00 stop/start 후에도 IP 유지. **주의: 2024년부터 EIP는 attach 여부 무관 시간당 과금(~월 $3.6)** |
 | 보안그룹 | 443 = Cloudflare IP 대역만, 22 = 기본 미개방(배포·디버그 = SSM), `var.ssh_allowed_cidrs` 로 운영자 1인 `/32` 예외만 (Q14) | 오리진 우회 차단 |
 
 **Terraform 관리 대상**: VPC(1) / IGW / 퍼블릭 서브넷(1) / 라우트테이블 / EC2 / EIP /
 보안그룹 / IAM 역할(SSM) / cloudflare DNS 레코드 / EventBridge Scheduler(03:30
-start) / DLM(EBS 스냅샷). provider 블록에 `default_tags { tags = { Team = "devcos-team01" } }`
+start). provider 블록에 `default_tags { tags = { Team = "devcos-team01" } }`
 → 모든 AWS 리소스에 태그 자동. (key pair 미사용 — SSM 이 기본. SSH 예외 1인은 authorized_keys 직접 등록, Q14 추가결정)
 
 **예산 개산**: `t4g.small` 24시간 ≈ 월 $12, gp3 30GB ≈ $2.4, EIP ≈ $3.6, 아웃바운드 전송
@@ -391,8 +391,8 @@ DB에 있고, 이게 날아가면 서비스가 끝난다. 데모/평가 중에 �
   인데, MVP 기간에 terminate할 일은 드물다(무중단 도입·스펙 변경 정도).
 - **결정: 루트 gp3 30GB 단일 + `mysql-data` named volume.** 백업 이중화:
   1. 야간 `mysqldump | gzip` → 로컬 7일 보관 (컨테이너 or 호스트 크론)
-  2. **매일 EBS 스냅샷** — Data Lifecycle Manager(DLM), 무료, 7일 롤링
-- 인스턴스를 갈아끼워야 하면 스냅샷에서 루트 볼륨 복원 or 덤프에서 복구. 런북에 절차.
+  2. ~~매일 EBS 스냅샷(DLM)~~ — 계정 규칙상 부수 서비스 결재 회피로 제외. 필요 시 수동 스냅샷.
+- 인스턴스를 갈아끼워야 하면 (수동 스냅샷이 있으면) 스냅샷에서 루트 볼륨 복원, 없으면 덤프에서 복구. 런북에 절차.
 
 ### Q14 — 배포 접속 방법 + 443 인바운드 (라운드 1 질문 다시 풀어서)
 
@@ -706,11 +706,10 @@ infra/
     variables.tf
     network.tf             # VPC / IGW / 퍼블릭 서브넷 1 / 라우트테이블
     security.tf            # SG: 443 = Cloudflare IPv4 대역만 (http 데이터소스), 22 = ssh_allowed_cidrs 예외만
-    iam.tf                 # ① EC2 SSM 역할 ② GitHub OIDC 배포 역할 ③ Scheduler ④ DLM
-    ec2.tf                 # AL2023 arm64 AMI, t4g.small, gp3 30GB(Backup=true), EIP
+    iam.tf                 # ① EC2 SSM 역할 ② GitHub OIDC 배포 역할 ③ Scheduler
+    ec2.tf                 # AL2023 arm64 AMI, t4g.small, gp3 30GB, EIP
     dns.tf                 # cloudflare_record: api A → EIP, proxied (apex는 Pages가 관리)
     schedule.tf            # EventBridge Scheduler: 매일 03:30 KST ec2:StartInstances
-    dlm.tf                 # 매일 18:30 KST EBS 스냅샷, 7일 롤링
     outputs.tf             # instance_id, deploy_role_arn 등 (GitHub Secrets 로)
     terraform.tfvars.example
     .gitignore             # *.tfstate*, terraform.tfvars
@@ -764,7 +763,6 @@ front/
 | `tftest` security_group_locks_origin / ssh_exception_is_narrow | 443 에 0.0.0.0/0, 또는 SSH 예외가 `/32`·22 를 벗어나 넓게 열림 → 오리진 직접 노출, Cloudflare 우회 |
 | `tftest` instance_is_hardened_and_cheap | 인스턴스 타입 상향(결재·예산), IMDSv2 해제(SSRF→자격증명 탈취), 루트 볼륨 미암호화, `user_data_replace_on_change=true`(수정 시 .env/certs 유실), IAM 프로파일 분리(SSM 배포 불가) |
 | `tftest` auto_start_before_batch | 기동 크론이 03:30·Asia/Seoul 이 아님 → 04:00 정산 배치 누락 |
-| `tftest` backup_policy_enabled | DLM 스냅샷 비활성 → 볼륨 백업 소실 |
 | `tftest` api_dns_is_proxied | `proxied=false` → 오리진 IP 노출 + SG(CF IP only)와 충돌해 접속 불가 |
 | `ActuatorSecurityTest` healthIsPublic | `/actuator/health` permitAll 소실 → nginx·Docker·deploy 헬스체크 전부 실패, 배포 롤백 루프 |
 | `ActuatorSecurityTest` otherActuatorEndpointsAreNotPublic | `exposure.include=*` 또는 매처를 `/actuator/**` 로 확대 → env·beans·heapdump 무인증 공개 |
