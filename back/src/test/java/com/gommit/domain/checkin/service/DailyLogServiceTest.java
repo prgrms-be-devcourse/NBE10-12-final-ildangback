@@ -37,7 +37,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -187,50 +186,20 @@ class DailyLogServiceTest {
     class RecordCheckIn {
 
         @Test
-        @DisplayName("그 날 첫 인증이면 row 를 만든다")
-        void createsRowOnFirstCheckIn() {
+        @DisplayName("row 확보를 DB upsert 에 위임한다 (동시 경합은 uk_daily_logs 충돌로 DB 에서 흡수)")
+        void ensuresRowViaUpsert() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 3);
-            when(dailyLogRepository.existsByChallengeIdAndLogDate(CHALLENGE_ID, DATE))
-                    .thenReturn(false);
             givenSnapshotTotal(3, List.of(), 5L);
 
             service.recordCheckIn(challenge, DATE);
 
-            verify(dailyLogRepository).saveAndFlush(any(DailyLog.class));
-        }
-
-        @Test
-        @DisplayName("이미 row 가 있으면 다시 만들지 않는다")
-        void skipsWhenRowExists() {
-            Challenge challenge = dailyChallenge(CHALLENGE_ID, 3);
-            when(dailyLogRepository.existsByChallengeIdAndLogDate(CHALLENGE_ID, DATE))
-                    .thenReturn(true);
-            givenSnapshotTotal(3, List.of(), 5L);
-
-            service.recordCheckIn(challenge, DATE);
-
-            verify(dailyLogRepository, never()).saveAndFlush(any());
-        }
-
-        @Test
-        @DisplayName("동시 생성 경합(uk_daily_logs 위반)은 무시한다")
-        void swallowsRaceOnCreate() {
-            Challenge challenge = dailyChallenge(CHALLENGE_ID, 3);
-            when(dailyLogRepository.existsByChallengeIdAndLogDate(CHALLENGE_ID, DATE))
-                    .thenReturn(false);
-            when(dailyLogRepository.saveAndFlush(any(DailyLog.class)))
-                    .thenThrow(new DataIntegrityViolationException("uk_daily_logs"));
-            givenSnapshotTotal(3, List.of(), 5L);
-
-            service.recordCheckIn(challenge, DATE); // 예외 없이 정상 반환되어야 한다
+            verify(dailyLogRepository).insertLogRowIfAbsent(CHALLENGE_ID, DATE);
         }
 
         @Test
         @DisplayName("전원 완료(completed == total > 0) 시 완료 이벤트를 발행한다")
         void publishesCompletedEvent() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
-            when(dailyLogRepository.existsByChallengeIdAndLogDate(CHALLENGE_ID, DATE))
-                    .thenReturn(true);
             givenSnapshotTotal(1, List.of(10L, 11L), 2L);
 
             service.recordCheckIn(challenge, DATE);
@@ -242,8 +211,6 @@ class DailyLogServiceTest {
         @DisplayName("아직 미완료면 이벤트를 발행하지 않는다")
         void doesNotPublishWhenIncomplete() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
-            when(dailyLogRepository.existsByChallengeIdAndLogDate(CHALLENGE_ID, DATE))
-                    .thenReturn(true);
             givenSnapshotTotal(1, List.of(10L), 2L);
 
             service.recordCheckIn(challenge, DATE);
@@ -255,8 +222,6 @@ class DailyLogServiceTest {
         @DisplayName("totalCount 가 0 이면 이벤트를 발행하지 않는다")
         void doesNotPublishWhenTotalIsZero() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
-            when(dailyLogRepository.existsByChallengeIdAndLogDate(CHALLENGE_ID, DATE))
-                    .thenReturn(true);
             givenSnapshotTotal(1, List.of(), 0L);
 
             service.recordCheckIn(challenge, DATE);

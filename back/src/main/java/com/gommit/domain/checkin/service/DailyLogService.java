@@ -18,15 +18,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.io.Resource;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -95,15 +92,8 @@ public class DailyLogService {
     }
 
     private void ensureLogRow(Long challengeId, LocalDate businessDate) {
-        if (dailyLogRepository.existsByChallengeIdAndLogDate(challengeId, businessDate)) {
-            return;
-        }
-        try {
-            dailyLogRepository.saveAndFlush(DailyLog.create(challengeId, businessDate));
-        } catch (DataIntegrityViolationException e) {
-            // uk_daily_logs 위반 = 동시 요청이 같은 challenge-day row 를 먼저 만듦 — 정상 상황, 무시.
-            log.debug("DailyLog row 동시 생성 경합 — 무시 (challengeId={}, businessDate={})", challengeId, businessDate);
-        }
+        // DB 레벨 upsert. 동시 첫 인증이 경합해도 uk_daily_logs 충돌은 DB 에서 흡수된다.
+        dailyLogRepository.insertLogRowIfAbsent(challengeId, businessDate);
     }
 
     private DailyLogResponse toResponse(DailyLog dailyLog, Challenge challenge) {

@@ -6,12 +6,22 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface DailyLogRepository extends JpaRepository<DailyLog, Long> {
 
-    boolean existsByChallengeIdAndLogDate(Long challengeId, LocalDate logDate);
+    // 그 challenge-day 의 bookkeeping row 확보. 동시 첫 인증이 경합해도 uk_daily_logs 충돌을
+    // DB 에서 no-op 로 흡수한다(ON DUPLICATE KEY UPDATE id=id). 네이티브라 영속성 컨텍스트를
+    // 거치지 않아 실패한 flush 로 세션이 오염되지 않는다. created_at/updated_at 은 auditing 우회라 직접 채운다.
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+                    insert into daily_logs (challenge_id, log_date, created_at, updated_at)
+                    values (:challengeId, :logDate, now(6), now(6))
+                    on duplicate key update id = id
+                    """, nativeQuery = true)
+    void insertLogRowIfAbsent(@Param("challengeId") Long challengeId, @Param("logDate") LocalDate logDate);
 
     Optional<DailyLog> findByChallengeIdAndLogDate(Long challengeId, LocalDate logDate);
 
