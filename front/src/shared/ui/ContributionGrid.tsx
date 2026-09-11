@@ -20,7 +20,11 @@ export interface GrassDay {
   count: number;
 }
 
-function todayKey(): string {
+/**
+ * 서버가 업무일을 안 줄 때 쓰는 대비책. 브라우저 시계라 자정부터 새벽 4시
+ * 사이에는 서버의 업무일과 하루 어긋난다 - 줄 수 있으면 businessDate 를 준다.
+ */
+function localTodayKey(): string {
   const now = new Date();
   const month = `${now.getMonth() + 1}`.padStart(2, "0");
   const day = `${now.getDate()}`.padStart(2, "0");
@@ -55,6 +59,11 @@ interface ContributionGridProps {
   cell?: number;
   /** 칸을 눌러 그 날 기록을 볼 수 있게 한다. 홈만 쓴다. */
   interactive?: boolean;
+  /**
+   * 오늘로 칠 날짜(YYYY-MM-DD). 하루 경계가 새벽 4시라 브라우저 시계로는
+   * 자정부터 4시 사이가 어긋난다. 서버가 주는 businessDate 를 넣는다.
+   */
+  today?: string;
 }
 
 export function ContributionGrid({
@@ -65,12 +74,13 @@ export function ContributionGrid({
   gap = 4,
   cell,
   interactive = false,
+  today: businessDate,
 }: ContributionGridProps) {
   const scroller = useRef<HTMLDivElement>(null);
   // 누른 칸. 폰에서는 마우스 올리기가 없어서 눌러야 그 날을 볼 수 있다.
   const [picked, setPicked] = useState<string | null>(null);
 
-  const today = todayKey();
+  const today = businessDate ?? localTodayKey();
   const columns = Math.ceil(days.length / 7);
   const total = days.reduce((sum, day) => sum + day.count, 0);
 
