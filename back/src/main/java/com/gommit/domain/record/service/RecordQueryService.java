@@ -264,10 +264,15 @@ public class RecordQueryService {
                         .stream()
                         .collect(Collectors.toMap(FinalMerge::getId, Function.identity()));
 
+        // 파이널 머지는 챌린지 시작~끝 전체 기간을 다시 통째로 재집계한 스냅샷이라(FinalMergeResult
+        // 참고), 파이널이 있는(=종료된) 챌린지는 월별 결과를 같이 더하면 중복 집계된다. 파이널로 대체한다.
+        Set<Long> challengeIdsWithFinalMerge =
+                finalMergesById.values().stream().map(FinalMerge::getChallengeId).collect(Collectors.toSet());
+
         List<StatRow> allRows = new ArrayList<>();
         for (MonthlyMergeResult result : monthlyResults) {
             MonthlyMerge merge = monthlyMergesById.get(result.getMonthlyMergeId());
-            if (merge != null) {
+            if (merge != null && !challengeIdsWithFinalMerge.contains(merge.getChallengeId())) {
                 allRows.add(StatRow.of(merge.getChallengeId(), merge, result));
             }
         }
