@@ -9,6 +9,10 @@ mock_provider "aws" {
   mock_resource "aws_iam_role" {
     defaults = { arn = "arn:aws:iam::123456789012:role/mock" }
   }
+  # GitHub OIDC provider 는 계정 싱글턴이라 data 로만 조회한다(iam.tf) — 실제 조회 대신 가짜 응답.
+  mock_data "aws_iam_openid_connect_provider" {
+    defaults = { arn = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com" }
+  }
 }
 mock_provider "cloudflare" {}
 
