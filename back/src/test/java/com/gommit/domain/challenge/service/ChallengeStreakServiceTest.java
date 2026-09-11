@@ -22,6 +22,7 @@ import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.point.config.PointProperties;
 import com.gommit.domain.point.entity.GroupPointReason;
 import com.gommit.domain.point.service.GroupPointService;
+import com.gommit.domain.user.service.UserService;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -37,7 +38,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("ChallengeStreakService — 하루 완료 시 개인/그룹 갱신")
+@DisplayName("ChallengeStreakService — 하루 완료 시 개인/그룹/유저 갱신")
 class ChallengeStreakServiceTest {
 
     private static final Long CHALLENGE_ID = 10L;
@@ -54,6 +55,9 @@ class ChallengeStreakServiceTest {
     private GroupDailyCompletionReader groupDailyCompletionReader;
 
     @Mock
+    private UserService userService;
+
+    @Mock
     private GroupPointService groupPointService;
 
     private ChallengeStreakService service;
@@ -65,6 +69,7 @@ class ChallengeStreakServiceTest {
                 challengeMemberRepository,
                 new ChallengeProgressCalculator(),
                 groupDailyCompletionReader,
+                userService,
                 groupPointService,
                 new PointProperties(10, 5, 0, 0));
     }
@@ -174,6 +179,25 @@ class ChallengeStreakServiceTest {
             MemberCheckInResult second = service.onMemberDailyComplete(CHALLENGE_ID, 1L, TODAY);
 
             assertThat(second.memberCurrentStreak()).isEqualTo(5);
+        }
+    }
+
+    @Nested
+    @DisplayName("유저 전역 스트릭 위임")
+    class UserStreak {
+
+        @Test
+        @DisplayName("연속성 판정은 UserService 에 맡기고 businessDate 만 넘긴다")
+        void delegatesUserStreak() {
+            Challenge challenge = dailyChallenge();
+            when(challengeRepository.findById(CHALLENGE_ID)).thenReturn(Optional.of(challenge));
+            stubMe(member(1L));
+            stubActiveMembers(1L);
+            stubOthersCompleted();
+
+            service.onMemberDailyComplete(CHALLENGE_ID, 1L, TODAY);
+
+            verify(userService).updateStreak(1L, TODAY);
         }
     }
 
