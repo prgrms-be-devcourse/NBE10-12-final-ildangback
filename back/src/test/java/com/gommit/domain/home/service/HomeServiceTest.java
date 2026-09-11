@@ -90,7 +90,7 @@ class HomeServiceTest {
     }
 
     private UserProfileResponse stubProfile() {
-        return new UserProfileResponse(USER_ID, "t@t.com", "테스터", null, 0, 0, null, LocalDateTime.now());
+        return new UserProfileResponse(USER_ID, "t@t.com", false, false, "테스터", null, 0, 0, null, LocalDateTime.now());
     }
 
     private UserPointHistory history(UserPointReason reason, Long challengeId) {
