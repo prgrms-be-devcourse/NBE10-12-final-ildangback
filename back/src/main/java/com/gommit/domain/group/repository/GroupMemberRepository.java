@@ -4,6 +4,7 @@ import com.gommit.domain.group.entity.GroupMember;
 import com.gommit.domain.group.entity.GroupMemberStatus;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,9 +12,14 @@ import org.springframework.data.repository.query.Param;
 public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> {
     List<GroupMember> findAllByGroupIdAndStatus(Long groupId, GroupMemberStatus status);
 
+    @EntityGraph(attributePaths = "group")
+    List<GroupMember> findAllByUserIdAndStatus(Long userId, GroupMemberStatus status);
+
     Optional<GroupMember> findByGroupIdAndUserId(Long groupId, Long userId);
 
     boolean existsByGroupIdAndUserId(Long groupId, Long userId);
+
+    boolean existsByGroupIdAndUserIdAndStatus(Long groupId, Long userId, GroupMemberStatus status);
 
     long countByGroupIdAndStatus(Long groupId, GroupMemberStatus status);
 

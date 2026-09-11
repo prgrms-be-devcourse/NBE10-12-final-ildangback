@@ -23,6 +23,19 @@ spring:
   flyway:
     enabled: true
 
+  http:
+    clients:
+      connect-timeout: 5s
+      read-timeout: 5s
+
+  mail:
+    properties:
+      mail:
+        smtp:
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
   data:
     web:
       pageable:
@@ -34,20 +47,32 @@ springdoc:
     tags-sorter: alpha
     operations-sorter: method
 
-app:
-  time-zone: Asia/Seoul # 인증 businessDate('오늘') 판정에 쓰는 Clock 빈의 기준 타임존
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
 
 point: # [임시값] 기획 확정 시 조정. 없으면 PointProperties 의 @DefaultValue 로 뜬다.
   check-in-reward: 10          # 개인 인증 1건
   group-daily-all-complete: 5  # 그룹 ACTIVE 전원이 그날 목표 달성
-
 
 auth-token:
   access-token:
     expiration: 15m
   refresh-token:
     expiration: 30d
-    reuse-grace-period: 30s
+    reuse-grace-period: 3s
+
+app:
+  time-zone: Asia/Seoul # 인증 businessDate('오늘') 판정에 쓰는 Clock 빈의 기준 타임존
+  frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+  api-base-url: ${API_BASE_URL:http://localhost:8080}
 
 media:
   storage:

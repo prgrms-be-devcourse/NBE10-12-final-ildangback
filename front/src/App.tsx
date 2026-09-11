@@ -10,9 +10,18 @@ import { DeleteAccountPage } from "./domains/user/pages/DeleteAccountPage";
 import { EditProfilePage } from "./domains/user/pages/EditProfilePage";
 import { PointHistoryDetailPage } from "./domains/point/pages/PointHistoryDetailPage";
 import { PointHistoryPage } from "./domains/point/pages/PointHistoryPage";
+import { FinalMergeResultPage } from "./domains/record/pages/FinalMergeResultPage";
+import { MergeListPage } from "./domains/record/pages/MergeListPage";
+import { MonthlyMergeResultPage } from "./domains/record/pages/MonthlyMergeResultPage";
+import { MyMonthlyMergeArchivePage } from "./domains/record/pages/MyMonthlyMergeArchivePage";
 import { ProfilePage } from "./domains/user/pages/ProfilePage";
 import { SettingsPage } from "./domains/user/pages/SettingsPage";
-import { ChallengeTabPlaceholder } from "./pages/ChallengeTabPlaceholder";
+import { GroupHomePage } from "./domains/group/pages/GroupHomePage";
+import { GroupPreviewPage } from "./domains/group/pages/GroupPreviewPage";
+import { GroupCreatePage } from "./domains/group/pages/GroupCreatePage";
+import { GroupJoinByCodePage } from "./domains/group/pages/GroupJoinByCodePage";
+import { GroupInvitePreviewPage } from "./domains/group/pages/GroupInvitePreviewPage";
+import { ChallengeStatusPage } from "./domains/challenge/pages/ChallengeStatusPage";
 import { HomePage } from "./pages/HomePage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { useAuth } from "./shared/lib/useAuth";
@@ -30,7 +39,24 @@ export function App() {
       {/* 하단바가 붙는 탭 3개. 비로그인도 들어올 수 있고 안에서 빈 상태가 뜬다. */}
       <Route element={<TabLayout />}>
         <Route index element={<HomePage />} />
-        <Route path="challenges" element={<ChallengeTabPlaceholder />} />
+        <Route path="challenges" element={<GroupHomePage />} />
+        <Route path="challenges/join" element={<GroupInvitePreviewPage />} />
+        <Route element={<RequireAuth />}>
+          <Route path="join-by-code" element={<GroupJoinByCodePage />} />
+          <Route
+            path="challenges/groups/join"
+            element={<GroupJoinByCodePage />}
+          />
+          <Route path="challenges/groups/new" element={<GroupCreatePage />} />
+          <Route
+            path="challenges/groups/:groupId"
+            element={<GroupPreviewPage />}
+          />
+          <Route
+            path="challenges/:challengeId"
+            element={<ChallengeStatusPage />}
+          />
+        </Route>
         <Route path="profile" element={<ProfilePage />} />
       </Route>
 
@@ -49,6 +75,22 @@ export function App() {
           <Route
             path="profile/points/:historyId"
             element={<PointHistoryDetailPage />}
+          />
+          <Route
+            path="profile/monthly-merges"
+            element={<MyMonthlyMergeArchivePage />}
+          />
+          <Route
+            path="challenges/:challengeId/merges"
+            element={<MergeListPage />}
+          />
+          <Route
+            path="challenges/:challengeId/monthly-merges/:seqNo"
+            element={<MonthlyMergeResultPage />}
+          />
+          <Route
+            path="challenges/:challengeId/final-merge"
+            element={<FinalMergeResultPage />}
           />
         </Route>
       </Route>

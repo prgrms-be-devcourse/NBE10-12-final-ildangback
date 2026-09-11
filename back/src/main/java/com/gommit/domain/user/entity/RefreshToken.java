@@ -23,6 +23,8 @@ public class RefreshToken extends BaseEntity {
     @Column(nullable = false)
     private LocalDateTime expiresAt;
 
+    private LocalDateTime rotatedAt;
+
     private LocalDateTime revokedAt;
 
     public RefreshToken(User user, String tokenHash, LocalDateTime expiresAt) {
@@ -37,5 +39,9 @@ public class RefreshToken extends BaseEntity {
 
     public boolean isRevoked() {
         return revokedAt != null;
+    }
+
+    public boolean isRotated() {
+        return rotatedAt != null;
     }
 }

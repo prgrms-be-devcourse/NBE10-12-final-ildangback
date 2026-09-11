@@ -52,12 +52,12 @@ class AuthApiIntegrationTest extends IntegrationTestSupport {
         return actions.andReturn().getResponse().getContentAsString();
     }
 
-    // 유예 경계를 실제 시간으로 기다리지 않기 위해 폐기 시각을 과거로 민다
-    private void backdateRevokedAt(LocalDateTime when) {
+    // 유예 경계를 실제 시간으로 기다리지 않기 위해 로테이션 시각을 과거로 민다
+    private void backdateRotatedAt(LocalDateTime when) {
         List<RefreshToken> all = refreshTokenRepository.findAll();
         all.forEach(token -> {
-            if (token.isRevoked()) {
-                ReflectionTestUtils.setField(token, "revokedAt", when);
+            if (token.isRotated()) {
+                ReflectionTestUtils.setField(token, "rotatedAt", when);
             }
         });
         refreshTokenRepository.saveAll(all);
@@ -160,7 +160,7 @@ class AuthApiIntegrationTest extends IntegrationTestSupport {
         // 화면 진입 시 API 를 여러 개 동시에 부르면 갱신도 같이 몰린다. 첫 요청이 RT 를 폐기한 뒤 나머지가 같은 RT 로 도착하는데, 이걸 거부하면 정상
         // 사용자가 로그아웃된다.
         @Test
-        @DisplayName("폐기된 지 유예 30초 안이면 통과한다")
+        @DisplayName("폐기된 지 유예 안이면 통과한다")
         void acceptsRevokedTokenWithinGrace() throws Exception {
             var tokens = loginAs(EMAIL, NICKNAME);
             refresh(tokens.refreshToken()).andExpect(status().isOk());
@@ -168,18 +168,53 @@ class AuthApiIntegrationTest extends IntegrationTestSupport {
             refresh(tokens.refreshToken()).andExpect(status().isOk());
         }
 
-        // 유예를 실제로 30초 기다리지 않고 revoked_at 을 과거로 밀어 만든다
+        // 유예를 실제로 기다리지 않고 revoked_at 을 과거로 밀어 만든다
         @Test
-        @DisplayName("유예를 넘긴 폐기 RT 는 401")
-        void rejectsRevokedTokenPastGrace() throws Exception {
+        @DisplayName("유예를 넘긴 로테이션 RT 는 401")
+        void rejectsRotatedTokenPastGrace() throws Exception {
             var tokens = loginAs(EMAIL, NICKNAME);
             refresh(tokens.refreshToken());
 
-            backdateRevokedAt(LocalDateTime.now().minusMinutes(1));
+            backdateRotatedAt(LocalDateTime.now().minusMinutes(1));
 
             refresh(tokens.refreshToken())
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_INVALID"));
+        }
+
+        // 훔친 RT 가 쓰인 것으로 본다. 그 요청만 막으면 최신 RT 를 가진 쪽이 계속 산다
+        @Test
+        @DisplayName("재사용이 탐지되면 그 사용자의 RT 가 전부 폐기된다")
+        void revokesAllOnReuseDetected() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+            String otherDevice = fieldOf(bodyOf(login(EMAIL, DEFAULT_PASSWORD)), "refreshToken");
+            String rotated = fieldOf(bodyOf(refresh(tokens.refreshToken())), "refreshToken");
+            backdateRotatedAt(LocalDateTime.now().minusMinutes(1));
+
+            refresh(tokens.refreshToken()).andExpect(status().isUnauthorized());
+
+            assertThat(jdbcTemplate.queryForObject(
+                            "SELECT COUNT(*) FROM refresh_tokens WHERE revoked_at IS NULL", Integer.class))
+                    .as("살아 있는 RT 가 남으면 폐기가 롤백된 것이다")
+                    .isZero();
+            refresh(rotated)
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_INVALID"));
+            refresh(otherDevice).andExpect(status().isUnauthorized());
+        }
+
+        // 로그아웃은 재사용이 아니다. 다른 기기까지 끊으면 안 된다
+        @Test
+        @DisplayName("세션이 끊긴 RT 로 들어와도 다른 기기는 살아 있다")
+        void keepsOtherSessionsOnRevokedToken() throws Exception {
+            var first = loginAs(EMAIL, NICKNAME);
+            var second = login(EMAIL, DEFAULT_PASSWORD);
+            String otherDevice = fieldOf(bodyOf(second), "refreshToken");
+            logout(first.accessToken(), first.refreshToken()).andExpect(status().isNoContent());
+
+            refresh(first.refreshToken()).andExpect(status().isUnauthorized());
+
+            refresh(otherDevice).andExpect(status().isOk());
         }
 
         @Test
@@ -237,9 +272,20 @@ class AuthApiIntegrationTest extends IntegrationTestSupport {
 
             logout(phone.accessToken(), phone.refreshToken()).andExpect(status().isNoContent());
 
-            backdateRevokedAt(LocalDateTime.now().minusMinutes(1));
             refresh(phone.refreshToken()).andExpect(status().isUnauthorized());
             refresh(laptopRefreshToken).andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("로그아웃한 RT 는 즉시 거부된다")
+        void revokedTokenIsRejectedImmediately() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+
+            logout(tokens.accessToken(), tokens.refreshToken()).andExpect(status().isNoContent());
+
+            refresh(tokens.refreshToken())
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_INVALID"));
         }
 
         @Test

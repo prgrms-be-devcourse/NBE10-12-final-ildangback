@@ -1,0 +1,10 @@
+build/
+.gradle/
+.git/
+.github/
+.idea/
+*.md
+data/
+bin/
+out/
+**/*.iml
