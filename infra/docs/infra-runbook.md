@@ -157,7 +157,8 @@ sudo -u ec2-user bash /opt/team1-app/deploy.sh <이전-12자-SHA> <이전-풀-SH
 ## 4. DB 백업 / 복구
 
 - **자동**: 호스트 cron 이 매일 04:20 `backup.sh` → `/opt/team1-app/backups/gommit-YYYYMMDD-HHMM.sql.gz`, 7일 보관.
-- **자동 2차**: DLM 이 매일 18:30 루트 EBS 볼륨 스냅샷, 7일 보관.
+- 볼륨 단위 자동 스냅샷(DLM)은 계정 규칙상 부수 서비스 결재 회피를 위해 제외했다.
+  필요 시 EC2 콘솔에서 루트 볼륨 스냅샷을 수동으로 찍을 수 있다.
 
 ### 논리 복구 (mysqldump 에서)
 
@@ -168,10 +169,11 @@ gunzip -c backups/gommit-YYYYMMDD-HHMM.sql.gz | \
 docker compose restart back
 ```
 
-### 볼륨 복구 (EBS 스냅샷에서)
+### 볼륨 복구 (수동 스냅샷에서)
 
-인스턴스 교체가 필요한 수준의 사고일 때. EC2 콘솔에서 스냅샷 → 볼륨 생성 → 루트 교체,
-또는 `terraform taint aws_instance.app && terraform apply` 후 논리 복구.
+인스턴스 교체가 필요한 수준의 사고일 때. 수동으로 찍어둔 스냅샷이 있으면 EC2 콘솔에서
+스냅샷 → 볼륨 생성 → 루트 교체. 없으면 `terraform taint aws_instance.app && terraform apply`
+로 인스턴스를 새로 만든 뒤 mysqldump 백업에서 논리 복구.
 
 > **규칙**: DB 를 초기화(wipe)하면 미디어 스토리지도 함께 정리한다 (Cloudinary 폴더 / 로컬 dir).
 > 안 그러면 고아 파일이 쌓인다. — `infra/docs/infra-design.md`, 미디어 설계 메모.

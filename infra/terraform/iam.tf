@@ -130,25 +130,3 @@ resource "aws_iam_role_policy" "scheduler" {
     }]
   })
 }
-
-# =============================================================================
-# 4. DLM 역할 — 매일 EBS 스냅샷
-#    없으면: 볼륨 단위 2차 백업이 안 돌아 mysqldump 실패한 날 사고 시 복구 불가.
-# =============================================================================
-
-resource "aws_iam_role" "dlm" {
-  name = "${var.name_prefix}-dlm-role"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Action    = "sts:AssumeRole"
-      Principal = { Service = "dlm.amazonaws.com" }
-    }]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "dlm" {
-  role       = aws_iam_role.dlm.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole"
-}
