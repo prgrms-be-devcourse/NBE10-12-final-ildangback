@@ -26,7 +26,11 @@ const MENU: { icon: string; label: string; to?: string }[] = [
     label: "포인트 내역",
     to: "/profile/points",
   },
-  { icon: pixelIcons.badgeAchievement, label: "참여했던 챌린지" },
+  {
+    icon: pixelIcons.badgeAchievement,
+    label: "참여했던 챌린지",
+    to: "/profile/challenges",
+  },
   { icon: pixelIcons.settingsGear, label: "설정", to: "/profile/settings" },
 ];
 

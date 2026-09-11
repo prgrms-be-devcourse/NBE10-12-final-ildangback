@@ -4,6 +4,10 @@ import { RequireAuth } from "./app/RequireAuth";
 import { TabLayout } from "./app/TabLayout";
 import { LoginPage } from "./domains/auth/pages/LoginPage";
 import { SignUpPage } from "./domains/auth/pages/SignUpPage";
+import { CheckInPage } from "./domains/checkin/pages/CheckInPage";
+import { MyChallengeAlbumPage } from "./domains/checkin/pages/MyChallengeAlbumPage";
+import { MyCheckInsPage } from "./domains/checkin/pages/MyCheckInsPage";
+import { ParticipatedChallengesPage } from "./domains/checkin/pages/ParticipatedChallengesPage";
 import { AccountPage } from "./domains/user/pages/AccountPage";
 import { ChangePasswordPage } from "./domains/user/pages/ChangePasswordPage";
 import { DeleteAccountPage } from "./domains/user/pages/DeleteAccountPage";
@@ -56,6 +60,15 @@ export function App() {
             path="challenges/:challengeId"
             element={<ChallengeStatusPage />}
           />
+          <Route
+            path="profile/challenges"
+            element={<ParticipatedChallengesPage />}
+          />
+          <Route path="profile/check-ins" element={<MyCheckInsPage />} />
+          <Route
+            path="profile/challenges/:challengeId/album"
+            element={<MyChallengeAlbumPage />}
+          />
         </Route>
         <Route path="profile" element={<ProfilePage />} />
       </Route>
@@ -91,6 +104,12 @@ export function App() {
           <Route
             path="challenges/:challengeId/final-merge"
             element={<FinalMergeResultPage />}
+          />
+
+          {/* 체크인 제출 플로우 — 카메라 중심의 집중 화면이라 하단바 없이 둔다. */}
+          <Route
+            path="challenges/:challengeId/check-in"
+            element={<CheckInPage />}
           />
         </Route>
       </Route>
