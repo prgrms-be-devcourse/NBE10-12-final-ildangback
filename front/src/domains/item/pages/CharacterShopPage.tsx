@@ -1,20 +1,27 @@
-import { CaretDownIcon, CheckIcon } from "@phosphor-icons/react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ITEM_ART } from "../../../mocks/itemArt";
 import {
+  CaretDownIcon,
+  CaretLeftIcon,
+  CaretRightIcon,
+  CheckIcon,
+} from "@phosphor-icons/react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { equipItem, fetchShop, purchaseItem, unequipItem } from "../api";
+import {
+  CHARACTER_LAYERS,
   OWNERSHIP_FILTERS,
   OWNERSHIP_LABEL,
   type OwnershipFilter,
-  type Slot,
+  type ShopData,
+  type ShopItem,
   SLOT_LABEL,
   SLOTS,
   type Sort,
   SORT_LABEL,
   SORTS,
-} from "../../../mocks/shop";
-// 교체 지점. 실 API 가 오면 이 import 만 domains/item/api.ts 로 바꾼다.
-import { equipItem, fetchShop, purchaseItem } from "../../../mocks/api";
-import type { ShopData, ShopItem } from "../../../mocks/types";
+} from "../lib/shop";
+import type { ItemSlot } from "../../../shared/api/types";
+import { CharacterView } from "../components/CharacterView";
+import { ItemThumb } from "../components/ItemThumb";
 import { PurchaseDialog } from "../components/PurchaseDialog";
 import { objectParticle } from "../../../shared/lib/korean";
 import { useToast } from "../../../shared/lib/useToast";
@@ -40,9 +47,9 @@ const BADGE_PLAIN = "#F6F4F9";
 export function CharacterShopPage() {
   const { showToast } = useToast();
 
-  const [slot, setSlot] = useState<Slot>("HEAD");
+  const [slot, setSlot] = useState<ItemSlot>("HEAD");
   const [ownership, setOwnership] = useState<OwnershipFilter>("ALL");
-  const [sort, setSort] = useState<Sort>("POPULAR");
+  const [sort, setSort] = useState<Sort>("DEFAULT");
 
   const [shop, setShop] = useState<ShopData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -83,42 +90,52 @@ export function CharacterShopPage() {
     return [...filtered].sort((a, b) => {
       if (sort === "CHEAP") return a.price - b.price;
       if (sort === "EXPENSIVE") return b.price - a.price;
-      return b.popularity - a.popularity;
+      // 기본순은 서버가 준 등록순 그대로다.
+      return 0;
     });
   }, [shop, slot, ownership, sort]);
 
   const picked = shop?.items.find((i) => i.id === pickedId) ?? null;
   const equipped = shop?.equipped ?? {};
 
+  // 착용 중인 부위의 그림. 카탈로그의 imageUrl 이 DEFAULT 포즈 그림이라
+  // /api/users/me/character 를 따로 부르지 않아도 같은 URL 이 나온다.
+  const characterArt = useMemo(() => {
+    const art: Partial<Record<ItemSlot, string>> = {};
+    for (const slot of CHARACTER_LAYERS) {
+      const itemId = shop?.equipped[slot];
+      const url = shop?.items.find((i) => i.id === itemId)?.imageUrl;
+      if (url) art[slot] = url;
+    }
+    return art;
+  }, [shop]);
+
   async function buy(item: ShopItem) {
     setBusy(true);
     try {
-      const { item: bought, point } = await purchaseItem(item.id);
-
-      // 산 아이템은 바로 입힌다. 사자마자 캐릭터에 보이는 게 자연스럽다.
-      // 입히기가 실패해도 구매는 이미 끝난 것이라 따로 잡아 다르게 알린다.
-      let nextEquipped = shop?.equipped ?? {};
-      let worn = true;
-      try {
-        nextEquipped = await equipItem(bought.slot, bought.id);
-      } catch {
-        worn = false;
-      }
+      // 서버가 구매와 함께 같은 부위를 벗기고 새 아이템을 입힌다.
+      // 여기서 착용을 또 부르면 ALREADY_EQUIPPED 로 실패한다.
+      const bought = await purchaseItem(item.id);
 
       setShop((prev) =>
         prev
           ? {
               ...prev,
-              point,
-              equipped: nextEquipped,
-              items: prev.items.map((i) => (i.id === bought.id ? bought : i)),
+              point: bought.balance,
+              equipped: bought.equippedSlot
+                ? { ...prev.equipped, [bought.equippedSlot]: item.id }
+                : prev.equipped,
+              items: prev.items.map((i) =>
+                i.id === item.id
+                  ? { ...i, owned: true, userItemId: bought.userItemId }
+                  : i,
+              ),
             }
           : prev,
       );
       setConfirming(null);
-      const name = `${bought.name}${objectParticle(bought.name)}`;
       showToast(
-        worn ? `${name} 구매하고 바로 착용했어요.` : `${name} 구매했어요.`,
+        `${item.name}${objectParticle(item.name)} 구매하고 바로 착용했어요.`,
       );
     } catch (error) {
       showToast(error instanceof Error ? error.message : "구매하지 못했어요.");
@@ -128,10 +145,24 @@ export function CharacterShopPage() {
   }
 
   async function wear(item: ShopItem, take: boolean) {
+    // 보유 중이어야 버튼이 뜨므로 userItemId 는 항상 있다.
+    if (item.userItemId === null) return;
+
     setBusy(true);
     try {
-      const next = await equipItem(item.slot, take ? null : item.id);
-      setShop((prev) => (prev ? { ...prev, equipped: next } : prev));
+      // 어느 부위에 들어갔는지는 응답이 알려준다. 벗으면 null 로 온다.
+      const result = take
+        ? await unequipItem(item.userItemId)
+        : await equipItem(item.userItemId);
+
+      setShop((prev) => {
+        if (!prev) return prev;
+        const equipped = { ...prev.equipped };
+        // 서버가 같은 부위의 이전 아이템을 알아서 벗긴다.
+        if (result.equippedSlot) equipped[result.equippedSlot] = item.id;
+        else delete equipped[item.slot];
+        return { ...prev, equipped };
+      });
     } catch (error) {
       showToast(error instanceof Error ? error.message : "적용하지 못했어요.");
     } finally {
@@ -177,11 +208,15 @@ export function CharacterShopPage() {
               className="h-full w-full object-cover pixelated"
               aria-hidden
             />
-            <img
-              src={designArt.shopCharacter}
-              alt="캐릭터 미리보기"
-              className="absolute top-[8px] left-[103px] h-[95px] w-[143px] object-contain pixelated"
-            />
+
+            {/* 아이템 그림이 1080x1080 정사각 캔버스라 상자도 정사각이어야 겹쳐진다.
+                배경판 받침대에 발이 닿도록 맞춰 뒀다. */}
+            <span className="absolute bottom-[1px] left-1/2 block h-[174px] w-[174px] -translate-x-1/2">
+              <CharacterView
+                art={characterArt}
+                label={characterLabel(shop.items, equipped)}
+              />
+            </span>
 
             <span
               className="absolute top-[8px] right-[6px] flex h-[27px] w-[78px] items-center justify-center gap-[5px] rounded-full"
@@ -199,9 +234,9 @@ export function CharacterShopPage() {
                 showToast("캐릭터 회전은 다음 업데이트에 오픈됩니다.")
               }
               aria-label="캐릭터 왼쪽으로 돌리기"
-              className="absolute top-1/2 left-[8px] h-[28px] w-[28px] -translate-y-1/2 rounded-full"
+              className="absolute top-1/2 left-[8px] flex h-[28px] w-[28px] -translate-y-1/2 items-center justify-center rounded-full bg-white/70 focus-visible:ring-2 focus-visible:ring-purple-300 focus-visible:outline-none"
             >
-              <span className="sr-only">왼쪽</span>
+              <CaretLeftIcon size={16} weight="bold" color={DEEP} aria-hidden />
             </button>
             <button
               type="button"
@@ -209,9 +244,14 @@ export function CharacterShopPage() {
                 showToast("캐릭터 회전은 다음 업데이트에 오픈됩니다.")
               }
               aria-label="캐릭터 오른쪽으로 돌리기"
-              className="absolute top-1/2 right-[8px] h-[28px] w-[28px] -translate-y-1/2 rounded-full"
+              className="absolute top-1/2 right-[8px] flex h-[28px] w-[28px] -translate-y-1/2 items-center justify-center rounded-full bg-white/70 focus-visible:ring-2 focus-visible:ring-purple-300 focus-visible:outline-none"
             >
-              <span className="sr-only">오른쪽</span>
+              <CaretRightIcon
+                size={16}
+                weight="bold"
+                color={DEEP}
+                aria-hidden
+              />
             </button>
           </section>
 
@@ -318,6 +358,21 @@ export function CharacterShopPage() {
   );
 }
 
+/** 미리보기는 그림만 겹친 것이라 무엇을 입고 있는지 말로 한 번 더 알린다. */
+function characterLabel(
+  items: ShopItem[],
+  equipped: ShopData["equipped"],
+): string {
+  const worn = CHARACTER_LAYERS.map(
+    (slot) => items.find((i) => i.id === equipped[slot])?.name,
+  ).filter((name): name is string => Boolean(name));
+
+  if (worn.length === 0) return "아무것도 착용하지 않은 캐릭터";
+
+  const names = worn.join(", ");
+  return `${names}${objectParticle(names)} 착용한 캐릭터`;
+}
+
 /**
  * 고른 아이템에 대해 할 수 있는 일을 한 줄로 보여준다. 시안 참고 화면에도
  * 같은 자리에 있다. 카드를 눌렀을 때 바로 사지 않고 여기서 한 번 더 고르게
@@ -347,18 +402,8 @@ function ActionBar({
       style={{ backgroundColor: CARD }}
     >
       <div className="flex items-center gap-[10px]">
-        <span className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-[10px] bg-purple-50">
-          {ITEM_ART[item.art] ? (
-            <img
-              src={ITEM_ART[item.art]}
-              alt=""
-              className="max-h-[32px] max-w-[32px] object-contain pixelated"
-            />
-          ) : (
-            <span className="text-[22px] leading-none" aria-hidden>
-              {item.art}
-            </span>
-          )}
+        <span className="block h-[44px] w-[44px] shrink-0 overflow-hidden rounded-[10px] bg-purple-50">
+          <ItemThumb item={item} />
         </span>
 
         <span className="min-w-0 flex-1">
@@ -448,18 +493,8 @@ function ItemCard({
         </span>
       )}
 
-      <span className="absolute top-[17px] left-1/2 flex h-[47px] w-[65px] -translate-x-1/2 items-center justify-center">
-        {ITEM_ART[item.art] ? (
-          <img
-            src={ITEM_ART[item.art]}
-            alt=""
-            className="max-h-full max-w-full object-contain pixelated"
-          />
-        ) : (
-          <span className="text-[36px] leading-none" aria-hidden>
-            {item.art}
-          </span>
-        )}
+      <span className="absolute top-[14px] left-1/2 block h-[52px] w-[52px] -translate-x-1/2">
+        <ItemThumb item={item} />
       </span>
 
       <span

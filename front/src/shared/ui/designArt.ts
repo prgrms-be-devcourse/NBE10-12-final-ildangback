@@ -17,9 +17,9 @@ import bestCategory from "../../assets/design/best-category.webp";
 import categoryDev from "../../assets/design/category-dev.webp";
 import categoryExercise from "../../assets/design/category-exercise.webp";
 import categoryReading from "../../assets/design/category-reading.webp";
+import characterBase from "../../assets/design/character-base.webp";
 import characterHome from "../../assets/design/character-home.webp";
 import notificationBell from "../../assets/design/notification-bell.webp";
-import shopCharacter from "../../assets/design/shop-character.webp";
 import statMonthly from "../../assets/design/stat-monthly.webp";
 import statRate from "../../assets/design/stat-rate.webp";
 import statStreak from "../../assets/design/stat-streak.webp";
@@ -37,7 +37,7 @@ export const designArt = {
   statMonthly,
   statRate,
   shopRoom,
-  shopCharacter,
+  characterBase,
   categoryExercise,
   categoryDev,
   categoryReading,

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
-import { ITEM_ART } from "../../../mocks/itemArt";
 import { objectParticle } from "../../../shared/lib/korean";
-import type { ShopItem } from "../../../mocks/types";
+import { ItemThumb } from "./ItemThumb";
+import type { ShopItem } from "../lib/shop";
 import { PixelIcon } from "../../../shared/ui/PixelIcon";
 import { pixelIcons } from "../../../shared/ui/pixelIcons";
 
@@ -56,18 +56,8 @@ export function PurchaseDialog({
       className="m-auto w-[calc(100%-3rem)] max-w-[320px] rounded-[14px] bg-white shadow-2xl backdrop:bg-black/50"
     >
       <div className="p-[20px] text-center">
-        <span className="mx-auto flex h-[76px] w-[76px] items-center justify-center rounded-[14px] bg-purple-50">
-          {ITEM_ART[item.art] ? (
-            <img
-              src={ITEM_ART[item.art]}
-              alt=""
-              className="max-h-[56px] max-w-[56px] object-contain pixelated"
-            />
-          ) : (
-            <span className="text-[36px] leading-none" aria-hidden>
-              {item.art}
-            </span>
-          )}
+        <span className="mx-auto block h-[76px] w-[76px] overflow-hidden rounded-[14px] bg-purple-50">
+          <ItemThumb item={item} />
         </span>
 
         <h2

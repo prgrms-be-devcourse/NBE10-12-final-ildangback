@@ -1,18 +1,18 @@
 /**
  * 화면을 그리는 데 프론트가 필요한 필드 목록이다.
  *
- * **이건 API 명세가 아니다.** `domain/record` 는 아직 빈 폴더고 `domain/item` 은
- * 컨트롤러가 없어서 응답 모양이 정해진 게 없다. 그래서 "API 가 이렇다" 가 아니라
- * "프론트는 이게 필요하다" 를 적어 둔 것이다.
+ * **이건 API 명세가 아니다.** `domain/record` 는 아직 빈 폴더라 응답 모양이
+ * 정해진 게 없다. 그래서 "API 가 이렇다" 가 아니라 "프론트는 이게 필요하다" 를
+ * 적어 둔 것이다.
  *
  * 담당자와 맞춘 뒤에 `shared/api/types.ts` 로 옮긴다.
- * record(홈 지표 · 잔디 · 통계) 한철완, item(상점 · 캐릭터) 최성혁.
+ * record(홈 지표 · 잔디 · 통계) 한철완.
+ * 상점과 캐릭터는 붙였다 — `domains/item/lib/shop.ts` 로 옮겨 갔다.
  *
  * 홈은 주인이 애매하다 — 지표는 record, 오늘의 챌린지는 challenge,
  * 포인트는 point 라서 어느 도메인이 모아 줄지 팀에서 정해야 한다.
  */
 import type { Category } from "./categories";
-import type { Slot } from "./shop";
 
 /** 잔디 한 칸. 서버는 날짜와 횟수만 주면 된다. 오늘/미래 판정은 프론트가 한다. */
 export interface CheckInDay {
@@ -81,29 +81,4 @@ export interface PersonalStatsData {
   worstMonth: number;
   worstMonthMissed: number;
   categories: CategoryStat[];
-}
-
-export interface ShopItem {
-  id: number;
-  slot: Slot;
-  name: string;
-  /** 아이템 그림 키. 실 API 는 이미지 URL 을 줄 것이다. */
-  art: string;
-  price: number;
-  /** 정렬용. 서버가 정렬해 준다면 필요 없다. */
-  popularity: number;
-  owned: boolean;
-}
-
-/** SHP-04: 구매 성공 시 산 아이템과 남은 포인트를 준다. */
-export interface PurchaseResult {
-  item: ShopItem;
-  point: number;
-}
-
-export interface ShopData {
-  point: number;
-  items: ShopItem[];
-  /** 부위별 착용 중인 아이템 id. */
-  equipped: Partial<Record<Slot, number>>;
 }
