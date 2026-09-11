@@ -21,12 +21,14 @@ public record ChallengeDetailResponse(
         List<DaysOfWeek> daysOfWeek,
         Integer dailyCheckInCount,
         Integer requiredDayCount,
+        int groupCompletedDayCount,
         Integer groupCurrentStreak,
         Integer groupBestStreak,
         List<CheckInType> allowedTypes,
         Long ownerId) {
     // groupCurrentStreak 은 저장값이 아니라 조회 시점 보정값(Challenge.groupCurrentStreakAsOf)을 넘겨받는다.
-    public ChallengeDetailResponse(Challenge challenge, Long ownerId, int groupCurrentStreak) {
+    public ChallengeDetailResponse(
+            Challenge challenge, Long ownerId, int groupCurrentStreak, int groupCompletedDayCount) {
         this(
                 challenge.getId(),
                 challenge.getGroupId(),
@@ -39,6 +41,7 @@ public record ChallengeDetailResponse(
                 parseDaysOfWeek(challenge.getDaysOfWeek()),
                 challenge.getDailyCheckInCount(),
                 challenge.getRequiredDayCount(),
+                groupCompletedDayCount,
                 groupCurrentStreak,
                 challenge.getGroupBestStreak(),
                 getAllowedTypes(challenge),

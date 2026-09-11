@@ -155,7 +155,7 @@ function MyCard({ group }: { group: MyGroupSummary }) {
         </div>
         <StatusBadge status={group.challengeStatus} />
       </div>
-      <ChallengeProgress {...group} />
+      <ChallengeProgress {...group} variant="period" />
       <p className="flex items-center justify-between text-sm text-gray-500">
         <span className="flex items-center gap-1">
           <img

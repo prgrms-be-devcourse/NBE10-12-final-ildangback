@@ -24,6 +24,7 @@ import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.domain.checkin.repository.CheckInRepository;
+import com.gommit.domain.checkin.service.GroupCompletionQueryService;
 import com.gommit.domain.group.entity.ChallengeGroup;
 import com.gommit.domain.group.entity.GroupCategory;
 import com.gommit.domain.group.entity.MapType;
@@ -79,6 +80,9 @@ class ChallengeServiceTest {
 
     @Mock
     private BusinessClock businessClock;
+
+    @Mock
+    private GroupCompletionQueryService groupCompletionQueryService;
 
     @InjectMocks
     private ChallengeService challengeService;
@@ -369,12 +373,16 @@ class ChallengeServiceTest {
                     .thenReturn(Optional.of(owner));
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(50L, 2L, today))
                     .thenReturn(1);
+            when(groupCompletionQueryService.countCompletedDays(challenge, today))
+                    .thenReturn(1);
 
             var response = challengeService.getChallengeStatus(50L, 2L);
 
             assertThat(response.currentDay()).isEqualTo(2);
             assertThat(response.isCheckInDay()).isTrue();
             assertThat(response.myCurrentCount()).isEqualTo(1);
+            assertThat(response.challenge().groupCompletedDayCount()).isEqualTo(1);
+            verify(groupCompletionQueryService).countCompletedDays(challenge, today);
             verify(challengeProgressCalculator).calculateCurrentDay(challenge, today);
             verify(challengeProgressCalculator).canCheckInOn(challenge, today);
             verify(checkInRepository).countByChallengeIdAndUserIdAndBusinessDate(50L, 2L, today);

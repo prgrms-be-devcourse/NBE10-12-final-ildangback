@@ -1,8 +1,11 @@
 import sportsIcon from "../../../assets/icons/sports.webp";
 import studyIcon from "../../../assets/icons/study.webp";
 import cameraIcon from "../../../assets/icons/camera.webp";
-import checkIcon from "../../../assets/icons/ei_check.webp";
+import camcorderIcon from "../../../assets/icons/camcorder.webp";
+import liveIcon from "../../../assets/icons/live.webp";
+import { CheckIcon } from "@phosphor-icons/react";
 import { useFormContext, useWatch } from "react-hook-form";
+import { useToast } from "../../../shared/lib/useToast";
 import { TextField } from "../../../shared/ui/TextField";
 import {
   ChallengeRulesCard,
@@ -22,6 +25,7 @@ import type { GroupCreateForm } from "../validation";
 const SELECTED = "border-purple-500 bg-purple-50 text-purple-700";
 const NORMAL = "border-purple-200 bg-white text-gray-500";
 export function GroupCreateSteps({ step }: { step: number }) {
+  const { showToast } = useToast();
   const {
     register,
     control,
@@ -292,7 +296,7 @@ export function GroupCreateSteps({ step }: { step: number }) {
             label="하루 인증 횟수"
             value={settings.dailyCheckInCount}
             min={1}
-            max={10}
+            max={4}
             unit="회"
             onChange={(value) =>
               setValue("challenge.dailyCheckInCount", value, {
@@ -309,28 +313,68 @@ export function GroupCreateSteps({ step }: { step: number }) {
     );
   if (step === 3)
     return (
-      <div className="rounded-2xl border border-purple-500 bg-purple-50 p-5">
-        <div className="flex items-center gap-4">
-          <img
-            src={cameraIcon}
-            alt=""
-            width={36}
-            height={36}
-            className="shrink-0 object-contain"
-          />
-          <div className="flex-1">
-            <h2 className="text-lg font-bold">사진</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              사진으로 인증하는 챌린지예요.
-            </p>
-          </div>
-          <img
-            src={checkIcon}
-            alt="선택됨"
-            width={26}
-            height={26}
-            className="shrink-0 object-contain"
-          />
+      <div>
+        <div className="space-y-3">
+          {[
+            {
+              label: "사진",
+              icon: cameraIcon,
+              description: "사진을 바로 촬영하여 인증",
+              available: true,
+            },
+            {
+              label: "영상",
+              icon: camcorderIcon,
+              description: "짧은 영상으로 인증",
+              available: false,
+            },
+            {
+              label: "라이브",
+              icon: liveIcon,
+              description: "멤버들과 실시간으로 인증",
+              available: false,
+            },
+          ].map(({ label, icon, description, available }) => (
+            <button
+              key={label}
+              type="button"
+              aria-pressed={
+                available && settings.allowedTypes.includes("PHOTO")
+              }
+              onClick={() => {
+                if (!available) {
+                  showToast("준비중입니다.");
+                  return;
+                }
+                setValue("challenge.allowedTypes", ["PHOTO"], {
+                  shouldValidate: true,
+                });
+              }}
+              className={`flex min-h-24 w-full items-center gap-4 rounded-2xl border p-4 text-left ${available && settings.allowedTypes.includes("PHOTO") ? SELECTED : NORMAL}`}
+            >
+              <img
+                src={icon}
+                alt=""
+                width={36}
+                height={36}
+                className="shrink-0 object-contain"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block text-lg font-bold">{label}</span>
+                <span className="mt-1 block text-sm text-gray-500">
+                  {description}
+                </span>
+              </span>
+              <span
+                aria-hidden="true"
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${available && settings.allowedTypes.includes("PHOTO") ? "border-purple-500 bg-purple-500" : "border-purple-200 bg-white"}`}
+              >
+                {available && settings.allowedTypes.includes("PHOTO") && (
+                  <CheckIcon size={18} weight="bold" className="text-white" />
+                )}
+              </span>
+            </button>
+          ))}
         </div>
         <p className="mt-5 text-xs text-purple-700">
           현재는 사진 인증 방식으로만 그룹을 만들 수 있어요.

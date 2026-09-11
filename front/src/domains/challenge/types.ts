@@ -24,6 +24,7 @@ export interface ChallengeSummary extends ChallengeSettings {
 export interface ChallengeDetail extends ChallengeSummary {
   groupId: number;
   requiredDayCount: number;
+  groupCompletedDayCount: number;
   groupCurrentStreak: number;
   groupBestStreak: number;
   ownerId: number;

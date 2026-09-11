@@ -25,7 +25,6 @@ import {
   delegateOwner,
 } from "../api";
 import { ChallengeSettingsEditor } from "../components/ChallengeSettingsEditor";
-import { ExtensionChoicePanel } from "../components/ExtensionChoicePanel";
 import { ChallengeRulesCard } from "../components/ChallengeInfo";
 import type { ChallengeStatusResponse } from "../types";
 
@@ -210,6 +209,7 @@ function ChallengeContent({
   const { user } = useAuth();
   const { showToast } = useToast();
   const [editing, setEditing] = useState(false);
+  const [delegating, setDelegating] = useState(false);
   const [action, setAction] = useState<{
     type: "delegate" | "kick";
     userId: number;
@@ -316,6 +316,7 @@ function ChallengeContent({
           mapType={group.data?.group.mapType}
           members={members.data ?? null}
           characters={characters.data ?? null}
+          currentUserId={user?.id}
           onDelegate={
             canDelegate
               ? (member) =>
@@ -326,9 +327,10 @@ function ChallengeContent({
                   })
               : undefined
           }
+          onExtensionSaved={members.retry}
         />
       )}
-      {!showDetails && (
+      {!showDetails && (characters.loading || characters.error) && (
         <div className="space-y-2">
           {characters.loading && (
             <p role="status" className="text-sm text-gray-500">
@@ -340,9 +342,6 @@ function ChallengeContent({
               캐릭터 정보를 불러오지 못했어요.
             </p>
           )}
-          <Button variant="secondary" onClick={characters.retry}>
-            캐릭터 정보 새로고침
-          </Button>
         </div>
       )}
       {!showDetails && members.loading && (
@@ -400,16 +399,32 @@ function ChallengeContent({
               </Button>
             ))}
           <section className="rounded-2xl border border-purple-200 p-4">
-            <h2 className="flex items-center gap-2 font-bold">
-              <img
-                src={peopleIcon}
-                alt=""
-                width={20}
-                height={20}
-                className="shrink-0 object-contain"
-              />
-              시즌 멤버
-            </h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="flex items-center gap-2 font-bold">
+                <img
+                  src={peopleIcon}
+                  alt=""
+                  width={20}
+                  height={20}
+                  className="shrink-0 object-contain"
+                />
+                시즌 멤버
+              </h2>
+              {canDelegate && (
+                <button
+                  type="button"
+                  onClick={() => setDelegating((value) => !value)}
+                  className="text-xs font-semibold text-purple-700 underline"
+                >
+                  {delegating ? "위임 취소" : "위임하기"}
+                </button>
+              )}
+            </div>
+            {delegating && (
+              <p className="mt-2 text-xs text-purple-500">
+                위임할 그룹원을 선택해주세요.
+              </p>
+            )}
             {members.loading && (
               <p role="status" className="mt-4 text-sm text-gray-500">
                 멤버를 불러오는 중…
@@ -425,57 +440,66 @@ function ChallengeContent({
             )}
             {members.data && (
               <ul className="mt-4 flex flex-wrap gap-2">
-                {members.data.map((member) => (
-                  <li
-                    key={member.userId}
-                    className="max-w-full rounded-xl bg-purple-50 px-3 py-2 text-sm wrap-anywhere"
-                  >
-                    {member.nickname}
-                    {member.userId === challenge.ownerId && (
-                      <span className="ml-2 text-xs text-purple-500">
-                        그룹장
-                      </span>
-                    )}
-                    {canDelegate && member.userId !== user?.id && (
-                      <button
-                        type="button"
-                        className="ml-2 py-1 text-xs text-purple-700 underline"
-                        onClick={() =>
-                          setAction({
-                            type: "delegate",
-                            userId: member.userId,
-                            nickname: member.nickname,
-                          })
-                        }
-                      >
-                        그룹장 위임
-                      </button>
-                    )}
-                    {isCurrent &&
-                      group.data &&
-                      group.data.group.ownerId === user?.id &&
-                      group.data.currentChallenge?.status === "ACTIVE" &&
-                      challenge.id === group.data.currentChallenge.id &&
-                      member.userId !== group.data.group.ownerId &&
-                      group.data.members.some(
-                        (item) => item.userId === member.userId,
-                      ) && (
+                {members.data.map((member) => {
+                  const isDelegateTarget =
+                    delegating && canDelegate && member.userId !== user?.id;
+                  return (
+                    <li
+                      key={member.userId}
+                      className={`max-w-full rounded-xl px-3 py-2 text-sm wrap-anywhere ${
+                        isDelegateTarget ? "bg-purple-100" : "bg-purple-50"
+                      }`}
+                    >
+                      {isDelegateTarget ? (
                         <button
                           type="button"
-                          className="ml-2 py-1 text-xs text-red-600 underline"
-                          onClick={() =>
+                          onClick={() => {
                             setAction({
-                              type: "kick",
+                              type: "delegate",
                               userId: member.userId,
                               nickname: member.nickname,
-                            })
-                          }
+                            });
+                            setDelegating(false);
+                          }}
+                          aria-label={`${member.nickname} 님에게 그룹장 위임`}
+                          className="cursor-pointer rounded font-semibold text-purple-700 underline decoration-dotted hover:text-purple-900"
                         >
-                          강퇴
+                          {member.nickname}
                         </button>
+                      ) : (
+                        member.nickname
                       )}
-                  </li>
-                ))}
+                      {member.userId === challenge.ownerId && (
+                        <span className="ml-2 text-xs text-purple-500">
+                          그룹장
+                        </span>
+                      )}
+                      {isCurrent &&
+                        group.data &&
+                        group.data.group.ownerId === user?.id &&
+                        group.data.currentChallenge?.status === "ACTIVE" &&
+                        challenge.id === group.data.currentChallenge.id &&
+                        member.userId !== group.data.group.ownerId &&
+                        group.data.members.some(
+                          (item) => item.userId === member.userId,
+                        ) && (
+                          <button
+                            type="button"
+                            className="ml-2 py-1 text-xs text-red-600 underline"
+                            onClick={() =>
+                              setAction({
+                                type: "kick",
+                                userId: member.userId,
+                                nickname: member.nickname,
+                              })
+                            }
+                          >
+                            강퇴
+                          </button>
+                        )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>
@@ -491,15 +515,6 @@ function ChallengeContent({
             </>
           )}
         </>
-      )}
-      {!showDetails && isCurrent && challenge.status === "ACTIVE" && (
-        <ExtensionChoicePanel
-          challengeId={challenge.id}
-          endDate={challenge.endDate}
-          members={members.data}
-          currentUserId={user?.id}
-          onSaved={members.retry}
-        />
       )}
       {action && (
         <ConfirmActionDialog

@@ -42,7 +42,7 @@ export const groupCreateSchema = z
         .number()
         .int()
         .min(1, "하루 최소 1회 인증해야 합니다.")
-        .max(10, "하루 최대 10회까지 설정할 수 있어요."),
+        .max(4, "하루 최대 4회까지 설정할 수 있어요."),
       allowedTypes: z
         .array(z.literal("PHOTO"))
         .length(1, "사진 인증을 선택해주세요."),

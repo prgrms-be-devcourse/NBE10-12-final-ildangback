@@ -178,10 +178,10 @@ export function ChallengeSettingsEditor({
           </>
         )}
         <TextField
-          label="하루 인증 횟수 (1~10회)"
+          label="하루 인증 횟수 (1~4회)"
           type="number"
           min={1}
-          max={10}
+          max={4}
           error={errors.dailyCheckInCount?.message}
           {...form.register("dailyCheckInCount", { valueAsNumber: true })}
         />

@@ -79,11 +79,27 @@ export function ChallengeProgress({
   currentDay,
   totalDays,
   periodProgressRate,
+  groupCompletedDayCount,
+  variant = "group",
 }: {
   currentDay: number;
   totalDays: number;
   periodProgressRate: number;
+  groupCompletedDayCount?: number;
+  variant?: "group" | "period";
 }) {
+  // 기간 전용 표시는 그룹 목록에서 명시적으로 요청한다. 성공일 누락을 기간 진행률로 대체하지 않는다.
+  const showsGroupProgress = variant === "group";
+  const hasSuccessCount =
+    typeof groupCompletedDayCount === "number" &&
+    Number.isFinite(groupCompletedDayCount) &&
+    groupCompletedDayCount >= 0;
+  const successRate = !hasSuccessCount
+    ? null
+    : totalDays > 0
+      ? Math.round((groupCompletedDayCount / totalDays) * 1000) / 10
+      : 0;
+  const displayedRate = showsGroupProgress ? successRate : periodProgressRate;
   return (
     <div className="space-y-3">
       <p className="text-[14px]">
@@ -93,21 +109,39 @@ export function ChallengeProgress({
       <div className="flex items-center gap-2">
         <div
           role="progressbar"
-          aria-label="챌린지 진행률"
+          aria-label={showsGroupProgress ? "그룹 인증 성공률" : "챌린지 진행률"}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-valuenow={periodProgressRate}
-          className="h-2.5 flex-1 overflow-hidden rounded-full bg-gray-100"
+          aria-valuenow={displayedRate ?? undefined}
+          aria-valuetext={
+            displayedRate === null ? "그룹 성공일 정보 없음" : undefined
+          }
+          className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-gray-100"
         >
+          {showsGroupProgress && (
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-gray-400"
+              style={{
+                width: `${Math.max(0, Math.min(100, periodProgressRate))}%`,
+              }}
+            />
+          )}
           <div
-            className="h-full rounded-full bg-purple-500"
+            className="absolute inset-y-0 left-0 z-10 rounded-full bg-purple-500"
             style={{
-              width: `${Math.max(0, Math.min(100, periodProgressRate))}%`,
+              width: `${Math.max(0, Math.min(100, displayedRate ?? 0))}%`,
             }}
           />
         </div>
-        <span className="text-[13px] font-semibold text-purple-500">
-          {periodProgressRate}%
+        <span
+          className="text-[13px] font-semibold text-purple-500"
+          title={
+            displayedRate === null
+              ? "그룹 성공일 정보가 응답에 없습니다."
+              : undefined
+          }
+        >
+          {displayedRate === null ? "—" : `${displayedRate}%`}
         </span>
       </div>
     </div>

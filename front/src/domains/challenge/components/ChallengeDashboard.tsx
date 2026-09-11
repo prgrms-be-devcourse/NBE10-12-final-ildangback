@@ -15,6 +15,7 @@ import type {
   MemberTodayStatusResponse,
 } from "../types";
 import { ChallengeProgress, StatusBadge } from "./ChallengeInfo";
+import { ExtensionChoicePanel } from "./ExtensionChoicePanel";
 
 export function ChallengeDashboard({
   data,
@@ -24,7 +25,9 @@ export function ChallengeDashboard({
   characters,
   isCurrent,
   currentKnown,
+  currentUserId,
   onDelegate,
+  onExtensionSaved,
 }: {
   data: ChallengeStatusResponse;
   name: string;
@@ -33,10 +36,13 @@ export function ChallengeDashboard({
   characters: ChallengeCharacterResponse[] | null;
   isCurrent: boolean;
   currentKnown: boolean;
+  currentUserId?: number;
   onDelegate?: (member: MemberTodayStatusResponse) => void;
+  onExtensionSaved: () => void;
 }) {
   const { showToast } = useToast();
   const [tab, setTab] = useState("현황");
+  const [delegating, setDelegating] = useState(false);
   const { challenge } = data;
   const canCheckIn = isCurrent && challenge.status === "ACTIVE";
   const gym = mapType === "GYM";
@@ -59,7 +65,10 @@ export function ChallengeDashboard({
           {frequencyLabel(challenge)} · 하루 {challenge.dailyCheckInCount}회
           인증
         </p>
-        <ChallengeProgress {...data} />
+        <ChallengeProgress
+          {...data}
+          groupCompletedDayCount={challenge.groupCompletedDayCount}
+        />
         <p className="text-right text-xs text-purple-500">
           남은 인증 예정일 {Math.max(0, data.totalDays - data.currentDay)}일
         </p>
@@ -120,73 +129,114 @@ export function ChallengeDashboard({
         aria-labelledby={`challenge-tab-${tab}`}
       >
         {tab === "현황" ? (
-          <div className="overflow-hidden rounded-2xl border border-purple-200 bg-purple-50">
-            {mapType ? (
-              <div className="relative isolate">
-                <img
-                  src={gym ? sportsMap : studyMap}
-                  alt={gym ? "운동 챌린지 공간" : "공부 챌린지 공간"}
-                  className="aspect-[4/3] w-full object-cover"
-                />
-                <div className="absolute bottom-5 left-1/2 flex w-[min(16rem,calc(100%-2rem))] -translate-x-1/2 flex-wrap items-end justify-center gap-x-2 gap-y-2 min-[400px]:gap-x-3">
-                  {characters?.map((character) => (
-                    <div
-                      key={character.userId}
-                      className="flex w-[calc((100%-1.5rem)/3)] min-w-0 flex-col items-center gap-1"
-                    >
-                      <CharacterRenderer
-                        pose={character.pose}
-                        slots={character.slots}
-                        label={`${character.nickname} 캐릭터`}
-                        className="h-12 w-12 min-[360px]:h-13 min-[360px]:w-13 min-[400px]:h-14 min-[400px]:w-14 sm:h-16 sm:w-16"
-                      />
-                      <span className="max-w-full truncate rounded bg-white/90 px-2 py-1 text-[10px] text-gray-900">
-                        {character.nickname}
-                      </span>
-                    </div>
-                  ))}
+          <div className="space-y-4">
+            <div className="overflow-hidden rounded-2xl border border-purple-200 bg-purple-50">
+              {mapType ? (
+                <div className="relative isolate">
+                  <img
+                    src={gym ? sportsMap : studyMap}
+                    alt={gym ? "운동 챌린지 공간" : "공부 챌린지 공간"}
+                    className="aspect-[4/3] w-full object-cover"
+                  />
+                  <div className="absolute bottom-5 left-1/2 flex w-[min(16rem,calc(100%-2rem))] -translate-x-1/2 flex-wrap items-end justify-center gap-x-2 gap-y-2 min-[400px]:gap-x-3">
+                    {characters?.map((character) => (
+                      <div
+                        key={character.userId}
+                        className="flex w-[calc((100%-1.5rem)/3)] min-w-0 flex-col items-center gap-1"
+                      >
+                        <CharacterRenderer
+                          pose={character.pose}
+                          slots={character.slots}
+                          label={`${character.nickname} 캐릭터`}
+                          className="h-12 w-12 min-[360px]:h-13 min-[360px]:w-13 min-[400px]:h-14 min-[400px]:w-14 sm:h-16 sm:w-16"
+                        />
+                        <span className="max-w-full truncate rounded bg-white/90 px-2 py-1 text-[10px] text-gray-900">
+                          {character.nickname}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <p className="p-8 text-center text-sm text-gray-500">
-                챌린지 공간 정보를 확인할 수 없어요.
-              </p>
-            )}
-            {members && (
-              <ul className="grid grid-cols-3 gap-4 bg-white p-4">
-                {members.map((member) => (
-                  <li key={member.userId} className="min-w-0 text-center">
-                    <div className="flex flex-wrap items-center justify-center gap-x-1">
-                      <span className="min-w-0 truncate text-xs font-semibold">
-                        {member.nickname}
+              ) : (
+                <p className="p-8 text-center text-sm text-gray-500">
+                  챌린지 공간 정보를 확인할 수 없어요.
+                </p>
+              )}
+              {members && (
+                <div className="bg-white p-4">
+                  {onDelegate && (
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <span className="text-xs text-gray-500">
+                        {delegating
+                          ? "위임할 그룹원을 선택해주세요."
+                          : "그룹원"}
                       </span>
-                      {onDelegate && member.userId !== challenge.ownerId && (
-                        <button
-                          type="button"
-                          onClick={() => onDelegate(member)}
-                          aria-label={`${member.nickname} 님에게 위임하기`}
-                          className="min-h-9 rounded px-1 text-xs text-purple-700 underline hover:bg-purple-50"
-                        >
-                          위임하기
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setDelegating((value) => !value)}
+                        className="text-xs font-semibold text-purple-700 underline"
+                      >
+                        {delegating ? "위임 취소" : "위임하기"}
+                      </button>
                     </div>
-                    {challenge.status === "ACTIVE" && data.isCheckInDay && (
-                      <p className="mt-1 flex items-center justify-center gap-1 text-xs text-purple-500">
-                        {member.todayCheckInCount}/{challenge.dailyCheckInCount}
-                        {member.todayCheckInCount >=
-                          challenge.dailyCheckInCount && (
-                          <img
-                            src={check}
-                            alt="인증 완료"
-                            className="h-4 w-4 object-contain"
-                          />
-                        )}
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ul>
+                  )}
+                  <ul className="grid grid-cols-3 gap-4">
+                    {members.map((member) => {
+                      const isDelegateTarget =
+                        delegating &&
+                        !!onDelegate &&
+                        member.userId !== challenge.ownerId;
+                      return (
+                        <li key={member.userId} className="min-w-0 text-center">
+                          <div className="flex flex-wrap items-center justify-center gap-x-1">
+                            {isDelegateTarget ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onDelegate(member);
+                                  setDelegating(false);
+                                }}
+                                aria-label={`${member.nickname} 님에게 그룹장 위임`}
+                                className="min-w-0 max-w-full cursor-pointer truncate rounded px-1 text-xs font-semibold text-purple-700 underline decoration-dotted hover:text-purple-900"
+                              >
+                                {member.nickname}
+                              </button>
+                            ) : (
+                              <span className="min-w-0 truncate text-xs font-semibold">
+                                {member.nickname}
+                              </span>
+                            )}
+                          </div>
+                          {challenge.status === "ACTIVE" &&
+                            data.isCheckInDay && (
+                              <p className="mt-1 flex items-center justify-center gap-1 text-xs text-purple-500">
+                                {member.todayCheckInCount}/
+                                {challenge.dailyCheckInCount}
+                                {member.todayCheckInCount >=
+                                  challenge.dailyCheckInCount && (
+                                  <img
+                                    src={check}
+                                    alt="인증 완료"
+                                    className="h-4 w-4 object-contain"
+                                  />
+                                )}
+                              </p>
+                            )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
+            {isCurrent && challenge.status === "ACTIVE" && (
+              <ExtensionChoicePanel
+                challengeId={challenge.id}
+                endDate={challenge.endDate}
+                members={members ?? undefined}
+                currentUserId={currentUserId}
+                onSaved={onExtensionSaved}
+              />
             )}
           </div>
         ) : (
