@@ -7,6 +7,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { useBodyScrollLock } from "../lib/useBodyScrollLock";
 
 interface Props {
@@ -81,7 +82,7 @@ export function BottomSheet({ isOpen, onClose, title, children }: Props) {
     close();
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
       <div
         data-testid="bottomsheet-backdrop"
@@ -118,6 +119,7 @@ export function BottomSheet({ isOpen, onClose, title, children }: Props) {
 
         <div className="px-5 pt-4">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
