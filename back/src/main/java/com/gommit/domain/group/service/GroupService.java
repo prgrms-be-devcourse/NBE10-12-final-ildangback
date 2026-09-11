@@ -21,6 +21,7 @@ import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import com.gommit.global.time.BusinessClock;
 import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.util.Comparator;
@@ -45,6 +46,7 @@ public class GroupService {
     private final ChallengeMemberService challengeMemberService;
     private final ChallengeProgressCalculator challengeProgressCalculator;
     private final PersonalPointService personalPointService;
+    private final BusinessClock businessClock;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final String INVITE_CODE_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final int INVITE_CODE_LENGTH = 6;
@@ -389,15 +391,14 @@ public class GroupService {
         Challenge challenge = member.getChallenge();
         int participantCount = (int)
                 challengeMemberRepository.countByChallengeIdAndStatus(challenge.getId(), ChallengeMemberStatus.ACTIVE);
-        LocalDate today = LocalDate.now();
+        LocalDate today = businessClock.today();
         int currentDay = challengeProgressCalculator.calculateCurrentDay(challenge, today);
         int totalDays = challenge.getRequiredDayCount();
         double periodProgressRate = challengeProgressCalculator.calculatePeriodProgressRate(currentDay, totalDays);
         int todayCheckInCount = 0;
         if (challenge.getStatus() == ChallengeStatus.ACTIVE) {
-            // TODO: CheckInRepository 연동 후 실제 값으로 변경
-            //            todayCheckInCount = (int)
-            // checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challenge.getId(), userId, today);
+            todayCheckInCount =
+                    checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challenge.getId(), userId, today);
         }
         boolean todayCompleted = challenge.getStatus() == ChallengeStatus.ACTIVE
                 && todayCheckInCount >= challenge.getDailyCheckInCount();
@@ -450,6 +451,81 @@ public class GroupService {
                     // 추방도 중도 탈퇴와 동일하게 그 챌린지에서 번 포인트를 회수한다(Should).
                     personalPointService.recoverChallengePoints(userId, challengeId, groupName);
                 });
+    }
+
+    // 회원 탈퇴 시 그룹 정리
+    @Transactional
+    public void leaveAllGroupsOnAccountDeletion(Long userId) {
+        List<GroupMember> groupMembers =
+                groupMemberRepository.findAllByUserIdAndStatus(userId, GroupMemberStatus.ACTIVE);
+        for (GroupMember groupMember : groupMembers) {
+            groupMember.leave();
+            ChallengeGroup group = groupMember.getGroup();
+            boolean ownerLeaving = group.getOwnerId().equals(userId);
+            Long newOwnerId = ownerLeaving ? pickNewOwner(group.getId(), userId) : null;
+            leaveChallengesOnAccountDeletion(group.getId(), userId, newOwnerId);
+            if (!ownerLeaving) {
+                continue;
+            }
+            if (newOwnerId == null) {
+                group.end();
+            } else {
+                group.changeOwner(newOwnerId);
+            }
+        }
+    }
+
+    // 새 방장 선정
+    private Long pickNewOwner(Long groupId, Long userId) {
+        List<GroupMember> remainingMembers =
+                groupMemberRepository.findAllByGroupIdAndStatus(groupId, GroupMemberStatus.ACTIVE).stream()
+                        .filter(member -> !member.getUserId().equals(userId))
+                        .toList();
+        return remainingMembers.isEmpty()
+                ? null
+                : remainingMembers
+                        .get(SECURE_RANDOM.nextInt(remainingMembers.size()))
+                        .getUserId();
+    }
+
+    // 살아 있는 시즌 정리
+    private void leaveChallengesOnAccountDeletion(Long groupId, Long userId, Long preferredOwnerId) {
+        for (ChallengeStatus status : List.of(ChallengeStatus.ACTIVE, ChallengeStatus.READY)) {
+            challengeRepository
+                    .findFirstByGroupIdAndStatus(groupId, status)
+                    .ifPresent(challenge -> leaveChallengeMemberAndDelegate(challenge, userId, preferredOwnerId));
+        }
+    }
+
+    // 시즌 이탈과 OWNER 이관
+    private void leaveChallengeMemberAndDelegate(Challenge challenge, Long userId, Long preferredOwnerId) {
+        ChallengeMember leavingMember = challengeMemberRepository
+                .findByChallengeIdAndUserId(challenge.getId(), userId)
+                .filter(member -> member.getStatus() == ChallengeMemberStatus.ACTIVE)
+                .orElse(null);
+        if (leavingMember == null) {
+            return;
+        }
+        leavingMember.leave();
+        if (leavingMember.getRole() != ChallengeMemberRole.OWNER) {
+            return;
+        }
+        leavingMember.changeRole(ChallengeMemberRole.MEMBER);
+        List<ChallengeMember> remainingMembers =
+                challengeMemberRepository
+                        .findAllByChallengeIdAndStatus(challenge.getId(), ChallengeMemberStatus.ACTIVE)
+                        .stream()
+                        .filter(member -> !member.getUserId().equals(userId))
+                        .toList();
+        if (remainingMembers.isEmpty()) {
+            challenge.end();
+            return;
+        }
+        ChallengeMember newOwner = remainingMembers.stream()
+                .filter(member -> member.getUserId().equals(preferredOwnerId))
+                .findFirst()
+                .orElseGet(() -> remainingMembers.get(SECURE_RANDOM.nextInt(remainingMembers.size())));
+        newOwner.changeRole(ChallengeMemberRole.OWNER);
     }
 
     @Transactional

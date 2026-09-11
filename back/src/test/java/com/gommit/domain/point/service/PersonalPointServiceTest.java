@@ -20,8 +20,12 @@ import com.gommit.domain.point.repository.UserPointRepository;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import com.gommit.global.time.BusinessClock;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +47,8 @@ class PersonalPointServiceTest {
     @Mock
     private UserPointRepository userPointRepository;
 
-    private final PointPeriodCalculator periodCalculator = new PointPeriodCalculator();
+    private final PointPeriodCalculator periodCalculator = new PointPeriodCalculator(new BusinessClock(
+            Clock.fixed(LocalDateTime.of(2026, 9, 15, 14, 0).toInstant(ZoneOffset.UTC), ZoneId.of("UTC"))));
 
     private PersonalPointService personalPointService;
 
@@ -335,8 +340,8 @@ class PersonalPointServiceTest {
             ArgumentCaptor<LocalDateTime> to = ArgumentCaptor.forClass(LocalDateTime.class);
             verify(userPointHistoryRepository)
                     .findHistories(any(), any(), from.capture(), to.capture(), any(), any(), any());
-            LocalDate expectedFirstDay = periodCalculator.businessMonthFirstDay(LocalDateTime.now());
-            assertThat(from.getValue()).isEqualTo(expectedFirstDay.atTime(4, 0));
+            // periodCalculator 는 2026-09-15 로 고정된 BusinessClock 사용 → 이번 영업월 1일 = 2026-09-01
+            assertThat(from.getValue()).isEqualTo(LocalDateTime.of(2026, 9, 1, 4, 0));
             assertThat(to.getValue()).isNull();
         }
 
@@ -353,10 +358,9 @@ class PersonalPointServiceTest {
             ArgumentCaptor<LocalDateTime> to = ArgumentCaptor.forClass(LocalDateTime.class);
             verify(userPointHistoryRepository)
                     .findHistories(any(), any(), from.capture(), to.capture(), any(), any(), any());
-            LocalDate thisMonthFirstDay = periodCalculator.businessMonthFirstDay(LocalDateTime.now());
-            assertThat(from.getValue())
-                    .isEqualTo(thisMonthFirstDay.minusMonths(1).atTime(4, 0));
-            assertThat(to.getValue()).isEqualTo(thisMonthFirstDay.atTime(4, 0));
+            // 고정 BusinessClock(2026-09-15) → 이번 영업월 1일 = 2026-09-01, 지난달 = 2026-08-01
+            assertThat(from.getValue()).isEqualTo(LocalDateTime.of(2026, 8, 1, 4, 0));
+            assertThat(to.getValue()).isEqualTo(LocalDateTime.of(2026, 9, 1, 4, 0));
         }
 
         @Test
