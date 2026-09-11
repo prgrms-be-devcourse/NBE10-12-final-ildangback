@@ -11,13 +11,16 @@ const NONE: ChallengeMember[] = [];
  * #31 머지 전까지만 dev 스텁 응답. 실패해도 화면을 막지 않는다 — 칩이 "전체"
  * 하나로 줄어든다.
  */
-export function useChallengeMembers(challengeId: number): ChallengeMember[] {
+export function useChallengeMembers(
+  challengeId: number,
+  enabled = true,
+): ChallengeMember[] {
   return useFetchOnce(
     () =>
-      Number.isNaN(challengeId)
+      !enabled || Number.isNaN(challengeId)
         ? Promise.resolve(NONE)
         : getChallengeMembers(challengeId),
-    [challengeId],
+    [challengeId, enabled],
     NONE,
   );
 }

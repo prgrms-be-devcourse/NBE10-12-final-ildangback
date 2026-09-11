@@ -1,5 +1,5 @@
 import { CharacterRenderer } from "../../user/components/CharacterRenderer";
-import { useToast } from "../../../shared/lib/useToast";
+import { useNavigate } from "react-router";
 import { frequencyLabel } from "../presentation";
 import { useState } from "react";
 import studyMap from "../../../assets/icons/studyMap.webp";
@@ -16,6 +16,8 @@ import type {
 } from "../types";
 import { ChallengeProgress, StatusBadge } from "./ChallengeInfo";
 import { ExtensionChoicePanel } from "./ExtensionChoicePanel";
+import { CheckInGalleryTab } from "../../checkin/components/CheckInGalleryTab";
+import { CheckInMethodSheet } from "../../checkin/components/CheckInMethodSheet";
 
 export function ChallengeDashboard({
   data,
@@ -40,11 +42,29 @@ export function ChallengeDashboard({
   onDelegate?: (member: MemberTodayStatusResponse) => void;
   onExtensionSaved: () => void;
 }) {
-  const { showToast } = useToast();
+  const navigate = useNavigate();
   const [tab, setTab] = useState("현황");
   const [delegating, setDelegating] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const { challenge } = data;
-  const canCheckIn = isCurrent && challenge.status === "ACTIVE";
+  const canCheckIn =
+    isCurrent &&
+    challenge.status === "ACTIVE" &&
+    data.isCheckInDay &&
+    !data.myCompleted;
+  const checkInHint = canCheckIn
+    ? null
+    : challenge.status === "READY"
+      ? "시작 전인 시즌은 인증할 수 없어요."
+      : challenge.status === "ENDED"
+        ? "종료된 시즌은 기록 조회만 가능해요."
+        : !isCurrent
+          ? currentKnown
+            ? "현재 시즌에서만 인증할 수 있어요."
+            : "현재 시즌 정보를 확인할 수 없어 인증할 수 없어요."
+          : data.isCheckInDay
+            ? "오늘 인증을 모두 마쳤어요."
+            : "오늘은 인증하는 날이 아니에요.";
   const gym = mapType === "GYM";
   return (
     <>
@@ -81,27 +101,21 @@ export function ChallengeDashboard({
         <button
           type="button"
           disabled={!canCheckIn}
-          onClick={() => showToast("인증 기능은 준비중입니다.")}
-          aria-describedby="check-in-unavailable"
+          onClick={() => setSheetOpen(true)}
+          aria-describedby={checkInHint ? "check-in-unavailable" : undefined}
           className="flex h-13 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-purple-100 font-semibold text-purple-700 hover:bg-purple-200 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500 disabled:opacity-50"
         >
           <img src={camera} alt="" className="h-5 w-5 object-contain" />
           오늘 인증하기
         </button>
-        <p
-          id="check-in-unavailable"
-          className="text-center text-xs text-gray-500"
-        >
-          {canCheckIn
-            ? "인증 기능은 준비중입니다."
-            : challenge.status === "READY"
-              ? "시작 전인 시즌은 인증할 수 없어요."
-              : challenge.status === "ENDED"
-                ? "종료된 시즌은 기록 조회만 가능해요."
-                : currentKnown
-                  ? "현재 시즌에서만 인증할 수 있어요."
-                  : "현재 시즌 정보를 확인할 수 없어 인증할 수 없어요."}
-        </p>
+        {checkInHint && (
+          <p
+            id="check-in-unavailable"
+            className="text-center text-xs text-gray-500"
+          >
+            {checkInHint}
+          </p>
+        )}
       </section>
       <div
         role="tablist"
@@ -239,12 +253,27 @@ export function ChallengeDashboard({
               />
             )}
           </div>
+        ) : tab === "갤러리" ? (
+          <CheckInGalleryTab challengeId={challenge.id} members={members} />
         ) : (
           <p className="rounded-2xl bg-purple-50 px-5 py-12 text-center text-sm text-gray-500">
             {tab} 기능을 준비 중이에요.
           </p>
         )}
       </section>
+      <CheckInMethodSheet
+        isOpen={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        loading={false}
+        status={{
+          currentCount: data.myCurrentCount,
+          targetCount: challenge.dailyCheckInCount,
+          allowedTypes: challenge.allowedTypes.includes("PHOTO")
+            ? ["PHOTO"]
+            : [],
+        }}
+        onSelectPhoto={() => navigate(`/challenges/${challenge.id}/check-in`)}
+      />
     </>
   );
 }

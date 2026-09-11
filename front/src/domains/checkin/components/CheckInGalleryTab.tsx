@@ -2,7 +2,7 @@ import { useState } from "react";
 import { currentMonth } from "../lib/month";
 import { useChallengeMembers } from "../lib/useChallengeMembers";
 import { useCheckInGallery } from "../lib/useCheckInGallery";
-import type { CheckIn } from "../types";
+import type { ChallengeMember, CheckIn } from "../types";
 import { CheckInGridSection } from "./CheckInGridSection";
 import { CheckInLightbox } from "./CheckInLightbox";
 import { Chip } from "./Chip";
@@ -14,16 +14,26 @@ import { MonthNav } from "./MonthNav";
  * 월 네비 + 참여자 필터 칩 + 3열 평평한 그리드(커서 무한스크롤). 셀을 탭하면 라이트박스로
  * 확대되고 사진 아래에 시간·memo·작성자가 뜬다.
  */
-export function CheckInGalleryTab({ challengeId }: { challengeId: number }) {
+export function CheckInGalleryTab({
+  challengeId,
+  members: preloadedMembers,
+}: {
+  challengeId: number;
+  members?: ChallengeMember[] | null;
+}) {
   const [month, setMonth] = useState(currentMonth);
   const [userId, setUserId] = useState<number | null>(null);
   const [selected, setSelected] = useState<CheckIn | null>(null);
 
-  const members = useChallengeMembers(challengeId);
+  const fetchedMembers = useChallengeMembers(
+    challengeId,
+    preloadedMembers == null,
+  );
+  const members = preloadedMembers ?? fetchedMembers;
   const result = useCheckInGallery(challengeId, { month, userId });
 
   return (
-    <div className="px-4 pt-4 pb-10">
+    <div className="pt-2">
       <MonthNav month={month} onChange={setMonth} />
 
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">

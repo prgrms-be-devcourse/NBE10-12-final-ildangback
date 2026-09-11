@@ -8,7 +8,10 @@ interface Props {
   onClose: () => void;
   loading: boolean;
   error?: boolean;
-  status: TodayCheckInStatus | null;
+  status: Pick<
+    TodayCheckInStatus,
+    "currentCount" | "targetCount" | "allowedTypes"
+  > | null;
   onSelectPhoto: () => void;
 }
 
