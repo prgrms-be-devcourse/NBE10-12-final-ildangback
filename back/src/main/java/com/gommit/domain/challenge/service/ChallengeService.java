@@ -9,6 +9,7 @@ import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.domain.checkin.repository.CheckInRepository;
+import com.gommit.domain.checkin.service.GroupCompletionQueryService;
 import com.gommit.domain.group.entity.ChallengeGroup;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
 import com.gommit.domain.user.entity.User;
@@ -37,6 +38,7 @@ public class ChallengeService {
     private final ChallengeMemberService challengeMemberService;
     private final ChallengeProgressCalculator challengeProgressCalculator;
     private final BusinessClock businessClock;
+    private final GroupCompletionQueryService groupCompletionQueryService;
 
     @Transactional
     public Challenge createInitialChallenge(Long groupId, Long userId, InitialChallengeSettingRequest setting) {
@@ -88,8 +90,11 @@ public class ChallengeService {
         boolean checkInDay = challengeProgressCalculator.canCheckInOn(challenge, today);
         LocalDate previousCheckInDay = challengeProgressCalculator.previousCheckInDay(challenge, today);
         int groupCurrentStreak = challenge.groupCurrentStreakAsOf(today, previousCheckInDay);
-        ChallengeDetailResponse challengeDetailResponse =
-                new ChallengeDetailResponse(challenge, owner.getUserId(), groupCurrentStreak);
+        ChallengeDetailResponse challengeDetailResponse = new ChallengeDetailResponse(
+                challenge,
+                owner.getUserId(),
+                groupCurrentStreak,
+                groupCompletionQueryService.countCompletedDays(challenge, today));
         int myCurrentCount = checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(challengeId, userId, today);
         boolean myCompleted = myCurrentCount >= challenge.getDailyCheckInCount();
         // TODO: 연장 가능 기간 정책 적용
@@ -123,7 +128,8 @@ public class ChallengeService {
                     User user = userMap.get(member.getUserId());
                     int todayCheckInCount = checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(
                             challengeId, member.getUserId(), today);
-                    return new MemberTodayStatusResponse(member.getUserId(), user.getNickname(), todayCheckInCount);
+                    return new MemberTodayStatusResponse(
+                            member.getUserId(), user.getNickname(), todayCheckInCount, member.getExtensionChoice());
                 })
                 .toList();
     }
@@ -187,8 +193,9 @@ public class ChallengeService {
         if (dailyCheckInCount < 1 || dailyCheckInCount > 10) {
             throw new BusinessException(ErrorCode.INVALID_DAILY_COUNT);
         }
-        List<CheckInType> allowedTypes =
-                request.allowedTypes() != null ? request.allowedTypes() : challenge.allowedCheckInTypes();
+        List<CheckInType> allowedTypes = request.allowedTypes() != null
+                ? request.allowedTypes()
+                : challenge.isAllowPhoto() ? List.of(CheckInType.PHOTO) : List.of();
         if (allowedTypes.isEmpty()) {
             throw new BusinessException(ErrorCode.NO_CHECK_IN_METHOD);
         }

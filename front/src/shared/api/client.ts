@@ -98,7 +98,7 @@ function refreshAccessToken(): Promise<string> {
 // ---------------------------------------------------------------------------
 
 interface RequestOptions {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   /**
    * 함수로 주면 보내기 직전에 평가한다. 401 → 갱신 → 재시도 경로에서 값이 바뀌는
    * 본문(RT)에 필요하다. 미리 만들어두면 재시도가 옛 RT 를 그대로 보낸다.

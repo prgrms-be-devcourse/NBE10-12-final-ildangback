@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ChallengeMemberRepository extends JpaRepository<ChallengeMember, Long> {
+    List<ChallengeMember> findAllByChallengeId(Long challengeId);
+
     Optional<ChallengeMember> findByChallengeIdAndUserId(Long challengeId, Long userId);
 
     Optional<ChallengeMember> findByChallengeIdAndRole(Long challengeId, ChallengeMemberRole role);

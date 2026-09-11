@@ -21,6 +21,6 @@ public record InitialChallengeSettingRequest(
 
         List<DaysOfWeek> daysOfWeek,
 
-        @NotNull @Min(1) @Max(10) Integer dailyCheckInCount,
+        @NotNull @Min(1) @Max(4) Integer dailyCheckInCount,
 
         @NotEmpty(message = "인증 방식은 최소 1개 이상 선택해야 합니다.") List<CheckInType> allowedTypes) {}

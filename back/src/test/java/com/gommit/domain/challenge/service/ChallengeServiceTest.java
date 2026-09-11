@@ -18,11 +18,13 @@ import com.gommit.domain.challenge.entity.ChallengeMember;
 import com.gommit.domain.challenge.entity.ChallengeMemberRole;
 import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.entity.ChallengeStatus;
+import com.gommit.domain.challenge.entity.ExtensionChoice;
 import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.domain.checkin.repository.CheckInRepository;
+import com.gommit.domain.checkin.service.GroupCompletionQueryService;
 import com.gommit.domain.group.entity.ChallengeGroup;
 import com.gommit.domain.group.entity.GroupCategory;
 import com.gommit.domain.group.entity.MapType;
@@ -78,6 +80,9 @@ class ChallengeServiceTest {
 
     @Mock
     private BusinessClock businessClock;
+
+    @Mock
+    private GroupCompletionQueryService groupCompletionQueryService;
 
     @InjectMocks
     private ChallengeService challengeService;
@@ -352,6 +357,38 @@ class ChallengeServiceTest {
     class GetChallengeStatus {
 
         @Test
+        @DisplayName("주입된 businessDate로 진행일과 인증 가능일 및 내 인증 횟수를 계산한다")
+        void usesInjectedBusinessDateForStatus() {
+            LocalDate today = LocalDate.of(2026, 9, 10);
+            when(businessClock.today()).thenReturn(today);
+            Challenge challenge = challenge(50L, ChallengeStatus.ACTIVE);
+            ReflectionTestUtils.setField(challenge, "startDate", today.minusDays(1));
+            ReflectionTestUtils.setField(challenge, "endDate", today.plusDays(5));
+            ReflectionTestUtils.setField(challenge, "frequencyType", FrequencyType.DAILY);
+            ChallengeMember member = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
+            ChallengeMember owner = challengeMember(71L, challenge, 1L, ChallengeMemberRole.OWNER);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(member));
+            when(challengeMemberRepository.findByChallengeIdAndRole(50L, ChallengeMemberRole.OWNER))
+                    .thenReturn(Optional.of(owner));
+            when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(50L, 2L, today))
+                    .thenReturn(1);
+            when(groupCompletionQueryService.countCompletedDays(challenge, today))
+                    .thenReturn(1);
+
+            var response = challengeService.getChallengeStatus(50L, 2L);
+
+            assertThat(response.currentDay()).isEqualTo(2);
+            assertThat(response.isCheckInDay()).isTrue();
+            assertThat(response.myCurrentCount()).isEqualTo(1);
+            assertThat(response.challenge().groupCompletedDayCount()).isEqualTo(1);
+            verify(groupCompletionQueryService).countCompletedDays(challenge, today);
+            verify(challengeProgressCalculator).calculateCurrentDay(challenge, today);
+            verify(challengeProgressCalculator).canCheckInOn(challenge, today);
+            verify(checkInRepository).countByChallengeIdAndUserIdAndBusinessDate(50L, 2L, today);
+        }
+
+        @Test
         @DisplayName("챌린지와 멤버 권한을 확인하고 진행 현황을 반환한다")
         void returnsChallengeStatus() {
             // given
@@ -509,9 +546,10 @@ class ChallengeServiceTest {
     @DisplayName("getMemberTodayStatuses - 시즌 멤버 오늘 인증 현황")
     class GetMemberTodayStatuses {
 
-        @Test
-        @DisplayName("참여 중인 멤버들의 닉네임과 오늘 인증 횟수를 반환한다")
-        void returnsMemberTodayStatuses() {
+        @ParameterizedTest
+        @EnumSource(ExtensionChoice.class)
+        @DisplayName("참여 멤버의 실제 인증 횟수와 연장 투표 선택을 함께 반환한다")
+        void returnsMemberTodayStatuses(ExtensionChoice choice) {
             // given
             Challenge challenge = challenge(50L, ChallengeStatus.ACTIVE);
             ChallengeMember requester = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
@@ -522,6 +560,13 @@ class ChallengeServiceTest {
                     .thenReturn(List.of(requester, member));
             when(userRepository.findAllByIdIn(List.of(1L, 2L))).thenReturn(List.of(user(1L, "방장"), user(2L, "멤버")));
 
+            when(businessClock.today()).thenReturn(LocalDate.of(2026, 9, 10));
+            member.changeExtensionChoice(choice);
+            when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(50L, 1L, businessClock.today()))
+                    .thenReturn(0);
+            when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(50L, 2L, businessClock.today()))
+                    .thenReturn(2);
+
             // when
             var response = challengeService.getMemberTodayStatuses(50L, 1L);
 
@@ -530,6 +575,9 @@ class ChallengeServiceTest {
             assertThat(response.get(0).nickname()).isEqualTo("방장");
             assertThat(response.get(0).todayCheckInCount()).isZero();
             assertThat(response.get(1).nickname()).isEqualTo("멤버");
+            assertThat(response.get(1).todayCheckInCount()).isEqualTo(2);
+            assertThat(response.get(0).extensionChoice()).isEqualTo(ExtensionChoice.PENDING);
+            assertThat(response.get(1).extensionChoice()).isEqualTo(choice);
         }
 
         @Test
