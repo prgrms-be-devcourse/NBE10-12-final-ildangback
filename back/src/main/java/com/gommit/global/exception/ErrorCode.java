@@ -72,6 +72,8 @@ public enum ErrorCode {
     POINT_HISTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 포인트 이력입니다."),
 
     // ===== record =====
+    MONTHLY_MERGE_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 월간 머지입니다."),
+    FINAL_MERGE_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 최종 머지입니다."),
 
     // ===== user =====
     EMAIL_DUPLICATED(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
