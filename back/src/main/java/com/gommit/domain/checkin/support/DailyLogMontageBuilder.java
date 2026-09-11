@@ -34,7 +34,9 @@ public class DailyLogMontageBuilder {
     private static final int CANVAS_WIDTH = 1280;
     private static final int FPS = 30; // 동영상 인증 대비해 30fps 로 통일
     private static final String PRESET = "veryfast";
-    private static final long TIMEOUT_SECONDS = 120;
+    // 예전엔 통짜 120초 하나였는데, 회차별 렌더로 쪼개면서 회차당 예산 + concat(재인코딩 없음) 예산으로 분리.
+    private static final long ROUND_TIMEOUT_SECONDS = 30;
+    private static final long CONCAT_TIMEOUT_SECONDS = 15;
 
     private final String ffmpegPath;
 
@@ -173,15 +175,42 @@ public class DailyLogMontageBuilder {
         ImageIO.write(cropped, "jpg", dest.toFile());
     }
 
+    // 회차별로 별도 ffmpeg 프로세스를 돌려 round_NN.mp4 를 만들고 마지막에 -c copy 로 이어붙인다.
+    // 이전엔 grid×round(최대 48)개 입력을 filter_complex 하나에 동시에 열었는데, 그 구조 자체가
+    // ffmpeg 가 인코딩 시작 전에 전부 초기화하며 메모리를 크게 무는 원인이었다(2026-09-11 실측).
+    // 이제 한 ffmpeg 프로세스가 여는 입력은 grid(≤6)개로 고정 — 회차 수가 늘어도 peak RSS 는 안 늘어난다.
+    // 회차 하나라도 실패/타임아웃하면 몽타주 전체를 포기한다(-1) — 새 상태 추적 없이 기존 재시도
+    // 모델(DailyLogMontageScheduler sweep 이 videoKey null 인 걸 재선택)에 그대로 얹힌다.
     private int runFfmpeg(
             Path workDir, Layout layout, int roundCount, List<Frame> flat, List<String> inputNames, Path output)
+            throws IOException, InterruptedException {
+        int grid = layout.gridCells();
+        List<String> roundFiles = new ArrayList<>();
+        for (int r = 0; r < roundCount; r++) {
+            int base = r * grid;
+            List<Frame> roundFrames = flat.subList(base, base + grid);
+            List<String> roundInputNames = inputNames.subList(base, base + grid);
+            String roundFile = "round_%02d.mp4".formatted(r);
+            Path roundOutput = workDir.resolve(roundFile);
+
+            int exitCode = runRoundFfmpeg(workDir, layout, roundFrames, roundInputNames, roundOutput);
+            if (exitCode != 0 || !Files.exists(roundOutput)) {
+                log.warn("ffmpeg 회차 렌더 실패 — 몽타주 전체 포기 (round={}, exitCode={})", r, exitCode);
+                return -1;
+            }
+            roundFiles.add(roundFile);
+        }
+        return concatRounds(workDir, roundFiles, output);
+    }
+
+    private int runRoundFfmpeg(
+            Path workDir, Layout layout, List<Frame> roundFrames, List<String> roundInputNames, Path output)
             throws IOException, InterruptedException {
         List<String> command = new ArrayList<>();
         command.add(ffmpegPath);
         command.add("-y");
-
-        for (int i = 0; i < flat.size(); i++) {
-            Frame frame = flat.get(i);
+        for (int i = 0; i < roundFrames.size(); i++) {
+            Frame frame = roundFrames.get(i);
             if (frame == null) {
                 // 검정 칸: ffmpeg의 lavfi 로 인라인 생성(임시 파일/추가 프로세스 불필요).
                 command.add("-f");
@@ -191,24 +220,22 @@ public class DailyLogMontageBuilder {
                 command.add("-i");
                 command.add("color=c=black:s=%dx%d:r=%d".formatted(layout.cellSize(), layout.cellSize(), FPS));
             } else if (frame.kind() == Kind.VIDEO) {
-                // 동영상 칸: 긴 클립은 -t 로 앞 ROUND_SECONDS 초만 디코드. 짧은 클립은 buildFilter 의 tpad 로 보정.
                 // NOTE: 현재 MediaType 에 VIDEO 가 없어 이 경로는 미사용 — 동영상 인증 도입 시 실제 클립으로 검증 필요.
                 command.add("-t");
                 command.add(String.valueOf(ROUND_SECONDS));
                 command.add("-i");
-                command.add(inputNames.get(i));
+                command.add(roundInputNames.get(i));
             } else {
                 command.add("-loop");
                 command.add("1");
                 command.add("-t");
                 command.add(String.valueOf(ROUND_SECONDS));
                 command.add("-i");
-                command.add(inputNames.get(i));
+                command.add(roundInputNames.get(i));
             }
         }
-
         command.add("-filter_complex");
-        command.add(buildFilter(layout, roundCount, flat));
+        command.add(buildRoundFilter(layout, roundFrames));
         command.add("-map");
         command.add("[out]");
         command.add("-r");
@@ -217,33 +244,57 @@ public class DailyLogMontageBuilder {
         command.add("yuv420p");
         command.add("-preset");
         command.add(PRESET);
-        command.add("-movflags");
-        command.add("+faststart");
         command.add(output.getFileName().toString());
+        return run(workDir, command, ROUND_TIMEOUT_SECONDS);
+    }
 
+    // 스트림 복사(-c copy)만 하므로 재인코딩 없음 — 메모리·시간 거의 안 든다.
+    private int concatRounds(Path workDir, List<String> roundFiles, Path output)
+            throws IOException, InterruptedException {
+        StringBuilder list = new StringBuilder();
+        for (String f : roundFiles) {
+            list.append("file '").append(f).append("'\n");
+        }
+        Files.writeString(workDir.resolve("concat.txt"), list.toString());
+        List<String> command = List.of(
+                ffmpegPath,
+                "-y",
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                "concat.txt",
+                "-c",
+                "copy",
+                "-movflags",
+                "+faststart",
+                output.getFileName().toString());
+        return run(workDir, command, CONCAT_TIMEOUT_SECONDS);
+    }
+
+    private int run(Path workDir, List<String> command, long timeoutSeconds) throws IOException, InterruptedException {
         Process process = new ProcessBuilder(command)
                 .directory(workDir.toFile())
                 .redirectErrorStream(true)
                 .start();
-
-        boolean finished = process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
         if (!finished) {
             process.destroyForcibly();
-            log.warn("ffmpeg 타임아웃 ({}초)", TIMEOUT_SECONDS);
+            log.warn("ffmpeg 타임아웃 ({}초)", timeoutSeconds);
             return -1;
         }
         return process.exitValue();
     }
 
-    // 칸별 cover 정규화(짧은 변을 셀에 맞춰 스케일 후 중앙 crop, 동영상은 tpad 로 길이 보정) → 회차별 xstack 그리드 → 회차 concat.
+    // 칸별 cover 정규화(짧은 변을 셀에 맞춰 스케일 후 중앙 crop, 동영상은 tpad 로 길이 보정) → xstack 그리드 한 장.
     // 입력은 이미 writeDownscaledImage 로 cellSize 로 줄어든 상태라 scale 은 사실상 no-op(안전망으로 유지).
-    private static String buildFilter(Layout layout, int roundCount, List<Frame> flat) {
+    private static String buildRoundFilter(Layout layout, List<Frame> roundFrames) {
         int grid = layout.gridCells();
         int s = layout.cellSize();
-        String cellLayout = xstackLayout(layout);
         StringBuilder sb = new StringBuilder();
 
-        for (int i = 0; i < flat.size(); i++) {
+        for (int i = 0; i < roundFrames.size(); i++) {
             sb.append('[')
                     .append(i)
                     .append(":v]")
@@ -258,10 +309,8 @@ public class DailyLogMontageBuilder {
                     .append(s)
                     .append(",setsar=1,fps=")
                     .append(FPS);
-            Frame frame = flat.get(i);
+            Frame frame = roundFrames.get(i);
             if (frame != null && frame.kind() == Kind.VIDEO) {
-                // 클립이 ROUND_SECONDS 보다 짧으면 마지막 프레임을 복제해 채우고, 그다음 정확히 잘라낸다.
-                // (동영상 인증 미도입 상태 — 실제 클립으로 검증 필요)
                 sb.append(",tpad=stop_mode=clone:stop_duration=")
                         .append(ROUND_SECONDS)
                         .append(",trim=duration=")
@@ -271,29 +320,18 @@ public class DailyLogMontageBuilder {
             sb.append("[c").append(i).append("];");
         }
 
-        // 회차별로 grid 칸을 하나의 프레임으로 합친다. xstack 단일 필터가 모든 레이아웃(1~6칸)을 커버.
-        for (int r = 0; r < roundCount; r++) {
-            int base = r * grid;
-            if (grid == 1) {
-                sb.append("[c").append(base).append("]null[round").append(r).append("];");
-                continue;
-            }
-            for (int k = 0; k < grid; k++) {
-                sb.append("[c").append(base + k).append(']');
-            }
-            sb.append("xstack=inputs=")
-                    .append(grid)
-                    .append(":layout=")
-                    .append(cellLayout)
-                    .append("[round")
-                    .append(r)
-                    .append("];");
+        if (grid == 1) {
+            sb.append("[c0]null[out]");
+            return sb.toString();
         }
-
-        for (int r = 0; r < roundCount; r++) {
-            sb.append("[round").append(r).append(']');
+        for (int k = 0; k < grid; k++) {
+            sb.append("[c").append(k).append(']');
         }
-        sb.append("concat=n=").append(roundCount).append(":v=1:a=0[out]");
+        sb.append("xstack=inputs=")
+                .append(grid)
+                .append(":layout=")
+                .append(xstackLayout(layout))
+                .append("[out]");
         return sb.toString();
     }
 
