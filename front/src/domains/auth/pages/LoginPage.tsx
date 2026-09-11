@@ -46,9 +46,15 @@ export function LoginPage() {
     setFormError(null);
     try {
       await signIn(email, password);
-      const from = (location.state as { from?: { pathname: string } } | null)
-        ?.from;
-      navigate(from?.pathname ?? "/", { replace: true });
+      const from = (
+        location.state as {
+          from?: { pathname: string; search?: string; hash?: string };
+        } | null
+      )?.from;
+      navigate(
+        from ? `${from.pathname}${from.search ?? ""}${from.hash ?? ""}` : "/",
+        { replace: true },
+      );
     } catch (error) {
       setFormError(
         applyApiError(error, setError, { fields: ["email", "password"] }),
