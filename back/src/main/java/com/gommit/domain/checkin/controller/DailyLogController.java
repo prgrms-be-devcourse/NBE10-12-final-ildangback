@@ -9,7 +9,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -29,14 +31,18 @@ public class DailyLogController {
 
     private final DailyLogService dailyLogService;
 
-    @Operation(summary = "일일로그 목록 조회 (무한스크롤)")
+    @Operation(summary = "일일로그 목록 조회 (무한스크롤, 월별 필터)")
     @GetMapping
     public ResponseEntity<SliceResponse<DailyLogResponse>> getDailyLogs(
             @CurrentUser SecurityUser actor,
             @PathVariable Long challengeId,
+            @RequestParam(required = false)
+                    @Pattern(regexp = "^\\d{4}-(0[1-9]|1[0-2])$", message = "yyyy-MM 형식이어야 합니다.")
+                    String month,
             @RequestParam(required = false) Long cursor,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ResponseEntity.ok(dailyLogService.getDailyLogs(actor.getId(), challengeId, cursor, size));
+        YearMonth yearMonth = (month == null) ? null : YearMonth.parse(month);
+        return ResponseEntity.ok(dailyLogService.getDailyLogs(actor.getId(), challengeId, yearMonth, cursor, size));
     }
 
     @Operation(summary = "일일로그 단건 조회")

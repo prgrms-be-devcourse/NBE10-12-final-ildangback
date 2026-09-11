@@ -101,11 +101,11 @@ class DailyLogServiceTest {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 2);
             when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID))
                     .thenReturn(new ReadDateAccess(challenge, null));
-            when(dailyLogRepository.findLogs(eq(CHALLENGE_ID), isNull(), isNull(), any()))
+            when(dailyLogRepository.findLogs(eq(CHALLENGE_ID), isNull(), isNull(), isNull(), isNull(), any()))
                     .thenReturn(List.of(logWithId(2L, CHALLENGE_ID, DATE)));
             givenSnapshotTotal(2, List.of(10L, 11L), 2L);
 
-            SliceResponse<DailyLogResponse> result = service.getDailyLogs(USER_ID, CHALLENGE_ID, null, 20);
+            SliceResponse<DailyLogResponse> result = service.getDailyLogs(USER_ID, CHALLENGE_ID, null, null, 20);
 
             assertThat(result.content()).hasSize(1);
             DailyLogResponse response = result.content().get(0);
@@ -125,11 +125,11 @@ class DailyLogServiceTest {
                     .thenReturn(new ReadDateAccess(challenge, null));
             DailyLog log = logWithId(5L, CHALLENGE_ID, DATE);
             log.attachVideo("daily-check-ins/2026/09/uuid.mp4");
-            when(dailyLogRepository.findLogs(eq(CHALLENGE_ID), isNull(), isNull(), any()))
+            when(dailyLogRepository.findLogs(eq(CHALLENGE_ID), isNull(), isNull(), isNull(), isNull(), any()))
                     .thenReturn(List.of(log));
             givenSnapshotTotal(1, List.of(10L), 1L);
 
-            DailyLogResponse response = service.getDailyLogs(USER_ID, CHALLENGE_ID, null, 20)
+            DailyLogResponse response = service.getDailyLogs(USER_ID, CHALLENGE_ID, null, null, 20)
                     .content()
                     .get(0);
 

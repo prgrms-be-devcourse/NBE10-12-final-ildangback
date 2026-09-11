@@ -16,6 +16,7 @@ import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -48,12 +49,16 @@ public class DailyLogService {
         }
     }
 
-    // 일일로그 목록 조회 (무한스크롤) — 활동 있던 날(row 존재)만 나열.
-    public SliceResponse<DailyLogResponse> getDailyLogs(Long userId, Long challengeId, Long cursor, int size) {
+    // 일일로그 목록 조회 (무한스크롤) — 활동 있던 날(row 존재)만 나열. month 필터로 월별 조회 가능.
+    public SliceResponse<DailyLogResponse> getDailyLogs(
+            Long userId, Long challengeId, YearMonth month, Long cursor, int size) {
         ReadDateAccess access = preconditions.resolveReadDateAccess(challengeId, userId);
 
-        List<DailyLog> rows =
-                dailyLogRepository.findLogs(challengeId, access.maxBusinessDate(), cursor, PageRequest.of(0, size + 1));
+        LocalDate from = (month == null) ? null : month.atDay(1);
+        LocalDate to = (month == null) ? null : month.atEndOfMonth();
+
+        List<DailyLog> rows = dailyLogRepository.findLogs(
+                challengeId, from, to, access.maxBusinessDate(), cursor, PageRequest.of(0, size + 1));
 
         SliceResponse<DailyLog> page = SliceResponse.ofCursor(rows, size, DailyLog::getId);
         List<DailyLogResponse> content = page.content().stream()
