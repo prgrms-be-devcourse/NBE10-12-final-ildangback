@@ -23,9 +23,9 @@ variable "team_tag" {
 }
 
 variable "instance_type" {
-  description = "EC2 타입. small 은 즉시 허가, 그 이상은 결재 필요"
+  description = "EC2 타입. x86(t3a) 계열. small 은 즉시 허가, 그 이상은 결재 필요"
   type        = string
-  default     = "t4g.small"
+  default     = "t3a.medium"
 }
 
 variable "root_volume_size" {

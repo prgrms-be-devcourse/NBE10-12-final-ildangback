@@ -15,6 +15,12 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
 
     int countByChallengeIdAndUserIdAndBusinessDate(Long challengeId, Long userId, LocalDate businessDate);
 
+    public interface CheckInCountByDate {
+        LocalDate getBusinessDate();
+
+        Long getCount();
+    }
+
     @Query("""
             select c.userId from CheckIn c
             where c.challengeId = :challengeId and c.businessDate = :businessDate
@@ -112,4 +118,23 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
             """)
     List<CheckIn> findByChallengeIdAndBusinessDate(
             @Param("challengeId") Long challengeId, @Param("businessDate") LocalDate businessDate);
+
+    @Query("""
+            SELECT c.businessDate AS businessDate, COUNT(c) AS count
+            FROM CheckIn c
+            WHERE c.userId = :userId
+                AND c.businessDate BETWEEN :from AND :to
+            GROUP BY c.businessDate
+            """)
+    List<CheckInCountByDate> countByUserIdGroupByDateBetween(
+            @Param("userId") Long userId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    @Query("""
+        SELECT COUNT(DISTINCT c.businessDate)
+        FROM CheckIn c
+        WHERE c.userId = :userId
+            AND c.businessDate BETWEEN :from AND :to
+        """)
+    long countDistinctDatesByUserIdBetween(
+            @Param("userId") Long userId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 }
