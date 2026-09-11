@@ -35,6 +35,7 @@ import com.gommit.domain.user.service.UserService;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import com.gommit.global.time.BusinessClock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -47,11 +48,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 // Spring Context 없이 Mockito만으로 실행하는 순수 단위 테스트
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class UserItemServiceTest {
     @Mock
     private UserItemRepository userItemRepository;
@@ -73,6 +77,9 @@ class UserItemServiceTest {
 
     @Mock
     private UserService userService;
+
+    @Mock
+    private BusinessClock businessClock;
 
     @InjectMocks
     private UserItemService userItemService;
@@ -98,6 +105,7 @@ class UserItemServiceTest {
         equippedUserItem.equip();
         ReflectionTestUtils.setField(equippedUserItem, "id", 11L);
         ReflectionTestUtils.setField(equippedUserItem, "createdAt", LocalDateTime.of(2025, 1, 2, 0, 0));
+        given(businessClock.today()).willReturn(LocalDate.of(2025, 6, 15));
     }
 
     // ─────────────────────────────────────────────────

@@ -4,6 +4,8 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 import { VitePWA } from "vite-plugin-pwa";
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 const { version } = JSON.parse(readFileSync("./package.json", "utf-8"));
 
 // https://vite.dev/config/
@@ -26,6 +28,7 @@ export default defineConfig({
       },
       devOptions: { enabled: false },
     }),
+    cloudflare(),
   ],
   server: {
     proxy: {
