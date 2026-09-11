@@ -28,7 +28,7 @@ export default defineConfig({
       },
       devOptions: { enabled: false },
     }),
-    cloudflare()
+    cloudflare(),
   ],
   server: {
     proxy: {
