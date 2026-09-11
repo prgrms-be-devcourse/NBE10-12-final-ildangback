@@ -74,8 +74,12 @@ export function ExtensionChoicePanel({
   // Status response extensionAvailable is currently a constant false TODO.
   // This panel is mounted only for ACTIVE challenges; mirror the existing PUT
   // service's date window and let its response enforce membership and cutoff.
-  const today = new Date();
-  const todayLabel = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  // businessDate mirrors the backend's BusinessDayCutoff: KST (UTC+9) wall clock
+  // minus a 4-hour cutoff, i.e. UTC+5h. Computed from the UTC epoch so it is
+  // correct regardless of the browser's own timezone setting.
+  const BUSINESS_DAY_OFFSET_MS = 5 * 60 * 60 * 1000;
+  const today = new Date(new Date().getTime() + BUSINESS_DAY_OFFSET_MS);
+  const todayLabel = today.toISOString().slice(0, 10);
   const available = deadlineLabel !== null && todayLabel <= deadlineLabel;
   const canChoose =
     available && !closed && !pending && currentChoice !== undefined;
