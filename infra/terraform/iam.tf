@@ -33,14 +33,12 @@ resource "aws_iam_instance_profile" "app" {
 #    로테이션·유출 리스크가 커서 배제.
 # =============================================================================
 
-resource "aws_iam_openid_connect_provider" "github" {
-  url            = "https://token.actions.githubusercontent.com"
-  client_id_list = ["sts.amazonaws.com"]
-  # GitHub OIDC 루트 CA 지문(고정). AWS 콘솔에서 자동 검증되지만 TF 는 목록을 요구한다.
-  thumbprint_list = [
-    "6938fd4d98bab03faadb97b34396831e3780aea1",
-    "1c58a3a8518e8759bf075b76b750d4f2df264fcd",
-  ]
+# 계정당 1개만 허용되는 싱글턴 자원. 이미 있는 걸 data 로만 조회한다.
+# 선행조건: 계정에 provider 가 없다면 누군가 먼저 한 번 만들어야 한다(수동 또는 다른 스택):
+#   aws iam create-open-id-connect-provider \
+#     --url https://token.actions.githubusercontent.com --client-id-list sts.amazonaws.com
+data "aws_iam_openid_connect_provider" "github" {
+  url = "https://token.actions.githubusercontent.com"
 }
 
 resource "aws_iam_role" "deploy" {
@@ -50,15 +48,21 @@ resource "aws_iam_role" "deploy" {
     Statement = [{
       Effect    = "Allow"
       Action    = "sts:AssumeRoleWithWebIdentity"
-      Principal = { Federated = aws_iam_openid_connect_provider.github.arn }
+      Principal = { Federated = data.aws_iam_openid_connect_provider.github.arn }
       Condition = {
-        # aud + sub 둘 다 정확히 일치해야 함.
+        # aud + sub 둘 다 일치해야 함.
         #   - sub 를 이 리포의 특정 GitHub Environment 로 한정 → 아무 브랜치/태그/PR 워크플로가
         #     이 역할을 못 씀. deploy.yml 의 deploy job 은 environment: ${var.deploy_environment} 로 돈다.
         #   - repo:*:* 로 넓히면 리포 write 권한자가 임의 브랜치에 워크플로를 올려 ssm:SendCommand 실행 가능.
+        #   - 이 GitHub organization 설정에 맞게 StringLike 로 매칭.
         StringEquals = {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repo}:environment:${var.deploy_environment}"
+        }
+        StringLike = {
+          "token.actions.githubusercontent.com:sub" = [
+            "repo:${var.github_repo}:environment:${var.deploy_environment}",
+            "repo:${split("/", var.github_repo)[0]}@*/${split("/", var.github_repo)[1]}@*:environment:${var.deploy_environment}",
+          ]
         }
       }
     }]
@@ -129,26 +133,4 @@ resource "aws_iam_role_policy" "scheduler" {
       Resource = "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:instance/${aws_instance.app.id}"
     }]
   })
-}
-
-# =============================================================================
-# 4. DLM 역할 — 매일 EBS 스냅샷
-#    없으면: 볼륨 단위 2차 백업이 안 돌아 mysqldump 실패한 날 사고 시 복구 불가.
-# =============================================================================
-
-resource "aws_iam_role" "dlm" {
-  name = "${var.name_prefix}-dlm-role"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Action    = "sts:AssumeRole"
-      Principal = { Service = "dlm.amazonaws.com" }
-    }]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "dlm" {
-  role       = aws_iam_role.dlm.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole"
 }

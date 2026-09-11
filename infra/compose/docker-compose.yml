@@ -32,10 +32,12 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+    # 1800M = 인스턴스 4GB(t3a.medium) 전환분 반영. DailyLog 몽타주(feat/36, main 미병합) 완화
+    # 실측 최악 1,264~1,327M(6×8회차+갤러리12명 동시)에 안전율(측정환경=Docker Desktop VM, 실 EC2 Linux 오차 보정).
     deploy:
       resources:
         limits:
-          memory: 1200M
+          memory: 1800M
     # 이미지 Dockerfile 의 HEALTHCHECK 와 값을 맞춘다 (드리프트 방지).
     # retries 5 = start_period 후 ~150s 여유 — 아침 콜드스타트(2분+)에 --wait 가
     # 조기에 unhealthy 로 판정하지 않도록.

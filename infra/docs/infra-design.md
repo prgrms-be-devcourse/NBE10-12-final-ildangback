@@ -198,19 +198,19 @@ monorepo 안 `infra/` 디렉터리. `feat/infra-idk` → 다른 브랜치 머지
 | 항목 | 결정 | 이유 |
 |---|---|---|
 | Region | `ap-northeast-2` (서울) | 사용자 위치 |
-| AMI | **Amazon Linux 2023 (arm64)** | EC2에 최적화, dnf/systemd, 무료, 규칙상 허용 |
-| Instance | **`t4g.small`** (2 vCPU, 2GB, ARM/Graviton) | small은 즉시 허가. ARM이 x86 대비 ~20% 저렴. Java 25·nginx·MySQL·ffmpeg 모두 arm64 지원 |
-| Swap | 파일 스왑 2GB | 2GB RAM에 JVM+MySQL+ffmpeg 동시 부하 대비 |
-| EBS | 루트 gp3 30GB 단일 + docker `mysql-data` named volume (Q13) | 별도 볼륨은 안 씀 — 단순. 백업은 mysqldump + DLM 스냅샷 |
+| AMI | **Amazon Linux 2023 (x86_64)** | EC2에 최적화, dnf/systemd, 무료, 규칙상 허용 |
+| Instance | **`t3a.medium`** (2 vCPU, 4GB, x86/AMD) | Java 25·nginx·MySQL·ffmpeg 모두 x86_64 지원. 4GB로 몽타주·갤러리 동시 부하 여유 확보 |
+| Swap | 파일 스왑 2GB | 4GB RAM에서도 JVM+MySQL+ffmpeg 동시 부하 안전망으로 유지. 단, cgroup 메모리 한도(`mem_limit`) 초과는 swap이 못 막음 — 실측상 컨테이너가 swap 안 쓰고 먼저 OOM-kill됨(아래 "4GB 메모리 배분" 참고) |
+| EBS | 루트 gp3 30GB 단일 + docker `mysql-data` named volume (Q13) | 별도 볼륨은 안 씀 — 단순. 백업은 야간 mysqldump. 볼륨 스냅샷은 필요 시 수동(자동 DLM 은 부수 서비스 결재 회피로 제외) |
 | EIP | 1개, 인스턴스에 attach | 18:00 stop/start 후에도 IP 유지. **주의: 2024년부터 EIP는 attach 여부 무관 시간당 과금(~월 $3.6)** |
 | 보안그룹 | 443 = Cloudflare IP 대역만, 22 = 기본 미개방(배포·디버그 = SSM), `var.ssh_allowed_cidrs` 로 운영자 1인 `/32` 예외만 (Q14) | 오리진 우회 차단 |
 
 **Terraform 관리 대상**: VPC(1) / IGW / 퍼블릭 서브넷(1) / 라우트테이블 / EC2 / EIP /
 보안그룹 / IAM 역할(SSM) / cloudflare DNS 레코드 / EventBridge Scheduler(03:30
-start) / DLM(EBS 스냅샷). provider 블록에 `default_tags { tags = { Team = "devcos-team01" } }`
+start). provider 블록에 `default_tags { tags = { Team = "devcos-team01" } }`
 → 모든 AWS 리소스에 태그 자동. (key pair 미사용 — SSM 이 기본. SSH 예외 1인은 authorized_keys 직접 등록, Q14 추가결정)
 
-**예산 개산**: `t4g.small` 24시간 ≈ 월 $12, gp3 30GB ≈ $2.4, EIP ≈ $3.6, 아웃바운드 전송
+**예산 개산**: `t3a.medium` 24시간 ≈ 월 $24, gp3 30GB ≈ $2.4, EIP ≈ $3.6, 아웃바운드 전송
 100GB/월 무료. 18:00 정지로 가동시간이 절반이면 컴퓨트도 절반. 8만원(≈ $57) 안에 충분.
 
 ### Q4 — Terraform state → 3안 비교 (결론은 4c Q22 = B)
@@ -319,7 +319,7 @@ DB에 있고, 이게 날아가면 서비스가 끝난다. 데모/평가 중에 �
 
 - 레지스트리: **GHCR** (무료). 패키지는 private — EC2에서 `read:packages` PAT로 1회 `docker login`.
 - `.github/workflows/deploy.yml`: `main` 머지 → 백엔드 `docker build`
-  (Q3가 ARM이므로 `buildx --platform linux/arm64`) → GHCR push → EC2에서
+  (Q3가 x86이므로 `buildx --platform linux/amd64`, ubuntu-latest 러너가 네이티브라 QEMU 불필요) → GHCR push → EC2에서
   `docker compose pull && docker compose up -d` → `/actuator/health` 확인.
 - Flyway는 앱 부팅 시 자동 마이그레이션 (별도 배포 스텝 없음).
 - 배포 채널: SSH 대신 **AWS SSM `send-command`** 권장 (포트 22를 안 열어도 됨). 라운드 2 확정.
@@ -391,8 +391,8 @@ DB에 있고, 이게 날아가면 서비스가 끝난다. 데모/평가 중에 �
   인데, MVP 기간에 terminate할 일은 드물다(무중단 도입·스펙 변경 정도).
 - **결정: 루트 gp3 30GB 단일 + `mysql-data` named volume.** 백업 이중화:
   1. 야간 `mysqldump | gzip` → 로컬 7일 보관 (컨테이너 or 호스트 크론)
-  2. **매일 EBS 스냅샷** — Data Lifecycle Manager(DLM), 무료, 7일 롤링
-- 인스턴스를 갈아끼워야 하면 스냅샷에서 루트 볼륨 복원 or 덤프에서 복구. 런북에 절차.
+  2. ~~매일 EBS 스냅샷(DLM)~~ — 계정 규칙상 부수 서비스 결재 회피로 제외. 필요 시 수동 스냅샷.
+- 인스턴스를 갈아끼워야 하면 (수동 스냅샷이 있으면) 스냅샷에서 루트 볼륨 복원, 없으면 덤프에서 복구. 런북에 절차.
 
 ### Q14 — 배포 접속 방법 + 443 인바운드 (라운드 1 질문 다시 풀어서)
 
@@ -455,7 +455,7 @@ DB에 있고, 이게 날아가면 서비스가 끝난다. 데모/평가 중에 �
 | | b. Grafana Cloud 무료 tier | c. 자체 호스팅 Prom + Loki (별도 EC2) |
 |---|---|---|
 | 인프라 | EC2에 Alloy 에이전트 1개만 | **EC2 2번째 대 (결재 필요)** + 그 관리 |
-| 비용 | 무료 (초과 시 사용량 과금) | t4g.small ≈ 월 $12+ |
+| 비용 | 무료 (초과 시 사용량 과금) | t3a.small ≈ 월 $15+ |
 | 한도 | 메트릭 10k series, 로그 50GB/월, 보존 14일 | 디스크 만큼 (보존기간 자유) |
 | 데이터 주권 | 외부(Grafana)로 나감 — 로그 PII 주의 | 자기 소유 |
 | 운영 부담 | 관리형 (업글·백업 신경 안 씀) | 업글·디스크·Loki 압축 설정 직접, 모니터링 서버 다운 시 공백 |
@@ -607,18 +607,24 @@ DB에 있고, 이게 날아가면 서비스가 끝난다. 데모/평가 중에 �
   상한을 건다. 컨테이너가 한도를 넘으면 **그 컨테이너만** OOM kill 당한다(호스트 전체가
   아니라). `-Xmx` (JVM 내부 힙 상한)와 `mem_limit` (컨테이너 전체 상한)을 둘 다 거는 게
   이중 안전이다.
-- **2GB 메모리 배분** (빠듯하지만 가능, swap 2GB가 안전망):
+- **4GB 메모리 배분** (인스턴스 `t3a.medium` 전환 후 재산정. 옛 2GB 배분표는 DailyLog 몽타주
+  기능 병합 전 값이라 폐기):
 
   | 대상 | `mem_limit` | 내역 |
   |---|---|---|
-  | `mysql` | 600m | `innodb_buffer_pool_size=256M` + 스레드 버퍼(50 conn) + InnoDB 오버헤드. 500m/384M 은 RSS 가 한계를 넘겨 OOM-kill 위험이라 조정 |
-  | `back` (JVM + ffmpeg) | 1200m | `-Xmx768m` + 힙 외 ~250M + ffmpeg 인코딩 시 ~300M (동시성 1) |
-  | `nginx` | 64m | |
-  | OS + 버퍼 캐시 | ~150m | (컨테이너 밖) |
-  | **합** | **~2GB** | ffmpeg 인코딩 중엔 잠깐 swap을 건드릴 수 있음 — 느려질 뿐 안 죽음 |
+  | `mysql` | 600m | `innodb_buffer_pool_size=256M` + 스레드 버퍼(50 conn) + InnoDB 오버헤드. 몽타주·갤러리와 무관, 실측 525~550M — 변경 없음 |
+  | `back` (JVM + ffmpeg) | 1800m | `-Xmx768m` 고정, 몽타주 RAM 완화 ①소스 사전 다운스케일 ②캔버스 1280 축소 ③회차별 렌더 적용 후 실측 최악(6명×8회차 몽타주 + 갤러리 12명 동시열람) 1,264~1,327M + 안전율(측정환경=Docker Desktop VM, 실 EC2 Linux 오차 보정). **①②③과 이 실측치는 `feat/36-dailylog` 브랜치 것 — main·본 인프라 브랜치엔 아직 몽타주 기능 자체가 없어 지금 당장은 이 한도까지 안 씀. 몽타주 병합에 앞서 미리 반영** |
+  | `nginx` | 64m | 실측 ~20M, 변경 없음 |
+  | OS + 버퍼 캐시 | ~250m | (컨테이너 밖) |
+  | **합** | **~2,714m** | 4,096m 대비 ~1,382m 여유 — 옵저버빌리티(Q16, Grafana 등, 예측 최대 ~900m) 추가분 흡수 가능 |
 
-  ffmpeg는 `back` 컨테이너 안에서 돌므로 그 1200m를 JVM과 나눠 쓴다. 인코딩을 트래픽 적은
-  새벽으로 몰면 여유가 는다.
+  ffmpeg는 `back` 컨테이너 안에서 돌므로 그 1800m를 JVM과 나눠 쓴다. 인코딩을 트래픽 적은
+  새벽으로 몰면 여유가 는다. **주의**: `mem_limit`는 컨테이너별 cgroup 하드 한도라 인스턴스
+  전체 RAM이 늘어도 이 값을 안 올리면 그대로 OOM-kill 당한다 — swap(2GB)도 못 막는다
+  (`swappiness=10` 실측: 한도 초과 시 swap을 안 쓰고 ffmpeg만 먼저 죽어 컨테이너는 생존,
+  `swappiness=60`으로 올리면 오히려 비결정적으로 다른 프로세스가 죽어 더 위험 — 현재 10 유지).
+  최악 동시성(몽타주 최대치 ∧ 다인원 갤러리 스크롤 동시 발생)은 완화 후에도 여전히 드물게
+  한도를 넘을 수 있음 — 흔치 않은 조합이라 감내, 재발하면 이 표부터 재조정.
 - **튜닝 프리셋** (부하 보고 조정): MySQL `innodb_buffer_pool_size=256M`, `max_connections=50`
   / JVM `-Xmx768m` / HikariCP `maximum-pool-size=10`.
 
@@ -630,10 +636,10 @@ ffmpeg가 `back` 컨테이너 안에서 JVM과 메모리를 공유하는 게 유
 | 단계 | 조건 | 조치 | 인프라 변경 |
 |---|---|---|---|
 | **1. 현행** | 지금 | `back` 컨테이너 내 실행. **동시성 1 엄수**, 인코딩은 04:00 배치 창에. `docker stats` 로 관찰 | 없음 |
-| **2. 사이드카** | 2번 이상 컨테이너 OOM-kill, 또는 인코딩이 주간 요청과 겹침 | 같은 compose에 `ffmpeg` 전용 컨테이너 추가. `back`이 공유 볼륨 + 큐로 작업 전달. `mem_limit` 분리 → ffmpeg가 `back`을 못 죽임 | 같은 EC2, 컨테이너 1개 추가 (2GB를 `back`↔`ffmpeg`로 재배분) |
+| **2. 사이드카** | 2번 이상 컨테이너 OOM-kill, 또는 인코딩이 주간 요청과 겹침 | 같은 compose에 `ffmpeg` 전용 컨테이너 추가. `back`이 공유 볼륨 + 큐로 작업 전달. `mem_limit` 분리 → ffmpeg가 `back`을 못 죽임 | 같은 EC2, 컨테이너 1개 추가 (위 "4GB 메모리 배분"의 `back` 몫을 `back`↔`ffmpeg`로 재배분) |
 | **3. 잡 단위 오프로드** | 인코딩량이 실제로 증가(다수 영상·동시·주간), 또는 유저 지연 유발 | AWS Fargate 태스크를 잡마다 띄우고 종료, 또는 MediaConvert. idle 비용 0 | 새 서비스 + IAM. **상시 2대째 EC2는 이 경우에도 아님** |
 
-t4g.small → t4g.medium(4GB) 상향은 2·3과 별개의 임시 방편이며 계정 결재가 필요하다.
+현재 인스턴스는 `t3a.medium`(4GB, x86) — small→medium 상향은 2·3과 별개의 임시 방편이다.
 
 ### Q25 — nginx 파라미터
 
@@ -706,11 +712,10 @@ infra/
     variables.tf
     network.tf             # VPC / IGW / 퍼블릭 서브넷 1 / 라우트테이블
     security.tf            # SG: 443 = Cloudflare IPv4 대역만 (http 데이터소스), 22 = ssh_allowed_cidrs 예외만
-    iam.tf                 # ① EC2 SSM 역할 ② GitHub OIDC 배포 역할 ③ Scheduler ④ DLM
-    ec2.tf                 # AL2023 arm64 AMI, t4g.small, gp3 30GB(Backup=true), EIP
+    iam.tf                 # ① EC2 SSM 역할 ② GitHub OIDC 배포 역할 ③ Scheduler
+    ec2.tf                 # AL2023 x86_64 AMI, t3a.medium, gp3 30GB, EIP
     dns.tf                 # cloudflare_record: api A → EIP, proxied (apex는 Pages가 관리)
     schedule.tf            # EventBridge Scheduler: 매일 03:30 KST ec2:StartInstances
-    dlm.tf                 # 매일 18:30 KST EBS 스냅샷, 7일 롤링
     outputs.tf             # instance_id, deploy_role_arn 등 (GitHub Secrets 로)
     terraform.tfvars.example
     .gitignore             # *.tfstate*, terraform.tfvars
@@ -732,7 +737,7 @@ infra/
   docker/.hadolint.yaml
 
 .github/workflows/
-  deploy.yml               # build(arm64→GHCR) → deploy(OIDC→SSM send-command→deploy.sh)
+  deploy.yml               # build(amd64→GHCR) → deploy(OIDC→SSM send-command→deploy.sh)
   infra-ci.yml             # fmt/validate/test 는 머지 차단, tflint/hadolint/shellcheck/actionlint 는 리포트만
 
 docs/
@@ -764,7 +769,6 @@ front/
 | `tftest` security_group_locks_origin / ssh_exception_is_narrow | 443 에 0.0.0.0/0, 또는 SSH 예외가 `/32`·22 를 벗어나 넓게 열림 → 오리진 직접 노출, Cloudflare 우회 |
 | `tftest` instance_is_hardened_and_cheap | 인스턴스 타입 상향(결재·예산), IMDSv2 해제(SSRF→자격증명 탈취), 루트 볼륨 미암호화, `user_data_replace_on_change=true`(수정 시 .env/certs 유실), IAM 프로파일 분리(SSM 배포 불가) |
 | `tftest` auto_start_before_batch | 기동 크론이 03:30·Asia/Seoul 이 아님 → 04:00 정산 배치 누락 |
-| `tftest` backup_policy_enabled | DLM 스냅샷 비활성 → 볼륨 백업 소실 |
 | `tftest` api_dns_is_proxied | `proxied=false` → 오리진 IP 노출 + SG(CF IP only)와 충돌해 접속 불가 |
 | `ActuatorSecurityTest` healthIsPublic | `/actuator/health` permitAll 소실 → nginx·Docker·deploy 헬스체크 전부 실패, 배포 롤백 루프 |
 | `ActuatorSecurityTest` otherActuatorEndpointsAreNotPublic | `exposure.include=*` 또는 매처를 `/actuator/**` 로 확대 → env·beans·heapdump 무인증 공개 |
