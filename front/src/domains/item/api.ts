@@ -74,6 +74,11 @@ export function unequipItem(userItemId: number): Promise<UserItemResponse> {
  *
  * 화면이 부위 탭과 보유 필터와 정렬을 전부 브라우저에서 거르기 때문에 목록이
  * 다 있어야 한다. hasNext 가 true 여도 nextCursor 가 비면 멈춘다.
+ *
+ * 서버는 커서를 마지막 행의 id 로 주고 다음 조회를 id > cursor 로 하므로 커서가
+ * 반드시 커진다. 그 약속이 깨지면 같은 페이지를 끝없이 받게 되니 커서가 안
+ * 늘어나면 멈춘다. 최대 페이지 수로 막지 않는 이유는 데이터가 늘면 조용히
+ * 잘리기 때문이다.
  */
 async function fetchAllPages<T>(
   load: (cursor: number | null) => Promise<SliceResponse<T>>,
@@ -81,13 +86,14 @@ async function fetchAllPages<T>(
   const all: T[] = [];
   let cursor: number | null = null;
 
-  do {
+  for (;;) {
     const page = await load(cursor);
     all.push(...page.content);
-    cursor = page.hasNext ? page.nextCursor : null;
-  } while (cursor !== null);
 
-  return all;
+    const next = page.hasNext ? page.nextCursor : null;
+    if (next === null || (cursor !== null && next <= cursor)) return all;
+    cursor = next;
+  }
 }
 
 /**

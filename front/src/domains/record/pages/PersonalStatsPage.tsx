@@ -1,15 +1,16 @@
 import { CalendarBlankIcon, CaretDownIcon } from "@phosphor-icons/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getGrassWeeks } from "../../home/api";
 import { getMyStats } from "../api";
 import {
-  type PersonalStatsData,
   STATS_PERIOD_LABEL,
   STATS_PERIODS,
   type StatsPeriod,
   toDateRange,
   toPersonalStatsData,
 } from "../lib/personalStats";
+import type { PersonalStatsResponse } from "../../../shared/api/types";
+import type { GrassDay } from "../../../shared/ui/ContributionGrid";
 import { TopBar } from "../../../shared/ui/TopBar";
 import { CategoryTab } from "../components/CategoryTab";
 import { MonthlyTab } from "../components/MonthlyTab";
@@ -38,27 +39,41 @@ export function PersonalStatsPage() {
   const [tab, setTab] = useState<TabKey>("SUMMARY");
   const [period, setPeriod] = useState<StatsPeriod>("ALL");
 
-  const [stats, setStats] = useState<PersonalStatsData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [summary, setSummary] = useState<PersonalStatsResponse | null>(null);
+  const [grass, setGrass] = useState<GrassDay[] | null>(null);
+  const [pending, setPending] = useState(true);
   const [failed, setFailed] = useState(false);
 
-  // 기간이 바뀌면 다시 받아온다. 잔디는 기간과 무관하게 1년치를 보여준다.
+  // 잔디는 기간 선택과 무관하게 1년 고정이라 처음 한 번만 받는다.
+  useEffect(() => {
+    let cancelled = false;
+    getGrassWeeks(GRASS_WEEKS)
+      .then((days) => {
+        if (!cancelled) setGrass(days);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // 통계는 기간이 바뀌면 다시 받는다.
   useEffect(() => {
     let cancelled = false;
 
     async function run() {
-      setLoading(true);
+      setPending(true);
       setFailed(false);
       try {
-        const [response, grass] = await Promise.all([
-          getMyStats(toDateRange(period)),
-          getGrassWeeks(GRASS_WEEKS),
-        ]);
-        if (!cancelled) setStats(toPersonalStatsData(response, grass));
+        const response = await getMyStats(toDateRange(period));
+        if (!cancelled) setSummary(response);
       } catch {
         if (!cancelled) setFailed(true);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setPending(false);
       }
     }
 
@@ -67,6 +82,14 @@ export function PersonalStatsPage() {
       cancelled = true;
     };
   }, [period]);
+
+  const stats = useMemo(
+    () => (summary && grass ? toPersonalStatsData(summary, grass) : null),
+    [summary, grass],
+  );
+
+  // 둘 중 하나라도 아직이면 로딩이다.
+  const loading = !failed && (pending || stats === null);
 
   return (
     <>
