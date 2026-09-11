@@ -25,7 +25,15 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private static final String[] PUBLIC_ENDPOINTS = {
-        "/api/auth/signup", "/api/auth/login", "/api/auth/refresh", "/api/auth/check-email", "/api/auth/check-nickname",
+        "/api/auth/signup",
+        "/api/auth/login",
+        "/api/auth/refresh",
+        "/api/auth/check-email",
+        "/api/auth/check-nickname",
+        "/api/auth/verify-email",
+        "/api/auth/password-reset",
+        "/api/auth/password-reset/confirm",
+        "/api/auth/oauth/*"
     };
 
     private static final String[] DOCS_ENDPOINTS = {

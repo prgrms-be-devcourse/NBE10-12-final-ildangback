@@ -23,6 +23,19 @@ spring:
   flyway:
     enabled: true
 
+  http:
+    clients:
+      connect-timeout: 5s
+      read-timeout: 5s
+
+  mail:
+    properties:
+      mail:
+        smtp:
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
   data:
     web:
       pageable:
@@ -54,7 +67,7 @@ auth-token:
     expiration: 15m
   refresh-token:
     expiration: 30d
-    reuse-grace-period: 30s
+    reuse-grace-period: 3s
 
 app:
   time-zone: Asia/Seoul # 인증 businessDate('오늘') 판정에 쓰는 Clock 빈의 기준 타임존
