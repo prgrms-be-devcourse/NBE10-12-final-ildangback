@@ -273,10 +273,13 @@ public class DailyLogMontageBuilder {
         return run(workDir, command, CONCAT_TIMEOUT_SECONDS);
     }
 
+    // 출력을 버린다(DISCARD) — 부모가 stdout/stderr 를 읽어가지 않으면 OS 파이프 버퍼가 차면서
+    // ffmpeg 가 write 블로킹될 수 있다. 로그 소비처가 없어 병합(redirectErrorStream) 대신 폐기한다.
     private int run(Path workDir, List<String> command, long timeoutSeconds) throws IOException, InterruptedException {
         Process process = new ProcessBuilder(command)
                 .directory(workDir.toFile())
-                .redirectErrorStream(true)
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
                 .start();
         boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
         if (!finished) {
