@@ -57,7 +57,7 @@ class DailyLogMontageBuilderFfmpegTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"1, 2160, 2160", "2, 2160, 1080", "3, 2160, 720", "4, 2160, 2160", "5, 2160, 1440", "6, 2160, 1440"})
+    @CsvSource({"1, 1280, 1280", "2, 1280, 640", "3, 1278, 426", "4, 1280, 1280", "5, 1278, 852", "6, 1278, 852"})
     @DisplayName("N칸 × 2회차 그리드가 지정 해상도 mp4 로 인코딩된다(방향 섞인 입력 + 빈 칸)")
     void gridEncodesAtExpectedResolution(int cellCount, int expectedWidth, int expectedHeight) throws Exception {
         DailyLogMontageBuilder builder = new DailyLogMontageBuilder("ffmpeg");

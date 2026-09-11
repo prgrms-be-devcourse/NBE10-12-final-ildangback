@@ -66,24 +66,26 @@ class DailyLogMontageBuilderTest {
 
         @ParameterizedTest
         @ValueSource(ints = {1, 2, 3, 4, 5, 6})
-        @DisplayName("캔버스 가로는 항상 2160, 칸은 정사각(짝수)이고 가로를 열수로 나눈 값이다")
+        @DisplayName("캔버스 가로는 CANVAS_WIDTH(1280) 이하, 칸은 정사각(짝수)이고 가로를 열수로 나눈 값이다")
         void squareCellsFillFixedWidth(int cellCount) {
             Layout layout = Layout.forCells(cellCount);
 
-            assertThat(layout.cols() * layout.cellSize()).isEqualTo(2160);
-            assertThat(layout.cellSize()).isEqualTo(2160 / layout.cols());
+            // 1280 이 열수(1/2/3)로 나누어떨어지지 않는 경우(3열) 정수 나눗셈으로 살짝 작아진다 —
+            // 그래도 정사각 칸이 채워지므로 실사용엔 무해(2026-09-11 완화 ②, 캔버스 2160→1280).
+            assertThat(layout.cols() * layout.cellSize()).isLessThanOrEqualTo(1280);
+            assertThat(layout.cellSize()).isEqualTo(1280 / layout.cols());
             assertThat(layout.canvasHeight()).isEqualTo(layout.rows() * layout.cellSize());
             assertThat(layout.cellSize() % 2).isZero();
         }
 
         @ParameterizedTest
         @org.junit.jupiter.params.provider.CsvSource({
-            "1, 2160, 2160",
-            "2, 2160, 1080",
-            "3, 2160, 720",
-            "4, 2160, 2160",
-            "5, 2160, 1440",
-            "6, 2160, 1440"
+            "1, 1280, 1280",
+            "2, 1280, 640",
+            "3, 1278, 426",
+            "4, 1280, 1280",
+            "5, 1278, 852",
+            "6, 1278, 852"
         })
         @DisplayName("N칸별 캔버스 해상도")
         void canvasSizePerCellCount(int cellCount, int width, int height) {
