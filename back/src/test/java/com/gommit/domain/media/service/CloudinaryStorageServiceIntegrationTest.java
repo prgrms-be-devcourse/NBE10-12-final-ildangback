@@ -65,7 +65,7 @@ class CloudinaryStorageServiceIntegrationTest {
                                     Set.of("image/png")),
                             MediaRole.DAILYLOG,
                             new StoragePolicy(
-                                    "gommit-it-test/daily-check-ins",
+                                    "integration-test/daily-check-ins",
                                     DataSize.ofMegabytes(40),
                                     Visibility.PRIVATE,
                                     Set.of("video/mp4")))));
@@ -103,7 +103,7 @@ class CloudinaryStorageServiceIntegrationTest {
     void generatedVideoRoundTrip() throws Exception {
         StorageResult stored = service.storeGenerated(MP4_TINY, MediaContentType.MP4, MediaRole.DAILYLOG);
         assertThat(stored.storageKey())
-                .startsWith("gommit-it-test/daily-check-ins/")
+                .startsWith("test-go-mmit/integration-test/daily-check-ins/")
                 .endsWith(".mp4");
 
         // 서명 URL 로 다시 받아 온다. Cloudinary video 배달은 리먹싱될 수 있어 바이트 일치 대신
