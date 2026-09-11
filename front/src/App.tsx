@@ -5,10 +5,12 @@ import { TabLayout } from "./app/TabLayout";
 import { LoginPage } from "./domains/auth/pages/LoginPage";
 import { SignUpPage } from "./domains/auth/pages/SignUpPage";
 import { AccountPage } from "./domains/user/pages/AccountPage";
+import { CharacterShopPage } from "./domains/item/pages/CharacterShopPage";
 import { ChangePasswordPage } from "./domains/user/pages/ChangePasswordPage";
 import { DeleteAccountPage } from "./domains/user/pages/DeleteAccountPage";
 import { EditProfilePage } from "./domains/user/pages/EditProfilePage";
 import { PointHistoryDetailPage } from "./domains/point/pages/PointHistoryDetailPage";
+import { PersonalStatsPage } from "./domains/record/pages/PersonalStatsPage";
 import { PointHistoryPage } from "./domains/point/pages/PointHistoryPage";
 import { FinalMergeResultPage } from "./domains/record/pages/FinalMergeResultPage";
 import { MergeListPage } from "./domains/record/pages/MergeListPage";
@@ -58,6 +60,12 @@ export function App() {
           />
         </Route>
         <Route path="profile" element={<ProfilePage />} />
+
+        {/* 뒤로가기가 있어도 하단바가 남는 화면들 (시안). */}
+        <Route element={<RequireAuth />}>
+          <Route path="profile/stats" element={<PersonalStatsPage />} />
+          <Route path="profile/shop" element={<CharacterShopPage />} />
+        </Route>
       </Route>
 
       <Route element={<PlainLayout />}>

@@ -6,11 +6,58 @@ import {
   DropIcon,
 } from "@phosphor-icons/react";
 import { toPng } from "html-to-image";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckInTrendChart } from "./CheckInTrendChart";
+import { getCharacters } from "../../item/api";
+import { CharacterView } from "../../item/components/CharacterView";
+import { toCharacterArt } from "../../item/lib/shop";
 import { Button } from "../../../shared/ui/Button";
 import { useToast } from "../../../shared/lib/useToast";
-import type { MergeParticipantResponse } from "../../../shared/api/types";
+import type {
+  ItemSlot,
+  MergeParticipantResponse,
+} from "../../../shared/api/types";
+
+type CharacterArt = Partial<Record<ItemSlot, string>>;
+
+/**
+ * 참여자들의 캐릭터를 한 번에 받아 온다. 못 받아도 기본 몸통은 그려지므로
+ * 머지 결과 자체는 그대로 보인다.
+ */
+function useParticipantCharacters(
+  participants: MergeParticipantResponse[],
+): Record<number, CharacterArt> {
+  const [characters, setCharacters] = useState<Record<number, CharacterArt>>(
+    {},
+  );
+
+  // 배열은 렌더마다 새 참조라 id 목록을 키로 쓴다.
+  const userIdKey = participants.map((p) => p.userId).join(",");
+
+  useEffect(() => {
+    if (!userIdKey) return;
+
+    let cancelled = false;
+    getCharacters(userIdKey.split(",").map(Number))
+      .then((response) => {
+        if (cancelled) return;
+        const next: Record<number, CharacterArt> = {};
+        for (const [userId, slots] of Object.entries(response)) {
+          next[Number(userId)] = toCharacterArt(slots);
+        }
+        setCharacters(next);
+      })
+      .catch(() => {
+        // 캐릭터를 못 받아도 머지 결과는 보여준다.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userIdKey]);
+
+  return characters;
+}
 
 /** LocalDate("YYYY-MM-DD")를 "YYYY.MM.DD"로. */
 function formatDateDot(localDate: string): string {
@@ -73,6 +120,7 @@ export function MergeResultView({
   const { showToast } = useToast();
   const sorted = [...participants].sort((a, b) => a.ranking - b.ranking);
   const me = participants.find((p) => p.userId === currentUserId);
+  const characters = useParticipantCharacters(participants);
   const resultCardRef = useRef<HTMLDivElement | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -154,11 +202,11 @@ export function MergeResultView({
             {summaryDescription}
           </p>
 
-          <ul className="mt-6 flex justify-center gap-4 overflow-x-auto">
+          <ul className="mt-6 flex justify-center gap-2 overflow-x-auto">
             {sorted.map((p, index) => (
               <li
                 key={p.userId}
-                className="flex w-14 shrink-0 flex-col items-center"
+                className="flex w-12 shrink-0 flex-col items-center"
               >
                 <div className="relative">
                   {index === 0 && (
@@ -169,9 +217,12 @@ export function MergeResultView({
                       aria-hidden
                     />
                   )}
-                  {/* TODO(Record): 캐릭터 일러스트는 User/Item 도메인 연결되면 교체 - 지금은 이니셜 원형. */}
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-100 text-[15px] font-bold text-purple-600">
-                    {p.nickname.slice(0, 1)}
+                  <div className="h-12 w-12">
+                    <CharacterView
+                      art={characters[p.userId] ?? {}}
+                      label={`${p.nickname} 캐릭터`}
+                      fit="tight"
+                    />
                   </div>
                 </div>
                 <p className="mt-1.5 max-w-full truncate text-[12px] font-medium text-gray-700">
@@ -216,6 +267,7 @@ export function MergeResultView({
         {me ? (
           <MyRecordCard
             me={me}
+            myArt={characters[me.userId] ?? {}}
             totalDays={totalDays}
             groupTotalCheckInCount={totalCheckInCount}
             myProgressLabel={myProgressLabel}
@@ -259,12 +311,14 @@ function SummaryStat({
 
 function MyRecordCard({
   me,
+  myArt,
   totalDays,
   groupTotalCheckInCount,
   myProgressLabel,
   trendChartTitle,
 }: {
   me: MergeParticipantResponse;
+  myArt: CharacterArt;
   totalDays: number;
   groupTotalCheckInCount: number;
   myProgressLabel: string;
@@ -273,9 +327,12 @@ function MyRecordCard({
   return (
     <div className="mt-3 rounded-2xl border border-purple-200 bg-white p-5">
       <div className="flex items-center gap-3">
-        {/* TODO(Record): 캐릭터 일러스트는 User/Item 도메인 연결되면 교체 - 지금은 이니셜 원형. */}
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-purple-100 text-[20px] font-bold text-purple-600">
-          {me.nickname.slice(0, 1)}
+        <div className="h-20 w-20 shrink-0">
+          <CharacterView
+            art={myArt}
+            label={`${me.nickname} 캐릭터`}
+            fit="tight"
+          />
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[16px] font-bold text-gray-900">
