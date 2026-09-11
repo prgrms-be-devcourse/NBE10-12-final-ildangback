@@ -10,6 +10,8 @@ import com.gommit.domain.group.entity.GroupMemberStatus;
 import com.gommit.domain.group.repository.GroupMemberRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import com.gommit.global.time.BusinessClock;
+import com.gommit.global.time.DaysOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
@@ -26,6 +28,7 @@ public class ChallengeExtensionService {
     private final GroupMemberRepository groupMemberRepository;
     private final ChallengeMemberService challengeMemberService;
     private final ChallengeProgressCalculator challengeProgressCalculator;
+    private final BusinessClock businessClock;
 
     @Transactional
     public ExtensionChoiceResponse updateExtensionChoice(
@@ -81,7 +84,7 @@ public class ChallengeExtensionService {
 
     private void validateExtensionChoicePeriod(Challenge challenge) {
         LocalDate deadline = challenge.getEndDate().minusDays(2);
-        LocalDate today = LocalDate.now();
+        LocalDate today = businessClock.today();
         if (today.isAfter(deadline)) {
             throw new BusinessException(ErrorCode.EXTENSION_CHOICE_CLOSED);
         }
@@ -176,7 +179,7 @@ public class ChallengeExtensionService {
 
     @Transactional
     public void finalizeExtensionsDueToday() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = businessClock.today();
         List<Challenge> challenges = challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE);
         for (Challenge challenge : challenges) {
             LocalDate deadline = challenge.getEndDate().minusDays(2);

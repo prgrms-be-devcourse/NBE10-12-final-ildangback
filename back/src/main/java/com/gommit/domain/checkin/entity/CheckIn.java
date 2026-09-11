@@ -17,6 +17,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class CheckIn extends BaseEntity {
 
+    public static final int MEMO_MAX_LENGTH = 100;
+
     @Column(nullable = false)
     private Long challengeId;
 
@@ -37,9 +39,28 @@ public class CheckIn extends BaseEntity {
     @Column(nullable = false, length = 20)
     private MediaType mediaType;
 
-    @Column(length = 100)
+    @Column(length = MEMO_MAX_LENGTH)
     private String memo;
 
     @Column(nullable = false)
     private LocalDate businessDate;
+
+    public CheckIn(
+            Long challengeId,
+            Long userId,
+            int roundNo,
+            CheckInType checkInType,
+            String mediaKey,
+            MediaType mediaType,
+            String memo,
+            LocalDate businessDate) {
+        this.challengeId = challengeId;
+        this.userId = userId;
+        this.roundNo = roundNo;
+        this.checkInType = checkInType;
+        this.mediaKey = mediaKey;
+        this.mediaType = mediaType;
+        this.memo = memo;
+        this.businessDate = businessDate;
+    }
 }

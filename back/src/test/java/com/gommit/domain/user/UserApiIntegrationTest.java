@@ -71,6 +71,11 @@ class UserApiIntegrationTest extends IntegrationTestSupport {
         return mockMvc.perform(get("/api/auth/check-email").param("email", email));
     }
 
+    // 비밀번호 변경이 옛 RT 를 끊었는지 확인하는 데 쓴다
+    private ResultActions refresh(String refreshToken) throws Exception {
+        return mockMvc.perform(jsonRequest(post("/api/auth/refresh"), json("refreshToken", refreshToken)));
+    }
+
     @Nested
     @DisplayName("회원가입")
     class SignUp {
@@ -326,6 +331,19 @@ class UserApiIntegrationTest extends IntegrationTestSupport {
 
             login(EMAIL, "N3wP@ssw0rd").andExpect(status().isOk());
             login(EMAIL, DEFAULT_PASSWORD).andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("변경 직후 옛 RT 는 즉시 거부된다")
+        void revokesOldRefreshTokenImmediately() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+
+            changePassword(tokens.accessToken(), DEFAULT_PASSWORD, "N3wP@ssw0rd")
+                    .andExpect(status().isNoContent());
+
+            refresh(tokens.refreshToken())
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_INVALID"));
         }
 
         @Test

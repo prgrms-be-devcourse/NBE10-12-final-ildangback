@@ -1,0 +1,5 @@
+# 로컬 시크릿 — 예시 파일(*.example)만 커밋한다.
+# compose/.env (배포 시 GitHub Actions Secrets 로 렌더), terraform.tfvars 등.
+.env
+*.env
+!*.env.example

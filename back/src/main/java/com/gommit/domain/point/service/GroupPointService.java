@@ -93,6 +93,13 @@ public class GroupPointService {
         return GroupPointHistoryResponse.from(history);
     }
 
+    // 그룹 하루 완료 판정(멤버 카운트 + 중복 가드)을 호출자 트랜잭션에서 직렬화하기 위해
+    // group_points 행을 미리 잠근다(없으면 0원으로 생성). 이후 같은 tx 의 reward 는 이 잠금을 재사용.
+    @Transactional
+    public void lockForGroupCompletion(Long groupId) {
+        lockOrCreatePoint(groupId);
+    }
+
     private GroupPoint lockOrCreatePoint(Long groupId) {
         if (!groupPointRepository.existsByGroupId(groupId)) {
             groupPointRepository.insertZeroBalanceIfAbsent(groupId, LocalDateTime.now());

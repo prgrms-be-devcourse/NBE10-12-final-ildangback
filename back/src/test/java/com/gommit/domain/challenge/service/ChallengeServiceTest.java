@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -17,7 +18,6 @@ import com.gommit.domain.challenge.entity.ChallengeMember;
 import com.gommit.domain.challenge.entity.ChallengeMemberRole;
 import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.entity.ChallengeStatus;
-import com.gommit.domain.challenge.entity.DaysOfWeek;
 import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
@@ -32,10 +32,13 @@ import com.gommit.domain.user.entity.User;
 import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import com.gommit.global.time.BusinessClock;
+import com.gommit.global.time.DaysOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -73,8 +76,16 @@ class ChallengeServiceTest {
     @Spy
     private ChallengeProgressCalculator challengeProgressCalculator = new ChallengeProgressCalculator();
 
+    @Mock
+    private BusinessClock businessClock;
+
     @InjectMocks
     private ChallengeService challengeService;
+
+    @BeforeEach
+    void stubBusinessClock() {
+        lenient().when(businessClock.today()).thenReturn(LocalDate.now());
+    }
 
     private InitialChallengeSettingRequest initialSetting() {
         return new InitialChallengeSettingRequest(
@@ -406,16 +417,10 @@ class ChallengeServiceTest {
         }
 
         @Test
-        @DisplayName("오늘이 요일 인증일이면 isCheckInDay=true를 반환한다")
-        void returnsTrueWhenTodayMatchesDaysOfWeek() {
+        @DisplayName("canCheckInOn=true 면 isCheckInDay=true 를 반환한다")
+        void returnsCheckInDayFromCanCheckInOn() {
             // given
-            LocalDate today = LocalDate.now();
-            DaysOfWeek todayOfWeek = DaysOfWeek.getDaysOfWeek(today.getDayOfWeek());
             Challenge challenge = challenge(50L, ChallengeStatus.ACTIVE);
-            ReflectionTestUtils.setField(challenge, "startDate", today.minusDays(1));
-            ReflectionTestUtils.setField(challenge, "endDate", today.plusDays(1));
-            ReflectionTestUtils.setField(challenge, "frequencyType", FrequencyType.DAYS_OF_WEEK);
-            ReflectionTestUtils.setField(challenge, "daysOfWeek", todayOfWeek.name());
             ChallengeMember member = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
             ChallengeMember owner = challengeMember(71L, challenge, 1L, ChallengeMemberRole.OWNER);
             when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
@@ -426,6 +431,7 @@ class ChallengeServiceTest {
                     .thenReturn(2L);
             doReturn(1).when(challengeProgressCalculator).calculateCurrentDay(eq(challenge), any(LocalDate.class));
             when(challengeProgressCalculator.calculatePeriodProgressRate(1, 7)).thenReturn(14.3);
+            doReturn(true).when(challengeProgressCalculator).canCheckInOn(eq(challenge), any(LocalDate.class));
 
             // when
             var response = challengeService.getChallengeStatus(50L, 2L);
@@ -435,15 +441,10 @@ class ChallengeServiceTest {
         }
 
         @Test
-        @DisplayName("오늘이 N일마다 인증일이 아니면 isCheckInDay=false를 반환한다")
-        void returnsFalseWhenTodayDoesNotMatchEveryNDays() {
+        @DisplayName("canCheckInOn=false 면 isCheckInDay=false 를 반환한다 (비인증일 또는 챌린지 비ACTIVE)")
+        void returnsFalseWhenCannotCheckIn() {
             // given
-            LocalDate today = LocalDate.now();
             Challenge challenge = challenge(50L, ChallengeStatus.ACTIVE);
-            ReflectionTestUtils.setField(challenge, "startDate", today.minusDays(1));
-            ReflectionTestUtils.setField(challenge, "endDate", today.plusDays(1));
-            ReflectionTestUtils.setField(challenge, "frequencyType", FrequencyType.EVERY_N_DAYS);
-            ReflectionTestUtils.setField(challenge, "frequencyValue", 2);
             ChallengeMember member = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
             ChallengeMember owner = challengeMember(71L, challenge, 1L, ChallengeMemberRole.OWNER);
             when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
@@ -454,12 +455,53 @@ class ChallengeServiceTest {
                     .thenReturn(2L);
             doReturn(1).when(challengeProgressCalculator).calculateCurrentDay(eq(challenge), any(LocalDate.class));
             when(challengeProgressCalculator.calculatePeriodProgressRate(1, 7)).thenReturn(14.3);
+            doReturn(false).when(challengeProgressCalculator).canCheckInOn(eq(challenge), any(LocalDate.class));
 
             // when
             var response = challengeService.getChallengeStatus(50L, 2L);
 
             // then
             assertThat(response.isCheckInDay()).isFalse();
+        }
+
+        @Test
+        @DisplayName("그룹이 직전 대상일 전원완료를 놓쳤으면 응답 groupCurrentStreak 은 저장값이 아니라 보정된 0")
+        void returnsCorrectedGroupStreak() {
+            // given — 저장값 5 이지만 마지막 전원완료가 5일 전(직전 대상일=어제 이전)
+            LocalDate start = LocalDate.now().minusDays(10);
+            Challenge challenge = Challenge.builder()
+                    .groupId(12L)
+                    .seqNo(1)
+                    .startDate(start)
+                    .endDate(LocalDate.now().plusDays(20))
+                    .frequencyType(FrequencyType.DAILY)
+                    .frequencyValue(null)
+                    .daysOfWeek(null)
+                    .dailyCheckInCount(1)
+                    .requiredDayCount(30)
+                    .groupCurrentStreak(5)
+                    .groupBestStreak(5)
+                    .allowPhoto(true)
+                    .build();
+            challenge.activate();
+            ReflectionTestUtils.setField(
+                    challenge, "groupLastCompletedDate", LocalDate.now().minusDays(5));
+            setBaseFields(challenge, 50L);
+            ChallengeMember member = challengeMember(70L, challenge, 2L, ChallengeMemberRole.MEMBER);
+            ChallengeMember owner = challengeMember(71L, challenge, 1L, ChallengeMemberRole.OWNER);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(member));
+            when(challengeMemberRepository.findByChallengeIdAndRole(50L, ChallengeMemberRole.OWNER))
+                    .thenReturn(Optional.of(owner));
+            when(challengeMemberRepository.countByChallengeIdAndStatus(50L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(2L);
+
+            // when
+            var response = challengeService.getChallengeStatus(50L, 2L);
+
+            // then
+            assertThat(response.challenge().groupCurrentStreak()).isZero();
+            assertThat(response.challenge().groupBestStreak()).isEqualTo(5);
         }
     }
 
