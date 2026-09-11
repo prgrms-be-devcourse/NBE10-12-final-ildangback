@@ -463,7 +463,7 @@ public class GroupService {
             ChallengeGroup group = groupMember.getGroup();
             boolean ownerLeaving = group.getOwnerId().equals(userId);
             Long newOwnerId = ownerLeaving ? pickNewOwner(group.getId(), userId) : null;
-            leaveChallengesOnAccountDeletion(group.getId(), userId, newOwnerId);
+            leaveChallengesOnAccountDeletion(group.getId(), userId, newOwnerId, group.getName());
             if (!ownerLeaving) {
                 continue;
             }
@@ -489,16 +489,18 @@ public class GroupService {
     }
 
     // 살아 있는 시즌 정리
-    private void leaveChallengesOnAccountDeletion(Long groupId, Long userId, Long preferredOwnerId) {
+    private void leaveChallengesOnAccountDeletion(Long groupId, Long userId, Long preferredOwnerId, String groupName) {
         for (ChallengeStatus status : List.of(ChallengeStatus.ACTIVE, ChallengeStatus.READY)) {
             challengeRepository
                     .findFirstByGroupIdAndStatus(groupId, status)
-                    .ifPresent(challenge -> leaveChallengeMemberAndDelegate(challenge, userId, preferredOwnerId));
+                    .ifPresent(challenge ->
+                            leaveChallengeMemberAndDelegate(challenge, userId, preferredOwnerId, groupName));
         }
     }
 
     // 시즌 이탈과 OWNER 이관
-    private void leaveChallengeMemberAndDelegate(Challenge challenge, Long userId, Long preferredOwnerId) {
+    private void leaveChallengeMemberAndDelegate(
+            Challenge challenge, Long userId, Long preferredOwnerId, String groupName) {
         ChallengeMember leavingMember = challengeMemberRepository
                 .findByChallengeIdAndUserId(challenge.getId(), userId)
                 .filter(member -> member.getStatus() == ChallengeMemberStatus.ACTIVE)
@@ -507,6 +509,8 @@ public class GroupService {
             return;
         }
         leavingMember.leave();
+        // 계정 탈퇴로 인한 이탈도 중도 탈퇴와 동일하게 그 챌린지에서 번 포인트를 회수한다(Should).
+        personalPointService.recoverChallengePoints(userId, challenge.getId(), groupName);
         if (leavingMember.getRole() != ChallengeMemberRole.OWNER) {
             return;
         }
