@@ -1,9 +1,4 @@
-import {
-  CaretDownIcon,
-  CaretLeftIcon,
-  CaretRightIcon,
-  CheckIcon,
-} from "@phosphor-icons/react";
+import { CaretDownIcon, CheckIcon } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { equipItem, fetchShop, purchaseItem, unequipItem } from "../api";
 import {
@@ -227,32 +222,6 @@ export function CharacterShopPage() {
                 {shop.point.toLocaleString()}P
               </span>
             </span>
-
-            <button
-              type="button"
-              onClick={() =>
-                showToast("캐릭터 회전은 다음 업데이트에 오픈됩니다.")
-              }
-              aria-label="캐릭터 왼쪽으로 돌리기"
-              className="absolute top-1/2 left-[8px] flex h-[28px] w-[28px] -translate-y-1/2 items-center justify-center rounded-full bg-white/70 focus-visible:ring-2 focus-visible:ring-purple-300 focus-visible:outline-none"
-            >
-              <CaretLeftIcon size={16} weight="bold" color={DEEP} aria-hidden />
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                showToast("캐릭터 회전은 다음 업데이트에 오픈됩니다.")
-              }
-              aria-label="캐릭터 오른쪽으로 돌리기"
-              className="absolute top-1/2 right-[8px] flex h-[28px] w-[28px] -translate-y-1/2 items-center justify-center rounded-full bg-white/70 focus-visible:ring-2 focus-visible:ring-purple-300 focus-visible:outline-none"
-            >
-              <CaretRightIcon
-                size={16}
-                weight="bold"
-                color={DEEP}
-                aria-hidden
-              />
-            </button>
           </section>
 
           <div

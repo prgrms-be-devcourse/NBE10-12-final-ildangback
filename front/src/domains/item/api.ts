@@ -1,6 +1,7 @@
 import { apiFetch } from "../../shared/api/client";
 import type {
   CharacterResponse,
+  CharactersResponse,
   ItemPurchaseResponse,
   ItemSlot,
   ShopItemResponse,
@@ -47,6 +48,11 @@ export function getMyItems(
  */
 export function getMyCharacter(): Promise<CharacterResponse> {
   return apiFetch("/api/users/me/character");
+}
+
+/** 여러 사람의 캐릭터. 머지 결과처럼 참여자를 나란히 그리는 화면이 쓴다. */
+export function getCharacters(userIds: number[]): Promise<CharactersResponse> {
+  return apiFetch(`/api/users/characters?userIds=${userIds.join(",")}`);
 }
 
 export function purchaseItem(itemId: number): Promise<ItemPurchaseResponse> {

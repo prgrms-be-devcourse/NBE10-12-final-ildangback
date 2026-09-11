@@ -225,6 +225,8 @@ export interface CategoryStatResponse {
 export interface HeatmapCellResponse {
   month: string;
   level: number;
+}
+
 // ===== item (상점, 캐릭터) =====
 
 export type ItemSlot = "HEAD" | "TOP" | "BOTTOM" | "SHOES";
@@ -259,6 +261,15 @@ export interface CharacterResponse {
   slots: Record<ItemSlot, string | null>;
 }
 
+/**
+ * 여러 유저의 부위별 그림. JSON 객체 키라 userId 가 문자열로 온다.
+ * 서버가 한 번에 30명까지 받는다.
+ */
+export type CharactersResponse = Record<
+  string,
+  Record<ItemSlot, string | null>
+>;
+
 export interface ItemPurchaseResponse {
   userItemId: number;
   itemId: number;
@@ -267,4 +278,54 @@ export interface ItemPurchaseResponse {
   balance: number;
   /** 서버가 구매와 함께 착용까지 끝낸다. 그때 채워진 부위다. */
   equippedSlot: ItemSlot | null;
+}
+
+// ===== home =====
+
+export interface HomeSummaryResponse {
+  personalStreak: number;
+  monthlyCheckInCount: number;
+  monthlyCompletionRate: number;
+}
+
+export interface TodayChallengeResponse {
+  challengeId: number;
+  groupId: number;
+  title: string;
+  category: GroupCategory;
+  currentCount: number;
+  targetCount: number;
+  completed: boolean;
+}
+
+export interface HomeResponse {
+  nickname: string;
+  pointBalance: number;
+  /** 아직 안 쓴 사람은 null 이다. */
+  statusMessage: string | null;
+  character: CharacterResponse;
+  summary: HomeSummaryResponse;
+  todayChallenges: TodayChallengeResponse[];
+  todayTotalCount: number;
+  todayCompletedCount: number;
+  hasUnreadNotification: boolean;
+  /** 업무일 기준 오늘. 새벽 4시 전은 전날로 친다. */
+  businessDate: string;
+}
+
+export interface ActivityResponse {
+  type: UserPointReason;
+  commitPrefix: string;
+  title: string;
+  pointAmount: number;
+  /** LocalDateTime 문자열. */
+  occurredAt: string;
+}
+
+export interface GrassResponse {
+  /** YYYY-MM-DD */
+  date: string;
+  checkInCount: number;
+  /** min(checkInCount, 4) */
+  level: number;
 }

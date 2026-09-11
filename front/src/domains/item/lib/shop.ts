@@ -47,6 +47,21 @@ export const CHARACTER_LAYERS: readonly ItemSlot[] = [
 ];
 
 /**
+ * 캐릭터 응답의 slots 에서 겹쳐 그릴 그림만 남긴다.
+ * 서버는 안 낀 부위도 null 로 채워 보낸다.
+ */
+export function toCharacterArt(
+  slots: Record<ItemSlot, string | null>,
+): Partial<Record<ItemSlot, string>> {
+  const art: Partial<Record<ItemSlot, string>> = {};
+  for (const slot of CHARACTER_LAYERS) {
+    const url = slots[slot];
+    if (url) art[slot] = url;
+  }
+  return art;
+}
+
+/**
  * 카드와 확인 창의 썸네일은 전체 프레임 그림을 그대로 쓰면 아이템이 작게 박힌다.
  * 부위마다 그림에서 차지하는 자리가 정해져 있으니 그 자리를 확대해 보여준다.
  *

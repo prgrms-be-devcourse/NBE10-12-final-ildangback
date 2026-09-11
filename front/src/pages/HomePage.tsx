@@ -3,9 +3,10 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import homeChangesCards from "../assets/illustrations/home-changes-cards.webp";
 import homeHeroCard from "../assets/illustrations/home-hero-card.webp";
-// 교체 지점. 실 API 가 오면 이 import 만 domains/*/api.ts 로 바꾼다.
-import { fetchHome } from "../mocks/api";
-import type { HomeData, TodayChallenge } from "../mocks/types";
+import { fetchHome, type HomeData } from "../domains/home/api";
+import { CharacterView } from "../domains/item/components/CharacterView";
+import { toCharacterArt } from "../domains/item/lib/shop";
+import type { TodayChallengeResponse } from "../shared/api/types";
 import { formatMonthDay } from "../shared/lib/date";
 import { useAuth } from "../shared/lib/useAuth";
 import { useToast } from "../shared/lib/useToast";
@@ -26,6 +27,9 @@ const DONE = "#16A300";
 // 홈은 미리보기다. 카드 높이가 세 줄에 맞춰져 있다.
 const RECENT_LIMIT = 3;
 
+// 홈 잔디는 4개월치다. 개인 통계가 1년을 보여준다.
+const GRASS_WEEKS = 18;
+
 // 상태 메시지를 아직 안 쓴 사람에게 보여줄 문구.
 const STATUS_PLACEHOLDER = "오늘도 한 칸 채우러 갑니다";
 
@@ -41,15 +45,15 @@ function SignedInHome() {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const [home, setHome] = useState<HomeData | null>(null);
+  const [data, setData] = useState<HomeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    fetchHome()
-      .then((data) => {
-        if (!cancelled) setHome(data);
+    fetchHome(GRASS_WEEKS)
+      .then((loaded) => {
+        if (!cancelled) setData(loaded);
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -70,7 +74,7 @@ function SignedInHome() {
     );
   }
 
-  if (failed || !home || !user) {
+  if (failed || !data || !user) {
     return (
       <p className="px-[22px] py-20 text-center text-[13px] text-gray-500">
         홈을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
@@ -78,9 +82,10 @@ function SignedInHome() {
     );
   }
 
-  const doneCount = home.todayChallenges.filter((c) => c.done >= c.goal).length;
+  const { home, grass } = data;
+  const characterArt = toCharacterArt(home.character.slots);
   // 카드 높이와 점 잇는 세로선이 세 줄에 맞춰져 있다. 나머지는 "전체 보기" 로 간다.
-  const recentActivities = home.recentActivities.slice(0, RECENT_LIMIT);
+  const recentActivities = data.activities.slice(0, RECENT_LIMIT);
 
   return (
     <div className="px-[22px] pt-[7px] pb-10">
@@ -93,16 +98,18 @@ function SignedInHome() {
           className="relative rounded-lg p-1.5 focus-visible:ring-2 focus-visible:ring-purple-300 focus-visible:outline-none after:absolute after:-inset-[5px] after:content-['']"
         >
           <PixelIcon src={designArt.notificationBell} size={28} />
-          <span
-            className="absolute top-[4px] right-[6px] h-[7px] w-[7px] rounded-full"
-            style={{ backgroundColor: DEEP }}
-          />
+          {home.hasUnreadNotification && (
+            <span
+              className="absolute top-[4px] right-[6px] h-[7px] w-[7px] rounded-full"
+              style={{ backgroundColor: DEEP }}
+            />
+          )}
         </button>
       </header>
 
       <div className="mt-[9px] flex items-center justify-between gap-2">
         <h2 className="text-[18px] leading-[22px] font-bold text-gray-900">
-          {user.nickname}님, 오늘도 꼬밋해볼까요?
+          {home.nickname}님, 오늘도 꼬밋해볼까요?
         </h2>
         <button
           type="button"
@@ -112,37 +119,36 @@ function SignedInHome() {
         >
           <PixelIcon src={pixelIcons.pointHistory} size={15} />
           <span className="text-[14px] leading-none font-bold text-purple-500">
-            {home.point.toLocaleString()}P
+            {home.pointBalance.toLocaleString()}P
           </span>
         </button>
       </div>
 
       {/* 시안 배치. 캐릭터가 지표 줄 왼쪽에 서고, 말풍선이 그 아래로 붙는다. */}
       <section className="mt-[9px] flex items-center">
-        <img
-          src={designArt.characterHome}
-          alt="내 캐릭터"
-          className="ml-[4px] h-[58px] w-[33px] shrink-0 object-contain pixelated"
-        />
+        {/* 아이템 그림이 1080x1080 정사각 캔버스라 상자도 정사각이어야 겹쳐진다. */}
+        <span className="-ml-[15px] block h-[76px] w-[76px] shrink-0">
+          <CharacterView art={characterArt} label="내 캐릭터" />
+        </span>
         <div className="flex flex-1 items-center justify-center gap-[10px]">
           <SummaryStat
             icon={designArt.statStreak}
             label="연속 인증"
-            value={home.streakDays}
+            value={home.summary.personalStreak}
             unit="일"
           />
           <span className="h-[29px] w-px shrink-0 bg-[#EDEDED]" />
           <SummaryStat
             icon={designArt.statMonthly}
             label="이번 달 인증"
-            value={home.monthlyCheckIns}
+            value={home.summary.monthlyCheckInCount}
             unit="회"
           />
           <span className="h-[29px] w-px shrink-0 bg-[#EDEDED]" />
           <SummaryStat
             icon={designArt.statRate}
             label="이번 달 성공률"
-            value={home.monthlySuccessRate}
+            value={home.summary.monthlyCompletionRate}
             unit="%"
           />
         </div>
@@ -163,7 +169,7 @@ function SignedInHome() {
         >
           <QuoteMark />
           <span className="ml-[8px] min-w-0 flex-1 truncate text-left text-[13px] text-[#4F4F4F]">
-            {user.introduction || STATUS_PLACEHOLDER}
+            {home.statusMessage || STATUS_PLACEHOLDER}
           </span>
           <PencilMark />
         </button>
@@ -175,7 +181,7 @@ function SignedInHome() {
             오늘의 챌린지
           </h3>
           <p className="text-[11px] leading-none text-gray-500">
-            오늘 {home.todayChallenges.length}개 중 {doneCount}개 완료
+            오늘 {home.todayTotalCount}개 중 {home.todayCompletedCount}개 완료
           </p>
         </div>
 
@@ -190,7 +196,7 @@ function SignedInHome() {
           )}
           {home.todayChallenges.map((challenge) => (
             <li
-              key={challenge.id}
+              key={challenge.challengeId}
               className="flex-1 border-b border-purple-200 last:border-b-0"
             >
               <TodayChallengeRow
@@ -212,12 +218,7 @@ function SignedInHome() {
           className="mt-[12px] rounded-[10px] border border-purple-200 px-[14px] py-[16px]"
           style={{ backgroundColor: CARD }}
         >
-          <ContributionGrid
-            days={home.grass}
-            gap={5}
-            showDayLabels
-            interactive
-          />
+          <ContributionGrid days={grass} gap={5} showDayLabels interactive />
         </div>
       </section>
 
@@ -228,9 +229,7 @@ function SignedInHome() {
           </h3>
           <button
             type="button"
-            onClick={() =>
-              showToast("전체 활동 기능은 다음 업데이트에 오픈됩니다.")
-            }
+            onClick={() => navigate("/profile/check-ins")}
             className="relative rounded text-[12px] leading-none font-semibold focus-visible:ring-2 focus-visible:ring-purple-300 focus-visible:outline-none after:absolute after:-inset-x-2 after:-inset-y-4 after:content-['']"
             style={{ color: DEEP }}
           >
@@ -256,7 +255,7 @@ function SignedInHome() {
           )}
           {recentActivities.map((activity) => (
             <li
-              key={activity.id}
+              key={`${activity.occurredAt}-${activity.title}`}
               className="relative flex flex-1 items-center pr-[16px] pl-[16px] after:absolute after:right-[16px] after:bottom-0 after:left-[44px] after:h-px after:bg-purple-100 after:content-[''] last:after:hidden"
             >
               <span className="relative h-2.5 w-2.5 shrink-0 rounded-full border border-purple-500 bg-white" />
@@ -264,19 +263,20 @@ function SignedInHome() {
                 className="ml-[18px] shrink-0 text-[12px] font-semibold"
                 style={{ color: DEEP }}
               >
-                {activity.prefix}:
+                {activity.commitPrefix}
               </span>
               <span className="ml-[6px] min-w-0 flex-1 truncate text-[12px] text-gray-900">
                 {activity.title}
               </span>
               <span className="shrink-0 text-[11px] text-gray-500 tabular-nums">
-                {formatMonthDay(activity.date)}
+                {formatMonthDay(activity.occurredAt.slice(0, 10))}
               </span>
               <span
                 className="ml-[14px] w-[34px] shrink-0 text-right text-[12px] font-semibold tabular-nums"
                 style={{ color: DEEP }}
               >
-                +{activity.point}P
+                {activity.pointAmount > 0 ? "+" : ""}
+                {activity.pointAmount}P
               </span>
             </li>
           ))}
@@ -317,12 +317,11 @@ function TodayChallengeRow({
   challenge,
   onCheckIn,
 }: {
-  challenge: TodayChallenge;
+  challenge: TodayChallengeResponse;
   onCheckIn(): void;
 }) {
   const art = CATEGORY_ART[challenge.category];
   const CategoryIcon = CATEGORY_ICON[challenge.category];
-  const done = challenge.done >= challenge.goal;
 
   return (
     <div className="flex h-full items-center gap-[10px] pr-[12px] pl-[12px]">
@@ -335,13 +334,13 @@ function TodayChallengeRow({
       </span>
 
       <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-gray-900">
-        {challenge.name}
+        {challenge.title}
       </span>
       <span className="w-[30px] shrink-0 text-right text-[11px] text-gray-500 tabular-nums">
-        {challenge.done}/{challenge.goal}
+        {challenge.currentCount}/{challenge.targetCount}
       </span>
 
-      {done ? (
+      {challenge.completed ? (
         <span
           className="flex w-[53px] shrink-0 items-center justify-center gap-[3px] text-[12px] font-semibold"
           style={{ color: DONE }}

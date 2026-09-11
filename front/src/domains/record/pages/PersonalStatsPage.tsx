@@ -1,18 +1,23 @@
 import { CalendarBlankIcon, CaretDownIcon } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
-// 교체 지점. 실 API 가 오면 이 import 만 domains/record/api.ts 로 바꾼다.
-import { fetchPersonalStats } from "../../../mocks/api";
+import { getGrassWeeks } from "../../home/api";
+import { getMyStats } from "../api";
 import {
+  type PersonalStatsData,
   STATS_PERIOD_LABEL,
   STATS_PERIODS,
   type StatsPeriod,
-} from "../../../mocks/stats";
-import type { PersonalStatsData } from "../../../mocks/types";
+  toDateRange,
+  toPersonalStatsData,
+} from "../lib/personalStats";
 import { TopBar } from "../../../shared/ui/TopBar";
 import { CategoryTab } from "../components/CategoryTab";
 import { MonthlyTab } from "../components/MonthlyTab";
 import { DEEP, MUTED } from "../components/statsTokens";
 import { SummaryTab } from "../components/SummaryTab";
+
+// 통계 잔디는 1년치다. 서버가 366일까지 받는다.
+const GRASS_WEEKS = 52;
 
 const TABS = [
   { key: "SUMMARY", label: "요약" },
@@ -37,7 +42,7 @@ export function PersonalStatsPage() {
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
 
-  // 기간이 바뀌면 다시 받아온다. 목은 기간을 무시하지만 호출은 실제로 나간다.
+  // 기간이 바뀌면 다시 받아온다. 잔디는 기간과 무관하게 1년치를 보여준다.
   useEffect(() => {
     let cancelled = false;
 
@@ -45,8 +50,11 @@ export function PersonalStatsPage() {
       setLoading(true);
       setFailed(false);
       try {
-        const data = await fetchPersonalStats(period);
-        if (!cancelled) setStats(data);
+        const [response, grass] = await Promise.all([
+          getMyStats(toDateRange(period)),
+          getGrassWeeks(GRASS_WEEKS),
+        ]);
+        if (!cancelled) setStats(toPersonalStatsData(response, grass));
       } catch {
         if (!cancelled) setFailed(true);
       } finally {

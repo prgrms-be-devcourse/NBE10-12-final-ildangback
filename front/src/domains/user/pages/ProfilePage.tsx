@@ -8,6 +8,7 @@ import iconUnauthStats from "../../../assets/icons/profile-unauth-stats.webp";
 import iconUnauthArchive from "../../../assets/icons/profile-unauth-archive.webp";
 import { getMyCharacter } from "../../item/api";
 import { CharacterView } from "../../item/components/CharacterView";
+import { toCharacterArt } from "../../item/lib/shop";
 import type { ItemSlot } from "../../../shared/api/types";
 import { useAuth } from "../../../shared/lib/useAuth";
 import { Button } from "../../../shared/ui/Button";
@@ -53,12 +54,7 @@ export function ProfilePage() {
     let cancelled = false;
     getMyCharacter()
       .then(({ slots }) => {
-        if (cancelled) return;
-        const art: Partial<Record<ItemSlot, string>> = {};
-        for (const [slot, url] of Object.entries(slots)) {
-          if (url) art[slot as ItemSlot] = url;
-        }
-        setCharacterArt(art);
+        if (!cancelled) setCharacterArt(toCharacterArt(slots));
       })
       .catch(() => {
         // 못 받아도 기본 몸통은 그린다. 이 화면의 본 내용은 아래 메뉴다.

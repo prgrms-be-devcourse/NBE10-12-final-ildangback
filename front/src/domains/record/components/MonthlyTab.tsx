@@ -1,5 +1,5 @@
 import { CalendarCheckIcon, CalendarXIcon } from "@phosphor-icons/react";
-import type { MonthlyPoint, PersonalStatsData } from "../../../mocks/types";
+import type { MonthlyPoint, PersonalStatsData } from "../lib/personalStats";
 import { CARD, CARD_TITLE, DEEP, INK, LIGHT, TRACK } from "./statsTokens";
 
 // 눈금 후보. 실제 값을 담을 수 있는 가장 작은 것을 고른다.
@@ -144,7 +144,7 @@ export function MonthlyTab({ stats }: { stats: PersonalStatsData }) {
           tone="worst"
           label="가장 많이 놓친 달"
           headline={`${stats.worstMonth}월`}
-          detail={`${stats.worstMonthMissed}회 미인증`}
+          detail={`완주율 ${stats.worstMonthRate}%`}
         />
       </div>
     </>

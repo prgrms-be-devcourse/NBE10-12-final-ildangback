@@ -1,5 +1,5 @@
 import { CheckCircleIcon, XCircleIcon } from "@phosphor-icons/react";
-import type { PersonalStatsData } from "../../../mocks/types";
+import type { PersonalStatsData } from "../lib/personalStats";
 import { ContributionGrid } from "../../../shared/ui/ContributionGrid";
 import { PixelIcon } from "../../../shared/ui/PixelIcon";
 import { designArt } from "../../../shared/ui/designArt";
@@ -122,8 +122,8 @@ export function SummaryTab({ stats }: { stats: PersonalStatsData }) {
             value={stats.completedChallenges}
           />
           <OutcomeTile
-            label="미완주 챌린지"
-            value={stats.abandonedChallenges}
+            label="진행 중 챌린지"
+            value={stats.inProgressChallenges}
           />
         </div>
       </section>

@@ -1,5 +1,5 @@
-import { CATEGORY_LABEL } from "../../../mocks/categories";
-import type { PersonalStatsData } from "../../../mocks/types";
+import { CATEGORY_LABEL } from "../lib/category";
+import type { PersonalStatsData } from "../lib/personalStats";
 import { designArt } from "../../../shared/ui/designArt";
 import { DonutChart } from "./DonutChart";
 import { BANNER, CARD, CARD_TITLE, DEEP, LIGHT, TRACK } from "./statsTokens";

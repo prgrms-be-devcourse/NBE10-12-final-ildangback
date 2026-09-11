@@ -9,8 +9,21 @@ import type {
   SliceResponse,
 } from "../../shared/api/types";
 
-export function getMyStats(): Promise<PersonalStatsResponse> {
-  return apiFetch("/api/users/me/stats");
+export interface GetMyStatsParams {
+  /** YYYY-MM-DD. 생략하면 전체 기간이다. */
+  from?: string;
+  to?: string;
+}
+
+export function getMyStats(
+  params: GetMyStatsParams = {},
+): Promise<PersonalStatsResponse> {
+  const query = new URLSearchParams();
+  if (params.from) query.set("from", params.from);
+  if (params.to) query.set("to", params.to);
+
+  const queryString = query.toString();
+  return apiFetch(`/api/users/me/stats${queryString ? `?${queryString}` : ""}`);
 }
 
 export interface GetMyChallengeMergeOverviewsParams {
