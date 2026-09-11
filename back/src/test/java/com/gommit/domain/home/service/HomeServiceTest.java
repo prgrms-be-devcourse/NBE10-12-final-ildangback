@@ -9,6 +9,7 @@ import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.checkin.repository.CheckInRepository;
+import com.gommit.domain.checkin.repository.CheckInRepository.CheckInCountByDate;
 import com.gommit.domain.group.entity.ChallengeGroup;
 import com.gommit.domain.group.entity.GroupCategory;
 import com.gommit.domain.group.entity.GroupStatus;
@@ -16,14 +17,14 @@ import com.gommit.domain.group.entity.MapType;
 import com.gommit.domain.group.entity.Visibility;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
 import com.gommit.domain.group.service.GroupService;
-import com.gommit.domain.home.dto.response.ActivityListResponse;
+import com.gommit.domain.home.dto.response.ActivityResponse;
 import com.gommit.domain.home.dto.response.GrassResponse;
 import com.gommit.domain.home.dto.response.HomeResponse;
 import com.gommit.domain.item.dto.response.CharacterResponse;
 import com.gommit.domain.item.entity.ItemSlot;
 import com.gommit.domain.item.service.UserItemService;
 import com.gommit.domain.point.dto.response.PointBalanceResponse;
-import com.gommit.domain.point.dto.response.UserPointHistoryResponse;
+import com.gommit.domain.point.entity.UserPointHistory;
 import com.gommit.domain.point.entity.UserPointReason;
 import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.domain.user.dto.response.UserProfileResponse;
@@ -34,7 +35,6 @@ import com.gommit.global.exception.ErrorCode;
 import com.gommit.global.time.BusinessClock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -93,12 +93,8 @@ class HomeServiceTest {
         return new UserProfileResponse(USER_ID, "t@t.com", "테스터", null, 0, 0, null, LocalDateTime.now());
     }
 
-    private UserPointHistoryResponse history(UserPointReason reason, Long challengeId) {
-        return new UserPointHistoryResponse(1L, USER_ID, challengeId, "소스", 100, reason, 100, LocalDateTime.now());
-    }
-
-    private SliceResponse<UserPointHistoryResponse> sliceOf(List<UserPointHistoryResponse> items) {
-        return new SliceResponse<>(items, false, null);
+    private UserPointHistory history(UserPointReason reason, Long challengeId) {
+        return UserPointHistory.of(USER_ID, challengeId, "소스", 100, reason, 100);
     }
 
     // ──────────────────────────────────────────────────
@@ -140,12 +136,12 @@ class HomeServiceTest {
             LocalDate from = LocalDate.of(2025, 6, 1);
             LocalDate to = LocalDate.of(2025, 6, 3);
 
-            List<GrassResponse> result = homeService.getGrass(USER_ID, from, to);
+            SliceResponse<GrassResponse> result = homeService.getGrass(USER_ID, from, to);
 
-            assertThat(result).hasSize(3);
-            assertThat(result.get(0).date()).isEqualTo(LocalDate.of(2025, 6, 1));
-            assertThat(result.get(1).date()).isEqualTo(LocalDate.of(2025, 6, 2));
-            assertThat(result.get(2).date()).isEqualTo(LocalDate.of(2025, 6, 3));
+            assertThat(result.content()).hasSize(3);
+            assertThat(result.content().get(0).date()).isEqualTo(LocalDate.of(2025, 6, 1));
+            assertThat(result.content().get(1).date()).isEqualTo(LocalDate.of(2025, 6, 2));
+            assertThat(result.content().get(2).date()).isEqualTo(LocalDate.of(2025, 6, 3));
         }
 
         @Test
@@ -153,10 +149,10 @@ class HomeServiceTest {
         void t4() {
             LocalDate date = LocalDate.of(2025, 6, 15);
 
-            List<GrassResponse> result = homeService.getGrass(USER_ID, date, date);
+            SliceResponse<GrassResponse> result = homeService.getGrass(USER_ID, date, date);
 
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0).date()).isEqualTo(date);
+            assertThat(result.content()).hasSize(1);
+            assertThat(result.content().get(0).date()).isEqualTo(date);
         }
 
         @Test
@@ -164,10 +160,10 @@ class HomeServiceTest {
         void t5() {
             LocalDate date = LocalDate.of(2025, 6, 1);
 
-            List<GrassResponse> result = homeService.getGrass(USER_ID, date, date);
+            SliceResponse<GrassResponse> result = homeService.getGrass(USER_ID, date, date);
 
-            assertThat(result.get(0).checkInCount()).isEqualTo(0);
-            assertThat(result.get(0).level()).isEqualTo(0);
+            assertThat(result.content().get(0).checkInCount()).isEqualTo(0);
+            assertThat(result.content().get(0).level()).isEqualTo(0);
         }
 
         @Test
@@ -176,12 +172,12 @@ class HomeServiceTest {
             LocalDate date = LocalDate.of(2025, 6, 1);
 
             given(checkInRepository.countByUserIdGroupByDateBetween(USER_ID, date, date))
-                    .willReturn(Collections.singletonList(new Object[] {date, 2L}));
+                    .willReturn(List.of(stubRow(date, 2L)));
 
-            List<GrassResponse> result = homeService.getGrass(USER_ID, date, date);
+            SliceResponse<GrassResponse> result = homeService.getGrass(USER_ID, date, date);
 
-            assertThat(result.get(0).checkInCount()).isEqualTo(2);
-            assertThat(result.get(0).level()).isEqualTo(2);
+            assertThat(result.content().get(0).checkInCount()).isEqualTo(2);
+            assertThat(result.content().get(0).level()).isEqualTo(2);
         }
 
         @Test
@@ -190,12 +186,26 @@ class HomeServiceTest {
             LocalDate date = LocalDate.of(2025, 6, 1);
 
             given(checkInRepository.countByUserIdGroupByDateBetween(USER_ID, date, date))
-                    .willReturn(Collections.singletonList(new Object[] {date, 5L}));
+                    .willReturn(List.of(stubRow(date, 5L)));
 
-            List<GrassResponse> result = homeService.getGrass(USER_ID, date, date);
+            SliceResponse<GrassResponse> result = homeService.getGrass(USER_ID, date, date);
 
-            assertThat(result.get(0).checkInCount()).isEqualTo(5);
-            assertThat(result.get(0).level()).isEqualTo(4);
+            assertThat(result.content().get(0).checkInCount()).isEqualTo(5);
+            assertThat(result.content().get(0).level()).isEqualTo(4);
+        }
+
+        private CheckInCountByDate stubRow(LocalDate date, long count) {
+            return new CheckInCountByDate() {
+                @Override
+                public LocalDate getBusinessDate() {
+                    return date;
+                }
+
+                @Override
+                public Long getCount() {
+                    return count;
+                }
+            };
         }
     }
 
@@ -210,10 +220,9 @@ class HomeServiceTest {
         @Test
         @DisplayName("이력이 없으면 빈 content가 반환된다")
         void t6() {
-            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(3)))
-                    .willReturn(sliceOf(List.of()));
+            given(pointService.getRecentHistories(USER_ID, 3)).willReturn(List.of());
 
-            ActivityListResponse result = homeService.getActivities(USER_ID);
+            SliceResponse<ActivityResponse> result = homeService.getActivities(USER_ID);
 
             assertThat(result.content()).isEmpty();
         }
@@ -221,10 +230,10 @@ class HomeServiceTest {
         @Test
         @DisplayName("CHECK_IN + challengeId 없으면 feat: 접두사를 가진다")
         void t7() {
-            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(3)))
-                    .willReturn(sliceOf(List.of(history(UserPointReason.CHECK_IN, null))));
+            given(pointService.getRecentHistories(USER_ID, 3))
+                    .willReturn(List.of(history(UserPointReason.CHECK_IN, null)));
 
-            ActivityListResponse result = homeService.getActivities(USER_ID);
+            SliceResponse<ActivityResponse> result = homeService.getActivities(USER_ID);
 
             assertThat(result.content().get(0).commitPrefix()).isEqualTo("feat:");
         }
@@ -232,10 +241,10 @@ class HomeServiceTest {
         @Test
         @DisplayName("ITEM_PURCHASE는 chore: 접두사를 가진다")
         void t8() {
-            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(3)))
-                    .willReturn(sliceOf(List.of(history(UserPointReason.ITEM_PURCHASE, null))));
+            given(pointService.getRecentHistories(USER_ID, 3))
+                    .willReturn(List.of(history(UserPointReason.ITEM_PURCHASE, null)));
 
-            ActivityListResponse result = homeService.getActivities(USER_ID);
+            SliceResponse<ActivityResponse> result = homeService.getActivities(USER_ID);
 
             assertThat(result.content().get(0).commitPrefix()).isEqualTo("chore:");
         }
@@ -243,10 +252,10 @@ class HomeServiceTest {
         @Test
         @DisplayName("CHALLENGE_BONUS는 feat: 접두사를 가진다")
         void t9() {
-            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(3)))
-                    .willReturn(sliceOf(List.of(history(UserPointReason.CHALLENGE_BONUS, null))));
+            given(pointService.getRecentHistories(USER_ID, 3))
+                    .willReturn(List.of(history(UserPointReason.CHALLENGE_BONUS, null)));
 
-            ActivityListResponse result = homeService.getActivities(USER_ID);
+            SliceResponse<ActivityResponse> result = homeService.getActivities(USER_ID);
 
             assertThat(result.content().get(0).commitPrefix()).isEqualTo("feat:");
         }
@@ -254,10 +263,10 @@ class HomeServiceTest {
         @Test
         @DisplayName("WITHDRAWAL_PENALTY는 fix: 접두사를 가진다")
         void t10() {
-            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(3)))
-                    .willReturn(sliceOf(List.of(history(UserPointReason.WITHDRAWAL_PENALTY, null))));
+            given(pointService.getRecentHistories(USER_ID, 3))
+                    .willReturn(List.of(history(UserPointReason.WITHDRAWAL_PENALTY, null)));
 
-            ActivityListResponse result = homeService.getActivities(USER_ID);
+            SliceResponse<ActivityResponse> result = homeService.getActivities(USER_ID);
 
             assertThat(result.content().get(0).commitPrefix()).isEqualTo("fix:");
         }
@@ -265,10 +274,10 @@ class HomeServiceTest {
         @Test
         @DisplayName("MONTHLY_MERGE_BONUS는 feat: 접두사를 가진다")
         void t11() {
-            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(3)))
-                    .willReturn(sliceOf(List.of(history(UserPointReason.MONTHLY_MERGE_BONUS, null))));
+            given(pointService.getRecentHistories(USER_ID, 3))
+                    .willReturn(List.of(history(UserPointReason.MONTHLY_MERGE_BONUS, null)));
 
-            ActivityListResponse result = homeService.getActivities(USER_ID);
+            SliceResponse<ActivityResponse> result = homeService.getActivities(USER_ID);
 
             assertThat(result.content().get(0).commitPrefix()).isEqualTo("feat:");
         }
@@ -279,8 +288,8 @@ class HomeServiceTest {
             Long challengeId = 100L;
             Long groupId = 200L;
 
-            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(3)))
-                    .willReturn(sliceOf(List.of(history(UserPointReason.CHECK_IN, challengeId))));
+            given(pointService.getRecentHistories(USER_ID, 3))
+                    .willReturn(List.of(history(UserPointReason.CHECK_IN, challengeId)));
 
             Challenge challenge = Challenge.builder()
                     .groupId(groupId)
@@ -307,7 +316,7 @@ class HomeServiceTest {
             given(challengeRepository.findAllById(List.of(challengeId))).willReturn(List.of(challenge));
             given(challengeGroupRepository.findAllById(any())).willReturn(List.of(group));
 
-            ActivityListResponse result = homeService.getActivities(USER_ID);
+            SliceResponse<ActivityResponse> result = homeService.getActivities(USER_ID);
 
             assertThat(result.content().get(0).commitPrefix()).isEqualTo("workout:");
         }
@@ -318,8 +327,8 @@ class HomeServiceTest {
             Long challengeId = 101L;
             Long groupId = 201L;
 
-            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(3)))
-                    .willReturn(sliceOf(List.of(history(UserPointReason.CHECK_IN, challengeId))));
+            given(pointService.getRecentHistories(USER_ID, 3))
+                    .willReturn(List.of(history(UserPointReason.CHECK_IN, challengeId)));
 
             Challenge challenge = Challenge.builder()
                     .groupId(groupId)
@@ -346,7 +355,7 @@ class HomeServiceTest {
             given(challengeRepository.findAllById(List.of(challengeId))).willReturn(List.of(challenge));
             given(challengeGroupRepository.findAllById(any())).willReturn(List.of(group));
 
-            ActivityListResponse result = homeService.getActivities(USER_ID);
+            SliceResponse<ActivityResponse> result = homeService.getActivities(USER_ID);
 
             assertThat(result.content().get(0).commitPrefix()).isEqualTo("docs:");
         }
@@ -357,8 +366,8 @@ class HomeServiceTest {
             Long challengeId = 102L;
             Long groupId = 202L;
 
-            given(pointService.getMyHistories(eq(USER_ID), any(), any(), any(), any(), any(), any(), eq(3)))
-                    .willReturn(sliceOf(List.of(history(UserPointReason.CHECK_IN, challengeId))));
+            given(pointService.getRecentHistories(USER_ID, 3))
+                    .willReturn(List.of(history(UserPointReason.CHECK_IN, challengeId)));
 
             Challenge challenge = Challenge.builder()
                     .groupId(groupId)
@@ -385,7 +394,7 @@ class HomeServiceTest {
             given(challengeRepository.findAllById(List.of(challengeId))).willReturn(List.of(challenge));
             given(challengeGroupRepository.findAllById(any())).willReturn(List.of(group));
 
-            ActivityListResponse result = homeService.getActivities(USER_ID);
+            SliceResponse<ActivityResponse> result = homeService.getActivities(USER_ID);
 
             assertThat(result.content().get(0).commitPrefix()).isEqualTo("chore:");
         }

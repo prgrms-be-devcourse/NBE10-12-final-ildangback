@@ -4,6 +4,7 @@ import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.ChallengeStatus;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.checkin.repository.CheckInRepository;
+import com.gommit.domain.checkin.repository.CheckInRepository.CheckInCountByDate;
 import com.gommit.domain.group.entity.ChallengeGroup;
 import com.gommit.domain.group.entity.GroupCategory;
 import com.gommit.domain.group.entity.GroupStatus;
@@ -12,7 +13,7 @@ import com.gommit.domain.group.service.GroupService;
 import com.gommit.domain.home.dto.response.*;
 import com.gommit.domain.item.dto.response.CharacterResponse;
 import com.gommit.domain.item.service.UserItemService;
-import com.gommit.domain.point.dto.response.UserPointHistoryResponse;
+import com.gommit.domain.point.entity.UserPointHistory;
 import com.gommit.domain.point.entity.UserPointReason;
 import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.domain.user.dto.response.UserProfileResponse;
@@ -96,12 +97,12 @@ public class HomeService {
     }
 
     // 꼬밋 잔디 조회
-    public List<GrassResponse> getGrass(Long userId, LocalDate from, LocalDate to) {
+    public SliceResponse<GrassResponse> getGrass(Long userId, LocalDate from, LocalDate to) {
         if (from.isAfter(to)) throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         if (ChronoUnit.DAYS.between(from, to) > 366) throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
 
         Map<LocalDate, Long> countByDate = checkInRepository.countByUserIdGroupByDateBetween(userId, from, to).stream()
-                .collect(Collectors.toMap(row -> (LocalDate) row[0], row -> (Long) row[1]));
+                .collect(Collectors.toMap(CheckInCountByDate::getBusinessDate, CheckInCountByDate::getCount));
 
         List<GrassResponse> result = new ArrayList<>();
         LocalDate date = from;
@@ -110,7 +111,7 @@ public class HomeService {
             result.add(new GrassResponse(date, count, toGrassLevel(count)));
             date = date.plusDays(1);
         }
-        return result;
+        return new SliceResponse<>(result, false, null);
     }
 
     // 인증 횟수 -> 잔디 레벨 변환 규칙
@@ -119,14 +120,13 @@ public class HomeService {
     }
 
     // 최근 활동 조회
-    public ActivityListResponse getActivities(Long userId) {
-        SliceResponse<UserPointHistoryResponse> histories =
-                pointService.getMyHistories(userId, null, null, null, null, null, null, 3);
+    public SliceResponse<ActivityResponse> getActivities(Long userId) {
+        List<UserPointHistory> histories = pointService.getRecentHistories(userId, 3);
 
         // CHECK_IN인 항목의 challengeId만 수집
-        List<Long> challengeIds = histories.content().stream()
-                .filter(h -> h.reason() == UserPointReason.CHECK_IN && h.challengeId() != null)
-                .map(UserPointHistoryResponse::challengeId)
+        List<Long> challengeIds = histories.stream()
+                .filter(h -> h.getReason() == UserPointReason.CHECK_IN && h.getChallengeId() != null)
+                .map(UserPointHistory::getChallengeId)
                 .distinct()
                 .toList();
 
@@ -143,22 +143,21 @@ public class HomeService {
             challengeToGroupId.forEach((cId, gId) -> challengeCategoryMap.put(cId, groupIdToCategory.get(gId)));
         }
 
-        List<ActivityResponse> content = histories.content().stream()
+        List<ActivityResponse> content = histories.stream()
                 .map(h -> toActivityResponse(h, challengeCategoryMap))
                 .toList();
 
-        return new ActivityListResponse(content);
+        return new SliceResponse<>(content, false, null);
     }
 
-    private ActivityResponse toActivityResponse(
-            UserPointHistoryResponse history, Map<Long, GroupCategory> categoryMap) {
-        GroupCategory category = history.challengeId() != null ? categoryMap.get(history.challengeId()) : null;
+    private ActivityResponse toActivityResponse(UserPointHistory history, Map<Long, GroupCategory> categoryMap) {
+        GroupCategory category = history.getChallengeId() != null ? categoryMap.get(history.getChallengeId()) : null;
         return new ActivityResponse(
-                history.reason(),
-                toCommitPrefix(history.reason(), category),
-                history.sourceName(),
-                history.amount(),
-                history.createdAt());
+                history.getReason(),
+                toCommitPrefix(history.getReason(), category),
+                history.getSourceName(),
+                history.getAmount(),
+                history.getCreatedAt());
     }
 
     private String toCommitPrefix(UserPointReason reason, GroupCategory category) {

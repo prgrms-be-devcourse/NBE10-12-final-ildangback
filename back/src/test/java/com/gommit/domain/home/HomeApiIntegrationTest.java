@@ -84,11 +84,11 @@ class HomeApiIntegrationTest extends IntegrationTestSupport {
                                     .param("to", "2025-06-03"),
                             tokens.accessToken()))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$").isArray())
-                    .andExpect(jsonPath("$.length()").value(3))
-                    .andExpect(jsonPath("$[0].date").value("2025-06-01"))
-                    .andExpect(jsonPath("$[0].checkInCount").isNumber())
-                    .andExpect(jsonPath("$[0].level").isNumber());
+                    .andExpect(jsonPath("$.content").isArray())
+                    .andExpect(jsonPath("$.content.length()").value(3))
+                    .andExpect(jsonPath("$.content[0].date").value("2025-06-01"))
+                    .andExpect(jsonPath("$.content[0].checkInCount").isNumber())
+                    .andExpect(jsonPath("$.content[0].level").isNumber());
         }
 
         @Test
@@ -146,7 +146,7 @@ class HomeApiIntegrationTest extends IntegrationTestSupport {
                                     .param("to", "2025-06-15"),
                             tokens.accessToken()))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.length()").value(1));
+                    .andExpect(jsonPath("$.content.length()").value(1));
         }
     }
 
@@ -165,7 +165,7 @@ class HomeApiIntegrationTest extends IntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("인증하면 200과 ActivityListResponse 구조를 돌려준다")
+        @DisplayName("인증하면 200과 SliceResponse 구조를 돌려준다")
         void t12() throws Exception {
             var tokens = loginAs();
 
