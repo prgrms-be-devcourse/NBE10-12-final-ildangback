@@ -1,5 +1,8 @@
 package com.gommit.domain.checkin.support;
 
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -9,6 +12,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import javax.imageio.ImageIO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
@@ -24,7 +28,10 @@ public class DailyLogMontageBuilder {
     public static final int MAX_CELLS = 6;
 
     private static final int ROUND_SECONDS = 2; // 회차 1개 노출 시간
-    private static final int CANVAS_WIDTH = 2160; // 캔버스 가로 고정 — 칸 = CANVAS_WIDTH / 열수 (정사각). 세로는 행수에 따라 달라짐
+    // 캔버스 가로 고정 — 칸 = CANVAS_WIDTH / 열수 (정사각). 세로는 행수에 따라 달라짐.
+    // 1280: 폰 피드에서 보는 2초 영상엔 레티나 해상도로 충분 — 2160(4K급)은 메모리만 태우고 무의미
+    // (2026-09-11 실측: 2160 은 ffmpeg RSS 가 back 컨테이너 한도를 넘겨 OOM-kill).
+    private static final int CANVAS_WIDTH = 1280;
     private static final int FPS = 30; // 동영상 인증 대비해 30fps 로 통일
     private static final String PRESET = "veryfast";
     private static final long TIMEOUT_SECONDS = 120;
@@ -43,7 +50,7 @@ public class DailyLogMontageBuilder {
     // 그리드 한 칸에 들어갈 미디어. extension 은 ffmpeg 이 디코더를 고르는 데 쓰인다(원본 확장자 그대로 넘긴다).
     public record Frame(Resource resource, String extension, Kind kind) {}
 
-    // 캔버스 가로 = CANVAS_WIDTH(2160) 고정. 칸은 정사각(cellSize = CANVAS_WIDTH / cols), 세로 = rows * cellSize.
+    // 캔버스 가로 = CANVAS_WIDTH(1280) 고정. 칸은 정사각(cellSize = CANVAS_WIDTH / cols), 세로 = rows * cellSize.
     // N=5 는 6칸 레이아웃을 쓰고 마지막 1칸은 항상 검정(gridCells > cellCount).
     record Layout(int cols, int rows, int cellSize) {
 
@@ -57,11 +64,11 @@ public class DailyLogMontageBuilder {
 
         static Layout forCells(int cellCount) {
             return switch (cellCount) {
-                case 1 -> new Layout(1, 1, CANVAS_WIDTH); // 2160×2160
-                case 2 -> new Layout(2, 1, CANVAS_WIDTH / 2); // 2160×1080
-                case 3 -> new Layout(3, 1, CANVAS_WIDTH / 3); // 2160×720
-                case 4 -> new Layout(2, 2, CANVAS_WIDTH / 2); // 2160×2160
-                case 5, 6 -> new Layout(3, 2, CANVAS_WIDTH / 3); // 2160×1440 (5는 마지막 칸 검정)
+                case 1 -> new Layout(1, 1, CANVAS_WIDTH); // 1280×1280
+                case 2 -> new Layout(2, 1, CANVAS_WIDTH / 2); // 1280×640
+                case 3 -> new Layout(3, 1, CANVAS_WIDTH / 3); // 1280×427(끝수 버림)
+                case 4 -> new Layout(2, 2, CANVAS_WIDTH / 2); // 1280×1280
+                case 5, 6 -> new Layout(3, 2, CANVAS_WIDTH / 3); // 1280×854 (5는 마지막 칸 검정)
                 default -> throw new IllegalArgumentException("지원하지 않는 그리드 칸 수: " + cellCount);
             };
         }
@@ -79,7 +86,7 @@ public class DailyLogMontageBuilder {
         Path workDir = null;
         try {
             workDir = Files.createTempDirectory("dailylog-montage-");
-            List<String> inputNames = writeFrames(workDir, flat);
+            List<String> inputNames = writeFrames(workDir, flat, layout.cellSize());
             Path output = workDir.resolve("out.mp4");
 
             int exitCode = runFfmpeg(workDir, layout, rounds.size(), flat, inputNames, output);
@@ -109,7 +116,11 @@ public class DailyLogMontageBuilder {
         return flat;
     }
 
-    private List<String> writeFrames(Path workDir, List<Frame> flat) throws IOException {
+    // 셀 크기로 사전 다운스케일해서 temp 에 쓴다. 원본(체크인 업로드, 최대 수천px)을 그대로 넘기면
+    // ffmpeg 가 그 해상도 그대로 디코드해 xstack framesync 가 큰 프레임을 버퍼링 — 회차당
+    // RSS 가 수백MB~1GB 로 뛰는 원인이었다(2026-09-11 실측). 여기서 미리 줄여두면 ffmpeg 는
+    // 이미 셀 크기인 작은 이미지만 디코드한다.
+    private List<String> writeFrames(Path workDir, List<Frame> flat, int cellSize) throws IOException {
         List<String> names = new ArrayList<>();
         int idx = 0;
         for (Frame frame : flat) {
@@ -118,13 +129,48 @@ public class DailyLogMontageBuilder {
                 idx++;
                 continue;
             }
-            String name = "frame_%04d.%s".formatted(idx++, frame.extension());
-            try (InputStream in = frame.resource().getInputStream()) {
-                Files.copy(in, workDir.resolve(name));
+            if (frame.kind() == Kind.IMAGE) {
+                String name = "frame_%04d.jpg".formatted(idx++);
+                writeDownscaledImage(frame.resource(), workDir.resolve(name), cellSize);
+                names.add(name);
+            } else {
+                // 동영상 칸: 현재 미사용 경로(NOTE 참고) — 다운스케일 없이 원본 그대로.
+                String name = "frame_%04d.%s".formatted(idx++, frame.extension());
+                try (InputStream in = frame.resource().getInputStream()) {
+                    Files.copy(in, workDir.resolve(name));
+                }
+                names.add(name);
             }
-            names.add(name);
         }
         return names;
+    }
+
+    // cover 다운스케일(짧은 변을 셀에 맞추고 중앙 crop) 후 JPEG 로 저장. ffmpeg 필터의 scale+crop 과
+    // 동일한 정규화를 앱단에서 먼저 해, ffmpeg 에는 이미 cellSize 인 작은 이미지만 들어가게 한다.
+    // 디코드 실패 시(손상 파일 등) 원본을 그대로 복사 — graceful degrade.
+    private void writeDownscaledImage(Resource resource, Path dest, int cellSize) throws IOException {
+        BufferedImage src;
+        try (InputStream in = resource.getInputStream()) {
+            src = ImageIO.read(in);
+        }
+        if (src == null) {
+            try (InputStream in = resource.getInputStream()) {
+                Files.copy(in, dest);
+            }
+            return;
+        }
+        double scale = (double) cellSize / Math.min(src.getWidth(), src.getHeight());
+        int w = Math.max(cellSize, (int) Math.round(src.getWidth() * scale));
+        int h = Math.max(cellSize, (int) Math.round(src.getHeight() * scale));
+        BufferedImage resized = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = resized.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.drawImage(src, 0, 0, w, h, null);
+        g.dispose();
+        int x = Math.max(0, (w - cellSize) / 2);
+        int y = Math.max(0, (h - cellSize) / 2);
+        BufferedImage cropped = resized.getSubimage(x, y, cellSize, cellSize);
+        ImageIO.write(cropped, "jpg", dest.toFile());
     }
 
     private int runFfmpeg(
@@ -190,14 +236,13 @@ public class DailyLogMontageBuilder {
     }
 
     // 칸별 cover 정규화(짧은 변을 셀에 맞춰 스케일 후 중앙 crop, 동영상은 tpad 로 길이 보정) → 회차별 xstack 그리드 → 회차 concat.
+    // 입력은 이미 writeDownscaledImage 로 cellSize 로 줄어든 상태라 scale 은 사실상 no-op(안전망으로 유지).
     private static String buildFilter(Layout layout, int roundCount, List<Frame> flat) {
         int grid = layout.gridCells();
         int s = layout.cellSize();
         String cellLayout = xstackLayout(layout);
         StringBuilder sb = new StringBuilder();
 
-        // 모든 입력을 정사각 셀에 cover: 짧은 변이 셀에 꽉 차도록 확대/축소(increase) 후 넘치는 긴 변을 중앙 기준 crop.
-        // 검정 여백 없음. 대신 긴 변 양끝이 일부 잘린다.
         for (int i = 0; i < flat.size(); i++) {
             sb.append('[')
                     .append(i)
