@@ -24,6 +24,7 @@ public enum ErrorCode {
     CHALLENGE_NOT_OWNER(HttpStatus.FORBIDDEN, "챌린지 OWNER 권한이 없습니다."),
     CHALLENGE_NOT_MEMBER(HttpStatus.FORBIDDEN, "챌린지에 참여 중인 멤버가 아닙니다."),
     CHALLENGE_NOT_EDITABLE(HttpStatus.FORBIDDEN, "READY 상태의 챌린지만 설정을 수정할 수 있습니다."),
+    CHALLENGE_NOT_ACTIVE(HttpStatus.CONFLICT, "진행 중인 챌린지가 아닙니다."),
     INVALID_DAILY_COUNT(HttpStatus.BAD_REQUEST, "하루 인증 횟수가 허용 범위를 벗어났습니다."),
     CANNOT_DELEGATE_TO_SELF(HttpStatus.BAD_REQUEST, "자기 자신에게 OWNER를 위임할 수 없습니다."),
     EXTENSION_CHOICE_CLOSED(HttpStatus.CONFLICT, "연장 참여 의사 선택 기간이 마감되었습니다."),
@@ -32,6 +33,10 @@ public enum ErrorCode {
     EXTENSION_START_DATE_NOT_EDITABLE(HttpStatus.BAD_REQUEST, "연장 시즌의 시작일은 변경할 수 없습니다."),
 
     // ===== checkin =====
+    CHECK_IN_NOT_FOUND(HttpStatus.NOT_FOUND, "인증을 찾을 수 없습니다."),
+    CHECK_IN_TYPE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "허용되지 않은 인증 방식입니다."),
+    DAILY_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "오늘 인증 횟수를 모두 채웠습니다."),
+    NOT_CHECK_IN_DAY(HttpStatus.CONFLICT, "오늘은 인증 대상일이 아닙니다."),
 
     // ===== group =====
     GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "그룹을 찾을 수 없습니다."),
@@ -47,10 +52,17 @@ public enum ErrorCode {
     GROUP_MEMBER_KICK_NOT_ALLOWED(HttpStatus.CONFLICT, "ACTIVE 챌린지에서만 그룹원을 강퇴할 수 있습니다."),
     INVITE_CODE_NOT_FOUND(HttpStatus.NOT_FOUND, "유효한 초대코드를 찾을 수 없습니다."),
     // ===== item =====
+    ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 아이템입니다."),
+    USER_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "보유 아이템을 찾을 수 없습니다."),
+    ALREADY_OWNED_ITEM(HttpStatus.CONFLICT, "이미 보유한 아이템입니다."),
+    ALREADY_EQUIPPED(HttpStatus.CONFLICT, "이미 착용 중인 아이템입니다."),
+    NOT_EQUIPPED(HttpStatus.BAD_REQUEST, "착용 중이 아닌 아이템입니다."),
+    NOT_ITEM_OWNER(HttpStatus.FORBIDDEN, "본인이 보유한 아이템만 착용할 수 있습니다."),
+    ITEM_IN_USE(HttpStatus.CONFLICT, "이미 보유중인 사용자가 있어 삭제할 수 없습니다."),
 
     // ===== media =====
     EMPTY_FILE(HttpStatus.BAD_REQUEST, "파일이 비어 있습니다."),
-    FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "허용된 파일 크기를 초과했습니다."),
+    FILE_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE, "허용된 파일 크기를 초과했습니다."),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 파일 형식입니다."),
     MEDIA_NOT_FOUND(HttpStatus.NOT_FOUND, "미디어를 찾을 수 없습니다."),
     MEDIA_STORAGE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장에 실패했습니다."),
@@ -69,6 +81,11 @@ public enum ErrorCode {
     PASSWORD_UNCHANGED(HttpStatus.BAD_REQUEST, "현재 비밀번호와 다른 비밀번호를 입력해 주세요."),
     REFRESH_TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "만료되었거나 유효하지 않은 토큰입니다. 다시 로그인해 주세요."),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
+    EMAIL_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "만료되었거나 이미 사용된 링크입니다. 메일을 다시 요청해 주세요."),
+    EMAIL_ALREADY_VERIFIED(HttpStatus.CONFLICT, "이미 인증된 이메일입니다."),
+    EMAIL_RESEND_TOO_SOON(HttpStatus.TOO_MANY_REQUESTS, "잠시 후 다시 시도해 주세요."),
+    OAUTH_FAILED(HttpStatus.UNAUTHORIZED, "소셜 로그인에 실패했습니다. 다시 시도해 주세요."),
+    OAUTH_REDIRECT_URI_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "허용되지 않은 리다이렉트 주소입니다."),
     ;
 
     private final HttpStatus httpStatus;

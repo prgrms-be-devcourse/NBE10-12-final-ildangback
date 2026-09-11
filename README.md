@@ -25,6 +25,16 @@
 (cd front && pnpm install && pnpm dev)
 ```
 
+### 이메일 인증 확인 (로컬)
+
+로컬에서는 메일을 보내지 않고 인증 링크를 콘솔에 찍습니다.
+
+```
+[인증 링크] user@example.com -> http://localhost:8080/api/auth/verify-email?token=...
+```
+
+이 주소를 브라우저에서 열면 인증이 완료됩니다.
+
 ### 엔드포인트
 
 | 서비스              | URL                                   |

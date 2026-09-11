@@ -3,9 +3,9 @@ package com.gommit.domain.challenge.dto.response;
 import com.gommit.domain.challenge.dto.request.InitialChallengeSettingRequest;
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.ChallengeStatus;
-import com.gommit.domain.challenge.entity.DaysOfWeek;
 import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.checkin.entity.CheckInType;
+import com.gommit.global.time.DaysOfWeek;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
@@ -46,7 +46,7 @@ public record ChallengeSummaryResponse(
                 challenge.getFrequencyValue(),
                 parseDaysOfWeek(challenge.getDaysOfWeek()),
                 challenge.getDailyCheckInCount(),
-                challenge.isAllowPhoto() ? List.of(CheckInType.PHOTO) : List.of());
+                challenge.allowedCheckInTypes());
     }
 
     private static List<DaysOfWeek> parseDaysOfWeek(String daysOfWeek) {
