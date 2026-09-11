@@ -32,7 +32,7 @@ export function DailyLogTimeline({ challengeId }: { challengeId: number }) {
   } = useDailyLogs(challengeId, month);
 
   return (
-    <div className="px-4 pt-4 pb-10">
+    <div className="pt-2">
       <MonthNav month={month} onChange={setMonth} />
 
       {meta && (

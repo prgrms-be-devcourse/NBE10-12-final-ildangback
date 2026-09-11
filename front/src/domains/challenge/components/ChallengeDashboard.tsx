@@ -17,6 +17,7 @@ import type {
 import { ChallengeProgress, StatusBadge } from "./ChallengeInfo";
 import { ExtensionChoicePanel } from "./ExtensionChoicePanel";
 import { CheckInGalleryTab } from "../../checkin/components/CheckInGalleryTab";
+import { DailyLogTimeline } from "../../checkin/components/DailyLogTimeline";
 import { CheckInMethodSheet } from "../../checkin/components/CheckInMethodSheet";
 
 export function ChallengeDashboard({
@@ -253,12 +254,10 @@ export function ChallengeDashboard({
               />
             )}
           </div>
-        ) : tab === "갤러리" ? (
-          <CheckInGalleryTab challengeId={challenge.id} members={members} />
+        ) : tab === "일일 로그" ? (
+          <DailyLogTimeline challengeId={challenge.id} />
         ) : (
-          <p className="rounded-2xl bg-purple-50 px-5 py-12 text-center text-sm text-gray-500">
-            {tab} 기능을 준비 중이에요.
-          </p>
+          <CheckInGalleryTab challengeId={challenge.id} members={members} />
         )}
       </section>
       <CheckInMethodSheet
