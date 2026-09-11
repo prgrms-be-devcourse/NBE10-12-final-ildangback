@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -106,6 +107,37 @@ class PersonalPointServiceTest {
 
             verify(userPointHistoryRepository, never()).save(any());
         }
+
+        @Test
+        @DisplayName("밀린 회수분(pendingDeduction)이 있으면 이번 적립에서 먼저 갚고, 이력이 두 줄 남는다")
+        void settlesPendingDeductionOnReward() {
+            UserPoint point = userPoint(0);
+            ReflectionTestUtils.setField(point, "pendingDeduction", 100);
+            when(userPointRepository.findWithLockByUserId(1L)).thenReturn(Optional.of(point));
+
+            personalPointService.reward(1L, 32L, 150, UserPointReason.CHECK_IN, "오운완");
+
+            ArgumentCaptor<UserPointHistory> captor = ArgumentCaptor.forClass(UserPointHistory.class);
+            verify(userPointHistoryRepository, times(2)).save(captor.capture());
+            List<UserPointHistory> saved = captor.getAllValues();
+
+            assertThat(saved.get(0).getAmount()).isEqualTo(150);
+            assertThat(saved.get(0).getBalanceAfter()).isEqualTo(150);
+            assertThat(saved.get(1).getAmount()).isEqualTo(-100);
+            assertThat(saved.get(1).getReason()).isEqualTo(UserPointReason.WITHDRAWAL_PENALTY);
+            assertThat(saved.get(1).getBalanceAfter()).isEqualTo(50);
+            assertThat(point.getPendingDeduction()).isZero();
+        }
+
+        @Test
+        @DisplayName("밀린 회수분이 없으면 이력이 한 줄만 남는다")
+        void doesNotSettleWhenNoPendingDeduction() {
+            when(userPointRepository.findWithLockByUserId(1L)).thenReturn(Optional.of(userPoint(0)));
+
+            personalPointService.reward(1L, 32L, 150, UserPointReason.CHECK_IN, "오운완");
+
+            verify(userPointHistoryRepository, times(1)).save(any());
+        }
     }
 
     @Nested
@@ -146,6 +178,73 @@ class PersonalPointServiceTest {
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
 
+            verify(userPointHistoryRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("recoverChallengePoints - 챌린지 중도 탈퇴 포인트 회수")
+    class RecoverChallengePoints {
+
+        @Test
+        @DisplayName("잔액이 충분하면 번 만큼 전액 차감되고 WITHDRAWAL_PENALTY로 남는다")
+        void recoversFullAmountWhenBalanceIsSufficient() {
+            when(userPointHistoryRepository.sumEarnedByUserIdAndChallengeId(1L, 32L))
+                    .thenReturn(200);
+            UserPoint point = userPoint(1000);
+            when(userPointRepository.findWithLockByUserId(1L)).thenReturn(Optional.of(point));
+
+            personalPointService.recoverChallengePoints(1L, 32L, "오운완");
+
+            ArgumentCaptor<UserPointHistory> captor = ArgumentCaptor.forClass(UserPointHistory.class);
+            verify(userPointHistoryRepository).save(captor.capture());
+            assertThat(captor.getValue().getAmount()).isEqualTo(-200);
+            assertThat(captor.getValue().getReason()).isEqualTo(UserPointReason.WITHDRAWAL_PENALTY);
+            assertThat(captor.getValue().getBalanceAfter()).isEqualTo(800);
+            assertThat(point.getPendingDeduction()).isZero();
+        }
+
+        @Test
+        @DisplayName("잔액이 모자라면 0까지만 깎고 나머지는 pendingDeduction에 쌓인다")
+        void recoversUpToBalanceAndKeepsRestAsPendingDeduction() {
+            when(userPointHistoryRepository.sumEarnedByUserIdAndChallengeId(1L, 32L))
+                    .thenReturn(200);
+            UserPoint point = userPoint(100);
+            when(userPointRepository.findWithLockByUserId(1L)).thenReturn(Optional.of(point));
+
+            personalPointService.recoverChallengePoints(1L, 32L, "오운완");
+
+            ArgumentCaptor<UserPointHistory> captor = ArgumentCaptor.forClass(UserPointHistory.class);
+            verify(userPointHistoryRepository).save(captor.capture());
+            assertThat(captor.getValue().getAmount()).isEqualTo(-100);
+            assertThat(captor.getValue().getBalanceAfter()).isZero();
+            assertThat(point.getBalance()).isZero();
+            assertThat(point.getPendingDeduction()).isEqualTo(100);
+        }
+
+        @Test
+        @DisplayName("잔액이 이미 0이면 이력 없이 pendingDeduction만 쌓인다")
+        void addsToPendingDeductionOnlyWhenBalanceIsZero() {
+            when(userPointHistoryRepository.sumEarnedByUserIdAndChallengeId(1L, 32L))
+                    .thenReturn(200);
+            UserPoint point = userPoint(0);
+            when(userPointRepository.findWithLockByUserId(1L)).thenReturn(Optional.of(point));
+
+            personalPointService.recoverChallengePoints(1L, 32L, "오운완");
+
+            verify(userPointHistoryRepository, never()).save(any());
+            assertThat(point.getPendingDeduction()).isEqualTo(200);
+        }
+
+        @Test
+        @DisplayName("그 챌린지에서 번 게 없으면 아무 일도 안 한다(잔액 조회조차 안 함)")
+        void doesNothingWhenNothingWasEarned() {
+            when(userPointHistoryRepository.sumEarnedByUserIdAndChallengeId(1L, 32L))
+                    .thenReturn(0);
+
+            personalPointService.recoverChallengePoints(1L, 32L, "오운완");
+
+            verify(userPointRepository, never()).findWithLockByUserId(any());
             verify(userPointHistoryRepository, never()).save(any());
         }
     }

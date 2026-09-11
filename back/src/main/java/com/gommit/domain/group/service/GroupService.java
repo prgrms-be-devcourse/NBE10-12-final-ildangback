@@ -15,6 +15,7 @@ import com.gommit.domain.group.entity.*;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
 import com.gommit.domain.group.repository.GroupMemberCount;
 import com.gommit.domain.group.repository.GroupMemberRepository;
+import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.domain.user.entity.User;
 import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.dto.SliceResponse;
@@ -43,6 +44,7 @@ public class GroupService {
     private final CheckInRepository checkInRepository;
     private final ChallengeMemberService challengeMemberService;
     private final ChallengeProgressCalculator challengeProgressCalculator;
+    private final PersonalPointService personalPointService;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final String INVITE_CODE_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final int INVITE_CODE_LENGTH = 6;
@@ -289,17 +291,22 @@ public class GroupService {
         groupMember.leave();
         challengeRepository
                 .findFirstByGroupIdAndStatus(groupId, ChallengeStatus.ACTIVE)
-                .ifPresent(challenge -> leaveChallengeMember(challenge.getId(), userId));
+                .ifPresent(challenge -> leaveChallengeMember(challenge.getId(), userId, group.getName()));
         challengeRepository
                 .findFirstByGroupIdAndStatus(groupId, ChallengeStatus.READY)
-                .ifPresent(challenge -> leaveChallengeMember(challenge.getId(), userId));
+                .ifPresent(challenge -> leaveChallengeMember(challenge.getId(), userId, group.getName()));
     }
 
-    private void leaveChallengeMember(Long challengeId, Long userId) {
+    private void leaveChallengeMember(Long challengeId, Long userId, String groupName) {
         challengeMemberRepository
                 .findByChallengeIdAndUserId(challengeId, userId)
                 .filter(member -> member.getStatus() == ChallengeMemberStatus.ACTIVE)
-                .ifPresent(ChallengeMember::leave);
+                .ifPresent(member -> {
+                    member.leave();
+                    // 중도 탈퇴 - 이 챌린지에서 번 포인트 회수(Should). READY 챌린지는 아직
+                    // 체크인이 없어 번 게 없으니 자연히 아무 일도 안 일어난다.
+                    personalPointService.recoverChallengePoints(userId, challengeId, groupName);
+                });
     }
 
     @Transactional(readOnly = true)
@@ -431,14 +438,18 @@ public class GroupService {
             throw new BusinessException(ErrorCode.NOT_GROUP_MEMBER);
         }
         targetMember.kick();
-        kickChallengeMember(activeChallenge.getId(), targetUserId);
+        kickChallengeMember(activeChallenge.getId(), targetUserId, group.getName());
     }
 
-    private void kickChallengeMember(Long challengeId, Long userId) {
+    private void kickChallengeMember(Long challengeId, Long userId, String groupName) {
         challengeMemberRepository
                 .findByChallengeIdAndUserId(challengeId, userId)
                 .filter(member -> member.getStatus() == ChallengeMemberStatus.ACTIVE)
-                .ifPresent(ChallengeMember::kick);
+                .ifPresent(member -> {
+                    member.kick();
+                    // 추방도 중도 탈퇴와 동일하게 그 챌린지에서 번 포인트를 회수한다(Should).
+                    personalPointService.recoverChallengePoints(userId, challengeId, groupName);
+                });
     }
 
     @Transactional

@@ -34,6 +34,7 @@ import com.gommit.domain.group.entity.Visibility;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
 import com.gommit.domain.group.repository.GroupMemberCount;
 import com.gommit.domain.group.repository.GroupMemberRepository;
+import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.domain.user.entity.User;
 import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
@@ -83,6 +84,9 @@ class GroupServiceTest {
 
     @Mock
     private ChallengeProgressCalculator challengeProgressCalculator;
+
+    @Mock
+    private PersonalPointService personalPointService;
 
     @InjectMocks
     private GroupService groupService;
@@ -682,6 +686,9 @@ class GroupServiceTest {
             assertThat(groupMember.getStatus()).isEqualTo(GroupMemberStatus.LEFT);
             assertThat(activeMember.getStatus()).isEqualTo(ChallengeMemberStatus.LEFT);
             assertThat(readyMember.getStatus()).isEqualTo(ChallengeMemberStatus.LEFT);
+            // 탈퇴한 시즌마다 그 챌린지에서 번 포인트를 회수한다.
+            verify(personalPointService).recoverChallengePoints(2L, 50L, "오운완 모임");
+            verify(personalPointService).recoverChallengePoints(2L, 51L, "오운완 모임");
         }
 
         @Test
@@ -970,6 +977,7 @@ class GroupServiceTest {
             assertThat(member.getStatus()).isEqualTo(GroupMemberStatus.KICKED);
             assertThat(seasonMember.getStatus()).isEqualTo(ChallengeMemberStatus.KICKED);
             org.mockito.Mockito.verifyNoInteractions(checkInRepository);
+            verify(personalPointService).recoverChallengePoints(2L, 50L, "그룹");
         }
 
         @ParameterizedTest
