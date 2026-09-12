@@ -3,8 +3,10 @@ package com.gommit.domain.checkin.support;
 import com.gommit.domain.checkin.entity.DailyLog;
 import com.gommit.domain.checkin.repository.DailyLogRepository;
 import com.gommit.domain.checkin.service.DailyLogMontageService;
+import com.gommit.global.time.BusinessDayCutoff;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,9 +21,9 @@ import org.springframework.stereotype.Component;
 // 한 시각에 몰려 ffmpeg CPU 버스트를 내는 걸 피한다. 한 틱은 sweep-budget-seconds 시간 예산 안에서만 처리하고
 // 남은 백로그는 다음 틱으로 넘긴다(건수 상한 sweep-max-per-run 은 재기동 직후 대량 백로그용 안전장치).
 
-// TODO(feat/20): businessDate 경계가 04:00 으로 바뀌면 "오늘" 계산을 공용 BusinessDate 컴포넌트로 교체하고
-//   sweep cron 을 경계 뒤(예: 05:00)로 옮긴다. 지금은 sweep 의 LocalDate.now(00:00 경계)와 businessDate(00:00 경계)가
-//   일치해 진행 중인 날이 대상에 안 들어오지만, 경계가 어긋나면 00:00~04:00 창에서 아직 인증받는 날을 몽타주할 수 있다.
+// businessDate 는 이미 04:00 컷오프 기준(BusinessClock.today())이라 sweep 의 "오늘"도 같은 기준으로 계산한다.
+// 그렇지 않으면 EC2 가 03:30 기동(EventBridge)해 sweepOnStartup() 이 00:00~04:00 사이에 도는 날, 아직
+// 인증을 받고 있는 businessDate(전날 04:00~오늘 04:00)를 "지난 날"로 오인해 몽타주를 조기 생성할 수 있다.
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -47,8 +49,7 @@ public class DailyLogMontageScheduler {
 
     @Scheduled(cron = "${app.dailylog.montage-sweep-cron:0 0/15 4-17 * * *}", zone = "${app.time-zone:Asia/Seoul}")
     public void sweepPendingMontages() {
-        // TODO(feat/20): 공용 BusinessDate 로 교체 + cron 을 경계 뒤로 (클래스 상단 주석 참고).
-        LocalDate today = LocalDate.now(clock);
+        LocalDate today = BusinessDayCutoff.of(LocalDateTime.now(clock));
         LocalDate from = today.minusDays(sweepLookbackDays);
         List<DailyLog> matched = dailyLogRepository.findByVideoKeyIsNullAndLogDateBetween(from, today.minusDays(1));
         if (matched.isEmpty()) {

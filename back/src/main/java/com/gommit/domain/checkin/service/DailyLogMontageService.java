@@ -12,6 +12,7 @@ import com.gommit.domain.checkin.repository.DailyLogRepository;
 import com.gommit.domain.checkin.support.DailyLogMontageBuilder;
 import com.gommit.domain.checkin.support.DailyLogMontageBuilder.Frame;
 import com.gommit.domain.checkin.support.DailyLogMontageBuilder.Kind;
+import com.gommit.global.time.BusinessDayCutoff;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -84,9 +85,8 @@ public class DailyLogMontageService {
 
     // 그 businessDate 시점 스냅샷 멤버(가입순) 앞 MAX_CELLS 명 → userId → 칸 인덱스.
     private Map<Long, Integer> resolveCells(Long challengeId, LocalDate businessDate) {
-        // TODO(feat/20): businessDate 경계가 04:00 로 바뀌면 이 창도 이동 (DailyLogService.countsFor 와 동일 규칙).
-        LocalDateTime startOfDay = businessDate.atStartOfDay();
-        LocalDateTime endOfDay = businessDate.plusDays(1).atStartOfDay();
+        LocalDateTime startOfDay = BusinessDayCutoff.startTimeOfBusinessDate(businessDate);
+        LocalDateTime endOfDay = BusinessDayCutoff.startTimeOfBusinessDate(businessDate.plusDays(1));
         List<Long> snapshot = challengeMemberRepository.findSnapshotMemberUserIds(
                 challengeId, startOfDay, endOfDay, ChallengeMemberStatus.ACTIVE);
 

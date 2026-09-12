@@ -14,6 +14,7 @@ import com.gommit.domain.checkin.support.CheckInPreconditions.ReadDateAccess;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import com.gommit.global.time.BusinessDayCutoff;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -120,9 +121,8 @@ public class DailyLogService {
                 .findCompletedUserIds(challenge.getId(), businessDate, challenge.getDailyCheckInCount())
                 .size();
 
-        // TODO(feat/20): businessDate 경계가 04:00 으로 바뀌면 이 벽시계 창도 04:00~다음날 04:00 으로 옮긴다
-        LocalDateTime startOfDay = businessDate.atStartOfDay();
-        LocalDateTime endOfDay = businessDate.plusDays(1).atStartOfDay();
+        LocalDateTime startOfDay = BusinessDayCutoff.startTimeOfBusinessDate(businessDate);
+        LocalDateTime endOfDay = BusinessDayCutoff.startTimeOfBusinessDate(businessDate.plusDays(1));
         long total = challengeMemberRepository.countSnapshotMembers(
                 challenge.getId(), startOfDay, endOfDay, ChallengeMemberStatus.ACTIVE);
 
