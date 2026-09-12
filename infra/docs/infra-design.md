@@ -724,6 +724,23 @@ Q16 "지금은 (a) 엔드포인트만" 재오픈. **결정: Prometheus+Loki+Graf
 - **메모리**: `docker-compose.yml` 캡 합계 — prometheus 450 + loki 350 + promtail 64 + grafana
   200 = 1,064M. 기존(nginx 64 + back 1800 + mysql 600 = 2,464M) 포함 총 3,528M / 4,096M,
   헤드룸 568M(전 컨테이너 동시 풀캡 기준 최악치, 실사용은 더 낮음).
+- **대시보드**: `infra/monitoring/grafana/provisioning/dashboards/json/*.json`을 Grafana가 부팅 시
+  file provider로 자동 로드(`dashboards.yml`). 지금 들어있는 건 grafana.com
+  [#4701 "JVM (Micrometer)"](https://grafana.com/grafana/dashboards/4701-jvm-micrometer/)
+  (revision 10, 2023-05 배포) 하나뿐 — Loki 로그는 라벨이 `app`/`container` 2개뿐이라 커스텀
+  대시보드 없이 Explore로 조회.
+  - **추가/수정 방법**: (1) Grafana UI에서 만든 뒤 Dashboard settings → JSON Model 복사해서
+    `*.json`으로 커밋, 또는 (2) grafana.com 커뮤니티 대시보드를 `/api/dashboards/<id>/revisions/<rev>/download`로
+    받아서 커밋. (2)일 때 JSON 안의 `${DS_PROMETHEUS}`/`${DS_LOKI}` 같은 플레이스홀더를 실제
+    데이터소스 이름(`datasources.yml`의 `Prometheus`/`Loki`)으로 문자열 치환해야 함 — file
+    provider는 UI import 위저드를 안 거쳐서 이 치환이 자동으로 안 됨.
+  - `allowUiUpdates`를 `dashboards.yml`에 명시 안 함 → 기본값 `false`. UI에서 패널을 열고 고칠 순
+    있지만 "Save"는 막히고 "Save As"로 별도 복사본만 만들어짐(git이 계속 source of truth) — 원본을
+    바꾸려면 그 복사본을 다시 Export해서 위 방법대로 커밋. 자유롭게 UI에서 바로 저장되게 하려면
+    `allowUiUpdates: true`로 바꿀 수 있지만, 그러면 변경이 Grafana DB에만 남고 git과 어긋날 수 있음.
+  - #4701처럼 `application` 라벨로 필터링하는 대시보드를 쓰려면 back에
+    `management.metrics.tags.application: ${spring.application.name}` 설정이 있어야 함(없으면
+    변수가 비어서 패널이 전부 빈 화면) — `application.yml`의 `management.metrics.tags`에 이미 추가됨.
 
 ---
 
