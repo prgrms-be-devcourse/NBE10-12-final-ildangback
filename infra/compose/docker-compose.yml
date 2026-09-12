@@ -14,8 +14,6 @@ services:
     depends_on:
       back:
         condition: service_healthy
-      grafana:
-        condition: service_started
     deploy:
       resources:
         limits:
