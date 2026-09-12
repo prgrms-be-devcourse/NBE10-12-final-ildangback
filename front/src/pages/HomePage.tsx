@@ -202,7 +202,7 @@ function SignedInHome() {
               <TodayChallengeRow
                 challenge={challenge}
                 onCheckIn={() =>
-                  showToast("인증 기능은 다음 업데이트에 오픈됩니다.")
+                  navigate(`/challenges/${challenge.challengeId}/check-in`)
                 }
               />
             </li>
@@ -218,7 +218,13 @@ function SignedInHome() {
           className="mt-[12px] rounded-[10px] border border-purple-200 px-[14px] py-[16px]"
           style={{ backgroundColor: CARD }}
         >
-          <ContributionGrid days={grass} gap={5} showDayLabels interactive />
+          <ContributionGrid
+            days={grass}
+            gap={5}
+            showDayLabels
+            interactive
+            today={home.businessDate}
+          />
         </div>
       </section>
 

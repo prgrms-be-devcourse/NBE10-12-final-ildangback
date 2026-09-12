@@ -15,6 +15,12 @@ export interface UserSummaryResponse {
   nickname: string;
 }
 
+/**
+ * 계정 권한. 응답 DTO 에는 실리지 않는다 - AT 의 role 클레임에서 읽는다
+ * (`shared/lib/accessTokenRole.ts`).
+ */
+export type UserRole = "USER" | "ADMIN";
+
 export interface UserProfileResponse {
   id: number;
   email: string;

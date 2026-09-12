@@ -1,13 +1,12 @@
 import {
   CalendarBlankIcon,
   CheckSquareIcon,
-  CrownSimpleIcon,
   DownloadSimpleIcon,
-  DropIcon,
 } from "@phosphor-icons/react";
 import { toPng } from "html-to-image";
 import { useEffect, useRef, useState } from "react";
 import { CheckInTrendChart } from "./CheckInTrendChart";
+import { MergeSummaryCard } from "./MergeSummaryCard";
 import { getCharacters } from "../../item/api";
 import { CharacterView } from "../../item/components/CharacterView";
 import { toCharacterArt } from "../../item/lib/shop";
@@ -57,11 +56,6 @@ function useParticipantCharacters(
   }, [userIdKey]);
 
   return characters;
-}
-
-/** LocalDate("YYYY-MM-DD")를 "YYYY.MM.DD"로. */
-function formatDateDot(localDate: string): string {
-  return localDate.replaceAll("-", ".");
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -118,7 +112,6 @@ export function MergeResultView({
   showDaysTogetherStat = true,
 }: MergeResultViewProps) {
   const { showToast } = useToast();
-  const sorted = [...participants].sort((a, b) => a.ranking - b.ranking);
   const me = participants.find((p) => p.userId === currentUserId);
   const characters = useParticipantCharacters(participants);
   const resultCardRef = useRef<HTMLDivElement | null>(null);
@@ -166,97 +159,19 @@ export function MergeResultView({
       {/* 저장 버튼을 누르면 이 wrapper 전체(그룹 결과 + 나의 기록 카드)가 이미지로
           저장된다 - 위 섹션만 캡처되지 않도록 ref를 여기(바깥)에 둔다. */}
       <div ref={resultCardRef} className="bg-white">
-        <section className="rounded-2xl border border-purple-200 bg-white px-5 py-6">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold tracking-wide text-purple-600">
-              {badgeLabel}
-            </span>
-            <span className="text-[12px] text-gray-500">
-              {formatDateDot(periodStart)} - {formatDateDot(periodEnd)}
-            </span>
-          </div>
-
-          <div className="mt-4 flex items-center gap-2">
-            <PixelDots />
-            <div className="min-w-0 flex-1">
-              <p
-                className="truncate text-center text-[15px] font-bold text-purple-500"
-                style={{ fontFamily: "'NeoDunggeunmo', monospace" }}
-              >
-                {groupName}
-              </p>
-              <div className="mt-2 h-px bg-purple-200" />
-            </div>
-            <PixelDots />
-          </div>
-
-          <div className="mt-5 flex items-center justify-center">
-            <span
-              className="rounded-none border-2 border-purple-500 px-2.5 py-1 text-[26px] whitespace-nowrap text-purple-600 shadow-[3px_3px_0_0_#b9a2e0]"
-              style={{ fontFamily: "'Press Start 2P', monospace" }}
-            >
-              MERGED
-            </span>
-          </div>
-          <p className="mt-3 text-center text-[13px] text-gray-500">
-            {summaryDescription}
-          </p>
-
-          <ul className="mt-6 flex justify-center gap-2 overflow-x-auto">
-            {sorted.map((p, index) => (
-              <li
-                key={p.userId}
-                className="flex w-12 shrink-0 flex-col items-center"
-              >
-                <div className="relative">
-                  {index === 0 && (
-                    <CrownSimpleIcon
-                      size={16}
-                      weight="fill"
-                      className="absolute -top-4 left-1/2 -translate-x-1/2 text-amber-400"
-                      aria-hidden
-                    />
-                  )}
-                  <div className="h-12 w-12">
-                    <CharacterView
-                      art={characters[p.userId] ?? {}}
-                      label={`${p.nickname} 캐릭터`}
-                      fit="tight"
-                    />
-                  </div>
-                </div>
-                <p className="mt-1.5 max-w-full truncate text-[12px] font-medium text-gray-700">
-                  {p.nickname}
-                </p>
-                <p className="text-[13px] font-bold text-purple-600">
-                  {p.completionRate}%
-                </p>
-              </li>
-            ))}
-          </ul>
-
-          <div className="mt-6 flex items-center justify-around border-t border-purple-100 pt-4 text-[12px] text-gray-500">
-            {showDaysTogetherStat && (
-              <SummaryStat icon={<CalendarBlankIcon size={16} weight="bold" />}>
-                <span className="font-bold text-purple-600">{totalDays}일</span>{" "}
-                함께함
-              </SummaryStat>
-            )}
-            <SummaryStat icon={<CheckSquareIcon size={16} weight="bold" />}>
-              총{" "}
-              <span className="font-bold text-purple-600">
-                {totalCheckInCount}회
-              </span>{" "}
-              인증
-            </SummaryStat>
-            <SummaryStat icon={<DropIcon size={16} weight="bold" />}>
-              평균 완주율{" "}
-              <span className="font-bold text-purple-600">
-                {averageCompletionRate}%
-              </span>
-            </SummaryStat>
-          </div>
-        </section>
+        <MergeSummaryCard
+          groupName={groupName}
+          badgeLabel={badgeLabel}
+          periodStart={periodStart}
+          periodEnd={periodEnd}
+          totalDays={totalDays}
+          totalCheckInCount={totalCheckInCount}
+          averageCompletionRate={averageCompletionRate}
+          participants={participants}
+          characters={characters}
+          summaryDescription={summaryDescription}
+          showDaysTogetherStat={showDaysTogetherStat}
+        />
 
         <div className="mt-6 flex items-center justify-between">
           <h2 className="text-[15px] font-bold text-gray-900">
@@ -294,21 +209,6 @@ export function MergeResultView({
   );
 }
 
-function SummaryStat({
-  icon,
-  children,
-}: {
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <p className="flex items-center gap-1.5">
-      <span className="text-purple-400">{icon}</span>
-      <span>{children}</span>
-    </p>
-  );
-}
-
 function MyRecordCard({
   me,
   myArt,
@@ -338,8 +238,7 @@ function MyRecordCard({
           <p className="truncate text-[16px] font-bold text-gray-900">
             {me.nickname}
           </p>
-          {/* TODO(Record): User 도메인에 handle/아이디 필드 생기면 그걸로 교체 - 지금은 닉네임으로 대체. */}
-          <p className="truncate text-[12px] text-gray-400">@{me.nickname}</p>
+          <p className="truncate text-[12px] text-gray-400">{me.ranking}위</p>
           <p className="mt-1 text-[24px] font-extrabold text-gray-900">
             {me.completedDayCount}
             <span className="text-[16px] font-bold"> / {totalDays}일</span>
@@ -428,18 +327,6 @@ function StatTile({
           {value}
         </span>
       </span>
-    </div>
-  );
-}
-
-/** 구분선 양 끝에 붙는 2x2 보라색 픽셀 도트 장식. */
-function PixelDots() {
-  return (
-    <div className="grid shrink-0 grid-cols-2 gap-1" aria-hidden>
-      <span className="h-1 w-1 bg-purple-300" />
-      <span className="h-1 w-1 bg-purple-300" />
-      <span className="h-1 w-1 bg-purple-300" />
-      <span className="h-1 w-1 bg-purple-300" />
     </div>
   );
 }

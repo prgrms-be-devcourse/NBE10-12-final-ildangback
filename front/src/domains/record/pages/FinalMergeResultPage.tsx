@@ -54,8 +54,8 @@ export function FinalMergeResultPage() {
       {merge && user && (
         <MergeResultView
           groupName={groupName ?? `챌린지 #${challengeId}`}
-          // TODO(Record): 서버가 고유 머지 번호 필드를 내려주면 challengeId 대신 그걸 쓴다.
-          badgeLabel={`CHALLENGE MERGE #${challengeId}`}
+          // 최종 머지는 챌린지당 1개뿐이라 번호를 붙이지 않는다.
+          badgeLabel="CHALLENGE MERGE"
           periodStart={merge.periodStart}
           periodEnd={merge.periodEnd}
           totalDays={merge.totalDays}

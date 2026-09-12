@@ -1,9 +1,16 @@
 import { Route, Routes } from "react-router";
 import { PlainLayout } from "./app/PlainLayout";
 import { RequireAuth } from "./app/RequireAuth";
+import { RequireAdmin } from "./domains/admin/RequireAdmin";
+import { AdminHomePage } from "./domains/admin/pages/AdminHomePage";
+import { ItemAdminPage } from "./domains/admin/pages/ItemAdminPage";
 import { TabLayout } from "./app/TabLayout";
 import { LoginPage } from "./domains/auth/pages/LoginPage";
 import { SignUpPage } from "./domains/auth/pages/SignUpPage";
+import { CheckInPage } from "./domains/checkin/pages/CheckInPage";
+import { MyChallengeAlbumPage } from "./domains/checkin/pages/MyChallengeAlbumPage";
+import { MyCheckInsPage } from "./domains/checkin/pages/MyCheckInsPage";
+import { ParticipatedChallengesPage } from "./domains/checkin/pages/ParticipatedChallengesPage";
 import { AccountPage } from "./domains/user/pages/AccountPage";
 import { CharacterShopPage } from "./domains/item/pages/CharacterShopPage";
 import { ChangePasswordPage } from "./domains/user/pages/ChangePasswordPage";
@@ -58,6 +65,15 @@ export function App() {
             path="challenges/:challengeId"
             element={<ChallengeStatusPage />}
           />
+          <Route
+            path="profile/challenges"
+            element={<ParticipatedChallengesPage />}
+          />
+          <Route path="profile/check-ins" element={<MyCheckInsPage />} />
+          <Route
+            path="profile/challenges/:challengeId/album"
+            element={<MyChallengeAlbumPage />}
+          />
         </Route>
         <Route path="profile" element={<ProfilePage />} />
 
@@ -100,6 +116,19 @@ export function App() {
             path="challenges/:challengeId/final-merge"
             element={<FinalMergeResultPage />}
           />
+
+          {/* 체크인 제출 플로우 — 카메라 중심의 집중 화면이라 하단바 없이 둔다. */}
+          <Route
+            path="challenges/:challengeId/check-in"
+            element={<CheckInPage />}
+          />
+
+          {/* 관리자. 앱 어디에도 링크가 없고 /admin 을 직접 입력해 들어온다.
+              가드는 화면을 안 그리는 것뿐이고 차단은 서버가 한다 (RequireAdmin 주석). */}
+          <Route path="admin" element={<RequireAdmin />}>
+            <Route index element={<AdminHomePage />} />
+            <Route path="items" element={<ItemAdminPage />} />
+          </Route>
         </Route>
       </Route>
 

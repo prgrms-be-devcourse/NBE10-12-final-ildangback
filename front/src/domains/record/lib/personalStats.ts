@@ -64,11 +64,33 @@ export function toDateRange(period: StatsPeriod): {
   const to = new Date();
   to.setHours(0, 0, 0, 0);
 
-  const from = new Date(to);
-  if (period === "YEAR") from.setFullYear(from.getFullYear() - 1);
-  else from.setMonth(from.getMonth() - 6);
+  const from = period === "YEAR" ? minusMonths(to, 12) : minusMonths(to, 6);
 
   return { from: dateKey(from), to: dateKey(to) };
+}
+
+/**
+ * 달을 빼면서 말일을 보정한다.
+ *
+ * Date.setMonth 는 옮겨간 달에 그 날짜가 없으면 다음 달로 넘긴다 - 8월 31일에서
+ * 6개월을 빼면 2월 31일이 되어 3월 2일로 튄다. 날짜를 1일로 내렸다가 옮긴 뒤
+ * 그 달 말일로 자른다.
+ */
+function minusMonths(date: Date, months: number): Date {
+  const day = date.getDate();
+  const moved = new Date(date);
+
+  moved.setDate(1);
+  moved.setMonth(moved.getMonth() - months);
+
+  const lastDay = new Date(
+    moved.getFullYear(),
+    moved.getMonth() + 1,
+    0,
+  ).getDate();
+  moved.setDate(Math.min(day, lastDay));
+
+  return moved;
 }
 
 function dateKey(date: Date): string {

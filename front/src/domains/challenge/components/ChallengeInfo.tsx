@@ -80,12 +80,14 @@ export function ChallengeProgress({
   totalDays,
   periodProgressRate,
   groupCompletedDayCount,
+  remainingDays,
   variant = "group",
 }: {
   currentDay: number;
   totalDays: number;
   periodProgressRate: number;
   groupCompletedDayCount?: number;
+  remainingDays?: number;
   variant?: "group" | "period";
 }) {
   // 기간 전용 표시는 그룹 목록에서 명시적으로 요청한다. 성공일 누락을 기간 진행률로 대체하지 않는다.
@@ -101,10 +103,17 @@ export function ChallengeProgress({
       : 0;
   const displayedRate = showsGroupProgress ? successRate : periodProgressRate;
   return (
-    <div className="space-y-3">
-      <p className="text-[14px]">
-        Day <strong>{currentDay}</strong> / {totalDays}{" "}
+    <div className="space-y-2">
+      <p className="flex items-baseline gap-2 text-[14px]">
+        <span>
+          Day <strong>{currentDay}</strong> / {totalDays}
+        </span>
         <span className="text-[11px] text-gray-500">인증 예정일 기준</span>
+        {typeof remainingDays === "number" && (
+          <span className="ml-auto text-[11px] font-semibold text-purple-500">
+            {remainingDays}일 남음
+          </span>
+        )}
       </p>
       <div className="flex items-center gap-2">
         <div
@@ -116,11 +125,11 @@ export function ChallengeProgress({
           aria-valuetext={
             displayedRate === null ? "그룹 성공일 정보 없음" : undefined
           }
-          className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-gray-100"
+          className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-purple-50"
         >
           {showsGroupProgress && (
             <div
-              className="absolute inset-y-0 left-0 rounded-full bg-gray-400"
+              className="absolute inset-y-0 left-0 rounded-full bg-purple-200"
               style={{
                 width: `${Math.max(0, Math.min(100, periodProgressRate))}%`,
               }}
@@ -134,13 +143,14 @@ export function ChallengeProgress({
           />
         </div>
         <span
-          className="text-[13px] font-semibold text-purple-500"
+          className="shrink-0 text-[13px] font-semibold text-purple-500"
           title={
             displayedRate === null
               ? "그룹 성공일 정보가 응답에 없습니다."
               : undefined
           }
         >
+          {showsGroupProgress && "성공 "}
           {displayedRate === null ? "—" : `${displayedRate}%`}
         </span>
       </div>
