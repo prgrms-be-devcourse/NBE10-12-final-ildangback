@@ -47,6 +47,8 @@ public class SecurityConfig {
         "/actuator/health",
     };
 
+    private static final String WEBSOCKET_ENDPOINT = "/ws/**";
+
     private static final String H2_CONSOLE = "/h2-console/**";
 
     // PUBLIC 미디어 정적 서빙 (media.storage.local.base-url 의 path). GET 만 공개, 인증 불필요.
@@ -86,6 +88,8 @@ public class SecurityConfig {
                         .requestMatchers(DOCS_ENDPOINTS)
                         .permitAll()
                         .requestMatchers(MONITORING_ENDPOINTS)
+                        .permitAll()
+                        .requestMatchers(WEBSOCKET_ENDPOINT)
                         .permitAll()
                         .requestMatchers("/api/admin/**")
                         .hasRole("ADMIN")
