@@ -13,12 +13,14 @@ import {
   PASSWORD_MIN,
 } from "../../../shared/lib/validation";
 import { useAuth } from "../../../shared/lib/useAuth";
+import { useToast } from "../../../shared/lib/useToast";
 import { Button } from "../../../shared/ui/Button";
 import { FormAlert } from "../../../shared/ui/FormAlert";
 import { TextField } from "../../../shared/ui/TextField";
 import { PixelSparkle } from "../../../shared/ui/PixelSparkle";
 import { TopBar } from "../../../shared/ui/TopBar";
 import { checkEmail, checkNickname, signUp } from "../api";
+import { SocialButtons } from "../components/SocialButtons";
 import { TermsAgreement } from "../components/TermsAgreement";
 import {
   EMPTY_TERMS,
@@ -44,6 +46,7 @@ const FIELDS = ["email", "password", "nickname"] as const;
 
 export function SignUpPage() {
   const { signIn } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const [terms, setTerms] = useState<TermsState>(EMPTY_TERMS);
   const [formError, setFormError] = useState<string | null>(null);
@@ -108,6 +111,7 @@ export function SignUpPage() {
     // 가입은 토큰을 주지 않는다. 방금 받은 값으로 곧바로 로그인한다.
     try {
       await signIn(email, password);
+      showToast("가입이 완료됐어요. 메일함의 인증 링크도 눌러주세요.");
       navigate("/", { replace: true });
     } catch {
       // 여기 왔으면 계정은 이미 만들어져 있다. "가입 실패" 를 띄우면 사용자가
@@ -145,6 +149,8 @@ export function SignUpPage() {
               label="이메일"
               type="email"
               autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
               placeholder="이메일을 입력해주세요"
               error={errors.email?.message}
               {...register("email", {
@@ -210,6 +216,13 @@ export function SignUpPage() {
               회원가입
             </Button>
           </form>
+          {/*
+            소셜은 가입과 로그인이 같은 엔드포인트라 이 버튼이 곧 가입이다.
+            로그인 화면에만 두면 소셜로 처음 오는 사람이 가입 화면에서 길을 잃고,
+            네이버 검수도 가입과 로그인 양쪽에 노출을 요구한다.
+            약관 동의는 이 화면이 아니라 가입 직후 /welcome 에서 받는다.
+          */}
+          <SocialButtons />
         </div>
 
         <p className="mt-3 text-center text-[13px] text-gray-500">

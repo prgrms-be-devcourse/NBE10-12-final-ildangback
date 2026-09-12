@@ -5,8 +5,13 @@ import { RequireAdmin } from "./domains/admin/RequireAdmin";
 import { AdminHomePage } from "./domains/admin/pages/AdminHomePage";
 import { ItemAdminPage } from "./domains/admin/pages/ItemAdminPage";
 import { TabLayout } from "./app/TabLayout";
+import { ForgotPasswordPage } from "./domains/auth/pages/ForgotPasswordPage";
 import { LoginPage } from "./domains/auth/pages/LoginPage";
+import { OAuthCallbackPage } from "./domains/auth/pages/OAuthCallbackPage";
+import { ResetPasswordPage } from "./domains/auth/pages/ResetPasswordPage";
 import { SignUpPage } from "./domains/auth/pages/SignUpPage";
+import { SocialOnboardingPage } from "./domains/auth/pages/SocialOnboardingPage";
+import { VerifyResultPage } from "./domains/auth/pages/VerifyResultPage";
 import { CheckInPage } from "./domains/checkin/pages/CheckInPage";
 import { MyChallengeAlbumPage } from "./domains/checkin/pages/MyChallengeAlbumPage";
 import { MyCheckInsPage } from "./domains/checkin/pages/MyCheckInsPage";
@@ -88,8 +93,22 @@ export function App() {
         <Route path="login" element={<LoginPage />} />
         <Route path="signup" element={<SignUpPage />} />
 
+        {/*
+          경로가 백엔드에 박혀 있다. verify-result 는 EmailVerificationService 의 302 목적지,
+          reset-password 는 재설정 메일 링크, oauth 콜백은 oauth.allowed-redirect-uris 다.
+          바꾸려면 백엔드도 같이 고쳐야 한다.
+        */}
+        <Route path="verify-result" element={<VerifyResultPage />} />
+        <Route path="reset-password" element={<ResetPasswordPage />} />
+        <Route path="forgot-password" element={<ForgotPasswordPage />} />
+        <Route
+          path="oauth/:provider/callback"
+          element={<OAuthCallbackPage />}
+        />
+
         {/* 로그인해야만 열리는 화면들 */}
         <Route element={<RequireAuth />}>
+          <Route path="welcome" element={<SocialOnboardingPage />} />
           <Route path="profile/settings" element={<SettingsPage />} />
           <Route path="profile/account" element={<AccountPage />} />
           <Route path="profile/edit" element={<EditProfilePage />} />
