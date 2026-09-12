@@ -116,8 +116,10 @@ docker compose ps
 
 1. Workers & Pages → Create → Connect to Git → 리포 선택.
 2. Build: root `front`, command `pnpm build`, output `dist`, Node 20+.
-3. 환경변수: `VITE_API_BASE_URL=https://api.go-mmit.site` — `front/.env.production`에 이미
-   커밋돼있어 보통 불필요.
+3. 환경변수: `VITE_API_BASE_URL=https://api.go-mmit.site` — `front/.env.production` 은
+   커밋하지 않음(관례상 `.env.example` 외 `.env*` 파일은 git에 안 넣음). Cloudflare 대시보드의
+   프로젝트 환경변수로 직접 등록해야 함. 지금 쓰는 GitHub Actions 경로(`deploy-front.yml`)는
+   같은 값을 repo variable `vars.VITE_API_BASE_URL` 로 등록해 빌드 직전에 주입한다.
 4. Custom domains → `go-mmit.site` 추가 → Cloudflare 가 apex 레코드 자동 생성.
 
 ### 1-6. 확인

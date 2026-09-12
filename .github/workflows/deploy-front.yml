@@ -44,7 +44,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # VITE_API_BASE_URL 은 front/.env.production 에 커밋돼있음 — 별도 secret 불필요.
+      # VITE_API_BASE_URL 은 공개 도메인이라 secret 대신 vars 로 등록해서 씀.
+      - name: Write production env
+        run: echo "VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}" > .env.production
+
       - name: Build
         run: pnpm run build
 
