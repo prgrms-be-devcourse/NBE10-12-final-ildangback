@@ -235,14 +235,13 @@ function ChallengeContent({
           </p>
           {seasonPicker}
         </div>
-        <button
-          type="button"
+        <Link
+          to={`/challenges/groups/${challenge.groupId}/shop`}
           aria-label="그룹 상점"
-          onClick={() => showToast("그룹 상점은 준비중입니다.")}
           className="shrink-0 rounded-lg p-2 text-purple-600 hover:bg-purple-50"
         >
           <ShopIcon className="h-6 w-6" />
-        </button>
+        </Link>
         <button
           type="button"
           aria-label="추가 메뉴"
