@@ -58,11 +58,14 @@ public class GroupPointService {
 
     public GroupPointBalanceResponse getBalance(Long groupId, Long requesterId) {
         requireActiveMember(groupId, requesterId);
-        int balance = groupPointRepository
+        return new GroupPointBalanceResponse(groupId, findBalance(groupId));
+    }
+
+    public int findBalance(Long groupId) {
+        return groupPointRepository
                 .findByGroupId(groupId)
                 .map(GroupPoint::getBalance)
                 .orElse(0);
-        return new GroupPointBalanceResponse(groupId, balance);
     }
 
     public SliceResponse<GroupPointHistoryResponse> getHistories(

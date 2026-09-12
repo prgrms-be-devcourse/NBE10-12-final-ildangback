@@ -264,7 +264,7 @@ public class BackgroundPurchaseService {
 
     // 그룹 포인트 잔액
     private int findGroupBalance(Long groupId) {
-        return groupPointService.getBalance(groupId).balance();
+        return groupPointService.findBalance(groupId);
     }
 
     // 활동 중인 멤버 확인
