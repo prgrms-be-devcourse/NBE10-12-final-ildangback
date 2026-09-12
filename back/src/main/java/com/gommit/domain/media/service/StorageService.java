@@ -2,6 +2,7 @@ package com.gommit.domain.media.service;
 
 import com.gommit.domain.media.dto.StorageResult;
 import com.gommit.domain.media.entity.MediaRole;
+import com.gommit.domain.media.support.MediaContentType;
 import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -10,6 +11,9 @@ import org.springframework.web.multipart.MultipartFile;
 // type 은 role -> StoragePolicy.visibility 로, resource_type 은 storageKey 의 확장자로 결정.
 public interface StorageService {
     StorageResult store(MultipartFile file, MediaRole mediaRole);
+
+    // 서버가 만든 바이트를 저장한다(예: DailyLog ffmpeg 몽타주). 업로드가 아니므로 MediaValidator 를 거치지 않는다
+    StorageResult storeGenerated(byte[] content, MediaContentType contentType, MediaRole mediaRole);
 
     Resource load(String storageKey, MediaRole mediaRole);
 
