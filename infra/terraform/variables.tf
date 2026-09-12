@@ -82,9 +82,17 @@ variable "cloudflare_zone_id" {
 }
 
 variable "cloudflare_api_token" {
-  description = "Cloudflare API 토큰 — Zone.DNS 편집 권한만"
+  description = "Cloudflare API 토큰. Zone.DNS 편집 권한만 있으면 됨(api/grafana 레코드 관리)."
   type        = string
   sensitive   = true
+}
+
+# ---- 모니터링 (Q29) ------------------------------------------------------------
+
+variable "grafana_subdomain" {
+  description = "Grafana 서브도메인 (앞부분만). apex/api 와 마찬가지로 Cloudflare 프록시 ON"
+  type        = string
+  default     = "grafana"
 }
 
 # ---- GitHub Actions OIDC 배포 -----------------------------------------------

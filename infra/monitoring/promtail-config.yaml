@@ -1,0 +1,26 @@
+server:
+  http_listen_port: 9080
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 15s
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: '/(.*)'
+        target_label: container
+      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
+        target_label: app
+    pipeline_stages:
+      # back 컨테이너는 logstash 구조화 콘솔 포맷(application-prod.yml)이라 최상위 level 필드가 존재.
+      # 라벨로는 승격하지 않음(라벨 값 조합별 시계열/스트림 생성) — 쿼리 시점에 LogQL로 파싱해서 씀.
+      - json:
+          expressions:
+            level: level

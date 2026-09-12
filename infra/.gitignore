@@ -3,3 +3,7 @@
 .env
 *.env
 !*.env.example
+
+# grafana.conf 의 nginx Basic Auth 실물 파일
+*.htpasswd
+!*.htpasswd.example
