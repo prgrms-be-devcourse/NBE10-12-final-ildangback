@@ -1,6 +1,6 @@
 # Q29. 이 폴더 밑 json/*.json 을 Grafana가 부팅 시 자동으로 불러온다.
-# 지금은 대시보드 JSON이 없음(TODO) — Grafana UI에서 만들고 "Export" → 이 폴더에 커밋하거나,
-# Grafana.com 커뮤니티 대시보드(JVM/Micrometer, Loki)를 임포트해서 넣어도 된다.
+# 지금은 grafana.com #4701 "JVM (Micrometer)" 하나만 들어있음. 추가하려면 Grafana UI에서
+# 만들고 "Export" → 이 폴더에 커밋하거나, Grafana.com 커뮤니티 대시보드를 임포트해서 넣으면 된다.
 
 apiVersion: 1
 
