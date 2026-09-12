@@ -202,7 +202,7 @@ function SignedInHome() {
               <TodayChallengeRow
                 challenge={challenge}
                 onCheckIn={() =>
-                  showToast("인증 기능은 다음 업데이트에 오픈됩니다.")
+                  navigate(`/challenges/${challenge.challengeId}/check-in`)
                 }
               />
             </li>
