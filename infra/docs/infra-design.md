@@ -10,7 +10,9 @@
 ### 1.1 이번에 만드는 것 (MVP)
 
 - EC2 1대 위에 `nginx + Spring Boot + MySQL`을 Docker Compose로 구동
-- Cloudflare: DNS + 프론트(Cloudflare Pages) + 엣지(TLS/DDoS)
+- Cloudflare: DNS + 프론트(Cloudflare Workers, 정적 자산 배포 — 예전 문서엔 Pages로 적혀있었으나
+  실제로는 Workers. 대시보드가 통합돼 신규 프로젝트는 기본이 Workers, Pages는 레거시 경로로만
+  생성 가능) + 엣지(TLS/DDoS)
 - GitHub Actions로 백엔드 이미지 빌드 → 배포 (중단 배포, 무중단은 다음 단계)
 - 사진 인증 + 2초 클립(추후) 저장·서빙
 - **DailyLog 서빙까지 MVP 포함**: 그룹·일자별로 서버가 ffmpeg로 타일 컴필레이션 영상 생성
@@ -48,7 +50,7 @@
 ```mermaid
 flowchart TB
     U["사용자 브라우저 / 설치형 PWA"] -->|HTTPS| CF["Cloudflare (엣지)"]
-    CF -->|"apex go-mmit.site"| PAGES["Cloudflare Pages<br/>front: Vite + React"]
+    CF -->|"apex go-mmit.site"| PAGES["Cloudflare Workers(정적 자산)<br/>front: Vite + React"]
     CF -->|"api.go-mmit.site"| NGINX["nginx :443<br/>(EC2)"]
     NGINX --> APP["Spring Boot 컨테이너 :8080"]
     APP --> DB[("MySQL 컨테이너<br/>docker named volume")]
@@ -61,7 +63,7 @@ flowchart TB
     GH -->|"배포: compose pull && up"| NGINX
 ```
 
-핵심: **프론트는 Cloudflare Pages, 백엔드는 EC2 1대, DB도 그 EC2 안 컨테이너.**
+핵심: **프론트는 Cloudflare Workers(정적 자산), 백엔드는 EC2 1대, DB도 그 EC2 안 컨테이너.**
 공개 미디어(아바타 옷, 배경)는 사용자가 Cloudinary에서 직접 본다. 비공개 미디어(체크인 사진,
 DailyLog 영상)만 서버가 바이트 경로에 들어간다.
 
@@ -306,9 +308,12 @@ DB에 있고, 이게 날아가면 서비스가 끝난다. 데모/평가 중에 �
 
 ### Q8 — 프론트 배포 + PWA + 도메인
 
-- **Cloudflare Pages** + GitHub 연동 자동 배포. 빌드 루트 `front/`, 명령 `pnpm build`,
-  출력 `dist`. PR 미리보기 배포 자동.
-- 도메인: **apex `go-mmit.site` = 앱(Pages)**, **`api.go-mmit.site` = 백엔드(EC2)**.
+- **Cloudflare Workers**(정적 자산, Pages 아님) + GitHub 연동(Workers Builds) 자동 배포. 빌드
+  루트 `front/`, 명령 `pnpm build`, 출력 `dist`.
+  - ⚠️ **2026-09-12 정정**: 이 Git 연동이 끊김(org GitHub App 권한 보류 중) → 대체로
+    `.github/workflows/deploy-front.yml`(GitHub Actions, `wrangler deploy`) 추가함.
+    연동 복구되면 둘 중 하나로 정리할 것.
+- 도메인: **apex `go-mmit.site` = 앱(Workers)**, **`api.go-mmit.site` = 백엔드(EC2)**.
   (`go-mmit.site` 는 임시 placeholder — Q23 경고 참고)
   - 대안: `app.go-mmit.site` = 앱, apex는 app으로 리다이렉트. 취향 차이.
 - 백엔드 `CORS_ALLOWED_ORIGINS = https://go-mmit.site`.
@@ -438,13 +443,13 @@ DB에 있고, 이게 날아가면 서비스가 끝난다. 데모/평가 중에 �
 - `tftest`: `security_group_locks_origin` 은 "기본값이면 22 규칙 0개", `ssh_exception_is_narrow`
   는 "열더라도 22/tcp·`/32` 만" 을 검증.
 
-### Q15 — Cloudflare를 Terraform으로 관리? → DNS만 Terraform, Pages는 대시보드
+### Q15 — Cloudflare를 Terraform으로 관리? → DNS만 Terraform, Workers는 대시보드
 
 - b안 = `cloudflare` Terraform provider용 **API 토큰 추가** (무료 범위 내, DNS 편집 권한만).
 - "한 방에 내리고 올릴" 값어치: EC2를 `destroy` 하면 EIP도 반납되고 재생성 시 IP가 바뀐다.
   DNS A레코드를 Terraform이 관리하면 `apply` 때 레코드도 같이 갱신 → 진짜 한 방. 값어치 있음.
-- 반면 **Cloudflare Pages의 Git 연동·빌드 설정·프리뷰**는 대시보드가 훨씬 쉽다.
-- **결정: DNS 레코드는 `cloudflare` provider로 Terraform 관리, Pages는 대시보드.** 토큰은
+- 반면 **Cloudflare Workers의 Git 연동·빌드 설정·프리뷰**는 대시보드가 훨씬 쉽다.
+- **결정: DNS 레코드는 `cloudflare` provider로 Terraform 관리, Workers는 대시보드.** 토큰은
   DNS 편집 스코프로 최소 발급, GitHub Actions Secret + 로컬 `terraform.tfvars`(git-ignored).
 
 ### Q16 — 모니터링 → (a) 지금은 엔드포인트만. b/c 비교는 아래
@@ -508,7 +513,7 @@ DB에 있고, 이게 날아가면 서비스가 끝난다. 데모/평가 중에 �
 - **구매: 팀에서 1인이 결제.** TLD는 `.com`(무난) 또는 `.app`(HTTPS 강제라 PWA에 어울리나 조금
   비쌈). 이름 문자열은 미정.
 - **언제 필요한가**: 도메인이 실제로 필요한 최초 시점은 아래 중 먼저 오는 것 —
-  1. Cloudflare Pages에 커스텀 도메인을 붙일 때 (그 전엔 `*.pages.dev` 로 접근)
+  1. Cloudflare Workers에 커스텀 도메인을 붙일 때 (그 전엔 `*.workers.dev` 로 접근)
   2. 백엔드에 정식 HTTPS 도메인이 필요할 때
   3. 팀·멘토에게 데모 URL을 보여줄 때
   - 즉 **인프라를 실제로 배포해 도메인으로 접속하는 단계**부터. 코드 PR(Terraform/compose
@@ -584,7 +589,7 @@ DB에 있고, 이게 날아가면 서비스가 끝난다. 데모/평가 중에 �
 
 > ⚠️ **이 문서 전체에서 도메인은 `go-mmit.site` 로 표기한다 — 임시 placeholder이며 확정값이
 > 아니다.** 구매 시점에 실제 문자열로 일괄 치환한다. (관련 파일: `CORS_ALLOWED_ORIGINS`,
-> `dns.tf`, nginx `server_name`, Cloudflare Pages 커스텀 도메인)
+> `dns.tf`, nginx `server_name`, Cloudflare Workers 커스텀 도메인)
 
 ### Q24 — 컨테이너 이미지
 
@@ -694,8 +699,9 @@ ffmpeg가 `back` 컨테이너 안에서 JVM과 메모리를 공유하는 게 유
 
 ### Q28 — 배포 트리거 → 확정
 
-`deploy.yml` = `main` push (`paths: [back/**]`) + 수동 `workflow_dispatch`. 프론트는 Cloudflare
-Pages Git 연동이 자체 처리하므로 백엔드 전용. CI(`backend-ci.yml`) 통과가 선행조건이 되도록
+`deploy.yml` = `main` push (`paths: [back/**]`) + 수동 `workflow_dispatch`. 프론트는 원래
+Cloudflare Workers Git 연동(Workers Builds)으로 자체 처리하려 했으나 연동 끊겨
+`deploy-front.yml`(GitHub Actions, `wrangler deploy`)로 대체. CI(`backend-ci.yml`) 통과가 선행조건이 되도록
 `workflow_run` 연동 또는 deploy job 내에서 테스트 재실행.
 
 ---
@@ -714,7 +720,7 @@ infra/
     security.tf            # SG: 443 = Cloudflare IPv4 대역만 (http 데이터소스), 22 = ssh_allowed_cidrs 예외만
     iam.tf                 # ① EC2 SSM 역할 ② GitHub OIDC 배포 역할 ③ Scheduler
     ec2.tf                 # AL2023 x86_64 AMI, t3a.medium, gp3 30GB, EIP
-    dns.tf                 # cloudflare_record: api A → EIP, proxied (apex는 Pages가 관리)
+    dns.tf                 # cloudflare_record: api A → EIP, proxied (apex는 Workers가 관리)
     schedule.tf            # EventBridge Scheduler: 매일 03:30 KST ec2:StartInstances
     outputs.tf             # instance_id, deploy_role_arn 등 (GitHub Secrets 로)
     terraform.tfvars.example
@@ -788,7 +794,7 @@ front/
 - **GHCR 패키지 visibility**: **private 유지**. 리포는 public이지만 이미지에는 빌드 산출물·의존성이
   담기므로 익명 pull을 열지 않는다. EC2는 `read:packages` PAT로 1회 `docker login` — runbook 1-3, 1-4.
 - **Cloudflare Origin CA 인증서**: 발급 후 EC2 `certs/` 에 배치 — runbook 1-1, 1-4.
-- **최초 배포**: runbook 1장 순서대로 (Terraform → Secrets → EC2 셋업 → Pages).
+- **최초 배포**: runbook 1장 순서대로 (Terraform → Secrets → EC2 셋업 → Workers).
 - **SSH 예외 1인**: `ssh_allowed_cidrs` 에 그 사람 공인 IP `/32`, 공개키는 런북 "SSH 예외
   접속" 절차대로 등록. IP 바뀌면 tfvars 갱신 후 `apply`.
 

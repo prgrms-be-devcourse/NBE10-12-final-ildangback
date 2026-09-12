@@ -10,7 +10,7 @@
 | 항목 | 발급처 | 쓰이는 곳 |
 |---|---|---|
 | AWS IAM 사용자 (인프라 담당자) | 강의 AWS 계정 | `terraform apply`, 수동 조작 |
-| Cloudflare 계정 + 존 | cloudflare.com | DNS, Pages, Origin CA |
+| Cloudflare 계정 + 존 | cloudflare.com | DNS, Workers, Origin CA |
 | Cloudflare API 토큰 (Zone.DNS 편집) | CF 대시보드 → My Profile → API Tokens | `terraform.tfvars` |
 | 도메인 | Cloudflare Registrar (권장) | — |
 | GitHub 리포 관리자 권한 | — | Actions Secrets 등록 |
@@ -108,11 +108,16 @@ docker compose up -d
 docker compose ps
 ```
 
-### 1-5. Cloudflare Pages (프론트)
+### 1-5. Cloudflare Workers (프론트) — Pages 아님, 대시보드가 통합돼 신규 프로젝트는 기본 Workers
 
-1. Pages → Create → Connect to Git → 리포 선택.
+> Git 연동(Workers Builds)이 끊긴 상태라 지금은 `.github/workflows/deploy-front.yml`
+> (GitHub Actions, `wrangler deploy`)로 배포함 — `infra-design.md` Q8 참고. 아래는 연동
+> 복구 시 참고용 원래 절차.
+
+1. Workers & Pages → Create → Connect to Git → 리포 선택.
 2. Build: root `front`, command `pnpm build`, output `dist`, Node 20+.
-3. 환경변수: `VITE_API_BASE_URL=https://api.go-mmit.site` (프론트 코드 기준으로 조정).
+3. 환경변수: `VITE_API_BASE_URL=https://api.go-mmit.site` — `front/.env.production`에 이미
+   커밋돼있어 보통 불필요.
 4. Custom domains → `go-mmit.site` 추가 → Cloudflare 가 apex 레코드 자동 생성.
 
 ### 1-6. 확인
@@ -257,5 +262,5 @@ IAM 을 나눠줄 수 없어 SSM 을 못 쓰는 운영자 1인 전용. 그 외�
 cd infra/terraform && terraform destroy
 ```
 
-- Cloudflare Pages 프로젝트 삭제, 도메인 갱신 해제(자동갱신 off).
+- Cloudflare Workers 프로젝트 삭제, 도메인 갱신 해제(자동갱신 off).
 - GHCR 패키지 삭제.

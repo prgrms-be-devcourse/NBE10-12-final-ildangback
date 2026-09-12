@@ -1,0 +1,56 @@
+name: Deploy Frontend
+
+# Cloudflare Workers(assets) 쪽 Git 연동(Workers Builds)이 빌드/배포가 끊겨 대체
+# front/wrangler.jsonc 기준 `wrangler deploy`
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'front/**'
+      - '.github/workflows/deploy-front.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-front-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      # package.json 의 packageManager 필드를 읽어 로컬과 같은 pnpm 버전을 쓴다.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: 'front/package.json'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'front/.nvmrc'
+          cache: 'pnpm'
+          cache-dependency-path: 'front/pnpm-lock.yaml'
+
+      - name: Install dependencies
+        working-directory: ./front
+        run: pnpm install --frozen-lockfile
+
+      # VITE_API_BASE_URL 은 front/.env.production 에 커밋돼있음 — 별도 secret 불필요.
+      - name: Build
+        working-directory: ./front
+        run: pnpm run build
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: front
+          command: deploy
