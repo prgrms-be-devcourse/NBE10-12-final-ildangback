@@ -77,6 +77,10 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
                 "{\"backgroundId\": " + backgroundId + "}"));
     }
 
+    private ResultActions resetBackground(String accessToken, Long groupId) throws Exception {
+        return mockMvc.perform(withToken(delete("/api/groups/" + groupId + "/background"), accessToken));
+    }
+
     private ResultActions getActiveBackground(String accessToken, Long groupId) throws Exception {
         return mockMvc.perform(withToken(get("/api/groups/" + groupId + "/background"), accessToken));
     }
@@ -829,6 +833,50 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.backgroundId").isEmpty())
                     .andExpect(jsonPath("$.imageUrl").isEmpty())
+                    .andExpect(jsonPath("$.mapType").value("GYM"));
+        }
+
+        @Test
+        @DisplayName("OWNER 는 적용을 해제해 기본 배경으로 되돌릴 수 있다")
+        void ownerCanResetToDefault() throws Exception {
+            Long[] holder = new Long[1];
+            String token = createGroupWith(0, holder).get(0);
+            Long backgroundId = insertBackground("GYM", "헬스장", 100);
+            giveGroupPoints(holder[0], 500);
+            createRequest(token, holder[0], backgroundId).andExpect(status().isCreated());
+
+            resetBackground(token, holder[0])
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.backgroundId").isEmpty())
+                    .andExpect(jsonPath("$.imageUrl").isEmpty())
+                    .andExpect(jsonPath("$.mapType").value("GYM"));
+
+            getActiveBackground(token, holder[0])
+                    .andExpect(jsonPath("$.backgroundId").isEmpty());
+            // 소유는 그대로다 - 해제는 적용만 끄는 것이지 되사야 하는 게 아니다.
+            assertThat(ownedCountOf(holder[0])).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("OWNER 가 아니면 해제할 수 없다")
+        void onlyOwnerCanReset() throws Exception {
+            Long[] holder = new Long[1];
+            List<String> tokens = createGroupWith(1, holder);
+            Long backgroundId = insertBackground("GYM", "헬스장", 100);
+            giveGroupPoints(holder[0], 500);
+            createRequest(tokens.get(0), holder[0], backgroundId).andExpect(status().isCreated());
+
+            resetBackground(tokens.get(1), holder[0]).andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("이미 기본 배경이어도 해제는 그대로 성공한다")
+        void resetWhenAlreadyDefaultSucceeds() throws Exception {
+            Long[] holder = new Long[1];
+            String token = createGroupWith(0, holder).get(0);
+
+            resetBackground(token, holder[0])
+                    .andExpect(status().isOk())
                     .andExpect(jsonPath("$.mapType").value("GYM"));
         }
     }

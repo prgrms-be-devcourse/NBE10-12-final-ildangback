@@ -61,6 +61,15 @@ export function applyBackground(
   });
 }
 
+/** 적용을 해제하고 맵 타입 기본 배경으로 되돌린다. 보유는 그대로 유지된다. */
+export function resetBackground(
+  groupId: number,
+): Promise<GroupBackgroundResponse> {
+  return apiFetch(`/api/groups/${groupId}/background`, {
+    method: "DELETE",
+  });
+}
+
 export function createPurchaseRequest(
   groupId: number,
   backgroundId: number,

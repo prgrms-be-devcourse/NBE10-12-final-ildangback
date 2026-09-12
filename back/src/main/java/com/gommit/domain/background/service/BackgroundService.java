@@ -119,6 +119,23 @@ public class BackgroundService {
         return new GroupBackgroundResponse(background, storageService.publicUrl(background.getImageKey()));
     }
 
+    // 그룹 배경 적용 해제
+    @Transactional
+    public GroupBackgroundResponse resetBackground(Long groupId, Long userId) {
+        ChallengeGroup group = getGroup(groupId);
+        validateActiveMember(groupId, userId);
+
+        if (!group.getOwnerId().equals(userId)) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED);
+        }
+
+        groupBackgroundRepository
+                .findByGroupIdAndStatus(groupId, GroupBackgroundStatus.ACTIVE)
+                .ifPresent(GroupBackground::deactivate);
+
+        return new GroupBackgroundResponse(group.getMapType());
+    }
+
     // 판매 배경 등록
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public BackgroundResponse createBackground(BackgroundCreateRequest request) {

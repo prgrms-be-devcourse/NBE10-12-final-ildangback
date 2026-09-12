@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -38,5 +39,12 @@ public class GroupBackgroundController {
             @CurrentUser SecurityUser actor,
             @Valid @RequestBody BackgroundApplyRequest request) {
         return ResponseEntity.ok(backgroundService.applyBackground(groupId, actor.getId(), request.backgroundId()));
+    }
+
+    @Operation(summary = "그룹 배경 적용 해제(기본 배경으로 되돌리기)")
+    @DeleteMapping
+    public ResponseEntity<GroupBackgroundResponse> resetBackground(
+            @PathVariable Long groupId, @CurrentUser SecurityUser actor) {
+        return ResponseEntity.ok(backgroundService.resetBackground(groupId, actor.getId()));
     }
 }

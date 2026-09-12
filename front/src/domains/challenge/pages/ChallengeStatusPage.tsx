@@ -16,6 +16,7 @@ import { Button } from "../../../shared/ui/Button";
 import { FormAlert } from "../../../shared/ui/FormAlert";
 import { ShopIcon } from "../../../shared/ui/icons";
 import { TopBar } from "../../../shared/ui/TopBar";
+import { getActiveBackground } from "../../background/api";
 import { getGroup, getGroupChallenges, leaveGroup } from "../../group/api";
 import { ConfirmActionDialog } from "../../group/components/ConfirmActionDialog";
 import { useResource } from "../../group/hooks/useResource";
@@ -213,6 +214,11 @@ function ChallengeContent({
     [challenge.id],
   );
   const characters = useResource(charactersLoader);
+  const backgroundLoader = useCallback(
+    () => getActiveBackground(challenge.groupId),
+    [challenge.groupId],
+  );
+  const background = useResource(backgroundLoader);
   // After a future check-in succeeds, call characters.retry() independently of members.retry().
   const joinedGroup = !!group.data?.members.some(
     (member) => member.userId === user?.id,
@@ -299,6 +305,7 @@ function ChallengeContent({
         currentKnown={currentKnown}
         description={group.data?.group.description}
         mapType={group.data?.group.mapType}
+        backgroundImageUrl={background.data?.imageUrl}
         members={members.data ?? null}
         characters={characters.data ?? null}
         currentUserId={user?.id}

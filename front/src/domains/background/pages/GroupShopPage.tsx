@@ -20,6 +20,7 @@ import {
   cancelPurchaseRequest,
   createPurchaseRequest,
   fetchGroupShop,
+  resetBackground,
   voteOnPurchaseRequest,
 } from "../api";
 import { MAP_TYPE_DEFAULT_IMAGE } from "../lib/defaultBackground";
@@ -52,6 +53,7 @@ function GroupShopContent({ groupId }: { groupId: number }) {
   const [confirmingApply, setConfirmingApply] =
     useState<ShopBackgroundResponse | null>(null);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [confirmingReset, setConfirmingReset] = useState(false);
   const [voteBusy, setVoteBusy] = useState(false);
   const [voteError, setVoteError] = useState<string | null>(null);
 
@@ -142,6 +144,16 @@ function GroupShopContent({ groupId }: { groupId: number }) {
               <span className="absolute bottom-[8px] left-[8px] rounded-full bg-black/45 px-3 py-1 text-[11px] font-semibold text-white">
                 {mapTypeLabel} 기본 배경
               </span>
+            )}
+
+            {isOwner && data.active.imageUrl && (
+              <button
+                type="button"
+                onClick={() => setConfirmingReset(true)}
+                className="absolute bottom-[8px] left-[8px] rounded-full bg-black/45 px-3 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-black/60"
+              >
+                기본 배경으로 되돌리기
+              </button>
             )}
 
             <Link
@@ -327,6 +339,20 @@ function GroupShopContent({ groupId }: { groupId: number }) {
             afterMutation();
           }}
           onClose={() => setConfirmingCancel(false)}
+        />
+      )}
+
+      {confirmingReset && (
+        <ConfirmActionDialog
+          title="기본 배경으로 되돌릴까요?"
+          description={`${mapTypeLabel} 기본 배경으로 바뀌어요. 보유한 배경은 그대로 남아 나중에 다시 적용할 수 있어요.`}
+          confirmLabel="되돌리기"
+          onConfirm={async () => {
+            await resetBackground(groupId);
+            afterMutation();
+            showToast("기본 배경으로 되돌렸어요.");
+          }}
+          onClose={() => setConfirmingReset(false)}
         />
       )}
     </>
