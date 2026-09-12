@@ -22,6 +22,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
+    defaults:
+      run:
+        working-directory: ./front
     steps:
       - uses: actions/checkout@v4
 
@@ -39,12 +42,10 @@ jobs:
           cache-dependency-path: 'front/pnpm-lock.yaml'
 
       - name: Install dependencies
-        working-directory: ./front
         run: pnpm install --frozen-lockfile
 
       # VITE_API_BASE_URL 은 front/.env.production 에 커밋돼있음 — 별도 secret 불필요.
       - name: Build
-        working-directory: ./front
         run: pnpm run build
 
       - name: Deploy to Cloudflare Workers
