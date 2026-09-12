@@ -3,11 +3,13 @@ import type {
   CharacterResponse,
   CharactersResponse,
   ItemPurchaseResponse,
+  ItemResponse,
   ItemSlot,
   ShopItemResponse,
   SliceResponse,
   UserItemResponse,
 } from "../../shared/api/types";
+import type { CharacterPose } from "../user/types";
 import { getMyBalance } from "../point/api";
 import type { ShopData } from "./lib/shop";
 
@@ -59,6 +61,35 @@ export function purchaseItem(itemId: number): Promise<ItemPurchaseResponse> {
   return apiFetch(`/api/items/${itemId}/purchase`, { method: "POST" });
 }
 
+export interface CreateItemInput {
+  slot: ItemSlot;
+  name: string;
+  price: number;
+  /**
+   * 포즈와 파일을 짝지어 보낸다. 서버가 poses[i] 와 images[i] 를 같은 순서로 읽으므로
+   * 배열 순서가 그대로 의미를 갖는다. DEFAULT 가 반드시 하나 있어야 하고 포즈는 중복될 수 없다.
+   */
+  images: { pose: CharacterPose; file: File }[];
+}
+
+/** POST /api/admin/items (multipart/form-data, 관리자) */
+export function createItem(input: CreateItemInput): Promise<ItemResponse> {
+  const form = new FormData();
+  form.append("slot", input.slot);
+  form.append("name", input.name);
+  form.append("price", String(input.price));
+  for (const { pose, file } of input.images) {
+    form.append("poses", pose);
+    form.append("images", file, file.name);
+  }
+  return apiFetch("/api/admin/items", { method: "POST", body: form });
+}
+
+/** DELETE /api/admin/items/{itemId} (관리자) */
+export function deleteItem(itemId: number): Promise<void> {
+  return apiFetch<void>(`/api/admin/items/${itemId}`, { method: "DELETE" });
+}
+
 export function equipItem(userItemId: number): Promise<UserItemResponse> {
   return apiFetch(`/api/users/me/items/${userItemId}/equip`, { method: "PUT" });
 }
@@ -94,6 +125,14 @@ async function fetchAllPages<T>(
     if (next === null || (cursor !== null && next <= cursor)) return all;
     cursor = next;
   }
+}
+
+/** 관리자 목록용 카탈로그 전체. 커서를 끝까지 따라간다. */
+export async function getAllItems(): Promise<ItemResponse[]> {
+  const pages = await fetchAllPages((cursor) =>
+    getShopItems({ cursor, size: PAGE_SIZE }),
+  );
+  return pages.map(({ item }) => item);
 }
 
 /**

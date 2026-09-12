@@ -1,6 +1,9 @@
 import { Route, Routes } from "react-router";
 import { PlainLayout } from "./app/PlainLayout";
 import { RequireAuth } from "./app/RequireAuth";
+import { RequireAdmin } from "./domains/admin/RequireAdmin";
+import { AdminHomePage } from "./domains/admin/pages/AdminHomePage";
+import { ItemAdminPage } from "./domains/admin/pages/ItemAdminPage";
 import { TabLayout } from "./app/TabLayout";
 import { LoginPage } from "./domains/auth/pages/LoginPage";
 import { SignUpPage } from "./domains/auth/pages/SignUpPage";
@@ -119,6 +122,13 @@ export function App() {
             path="challenges/:challengeId/check-in"
             element={<CheckInPage />}
           />
+
+          {/* 관리자. 앱 어디에도 링크가 없고 /admin 을 직접 입력해 들어온다.
+              가드는 화면을 안 그리는 것뿐이고 차단은 서버가 한다 (RequireAdmin 주석). */}
+          <Route path="admin" element={<RequireAdmin />}>
+            <Route index element={<AdminHomePage />} />
+            <Route path="items" element={<ItemAdminPage />} />
+          </Route>
         </Route>
       </Route>
 

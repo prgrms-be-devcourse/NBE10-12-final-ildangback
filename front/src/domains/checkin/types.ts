@@ -117,11 +117,6 @@ export interface MyChallengeSummary {
   challengeId: number;
   /** 그룹명 (챌린지 자체엔 이름이 없음) */
   name: string;
-  /**
-   * 앨범 카드 커버용 최근 인증 미디어 URL(최신순, 최대 4장). 없거나 부족하면 프론트가
-   * 빈 칸을 채운다. ⚠️ 아직 백엔드 계약 미정 — 요청 필요.
-   */
-  recentMediaUrls?: string[];
 }
 
 /**
@@ -172,4 +167,14 @@ export interface DailyLogPageMeta extends CursorPageMeta {
 export interface DailyLogCursorResponse {
   content: DailyLog[];
   meta: DailyLogPageMeta;
+}
+
+/** 챌린지 현황의 "인증 로그" 한 줄. text 는 "닉네임_메모" 형식으로 서버가 만든다. */
+export interface RecentCheckIn {
+  checkInId: number;
+  nickname: string;
+  text: string;
+  earnedUserPoints: number | null;
+  /** LocalDateTime 문자열. */
+  createdAt: string;
 }

@@ -1,10 +1,13 @@
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DailyLog, DailyLogCursorResponse } from "../types";
 import { DailyLogTimeline } from "./DailyLogTimeline";
 
 vi.mock("../api", () => ({ getDailyLogs: vi.fn() }));
+// 영상 타일이 useAuthedImage 로 mp4 를 받는다. 그 경로만 막으면 나머지는 실제 코드가 돈다.
+vi.mock("../../../shared/api/client", () => ({ apiFetchBlob: vi.fn() }));
 const { getDailyLogs } = await import("../api");
+const { apiFetchBlob } = await import("../../../shared/api/client");
 
 function log(over: Partial<DailyLog> = {}): DailyLog {
   return {
@@ -32,14 +35,35 @@ function page(content: DailyLog[]): DailyLogCursorResponse {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // jsdom 에는 objectURL 이 없다.
+  vi.stubGlobal("URL", {
+    ...URL,
+    createObjectURL: vi.fn(() => "blob:daily-log-1"),
+    revokeObjectURL: vi.fn(),
+  });
+  // 관찰을 걸면 바로 "보인다" 고 답한다 — 영상 타일이 뷰포트 진입까지 fetch 를 미루기 때문.
   vi.stubGlobal(
     "IntersectionObserver",
     class {
-      observe() {}
+      // 파라미터 프로퍼티는 erasableSyntaxOnly 가 막는다. 필드로 따로 둔다.
+      cb: IntersectionObserverCallback;
+      constructor(cb: IntersectionObserverCallback) {
+        this.cb = cb;
+      }
+      observe() {
+        this.cb(
+          [{ isIntersecting: true } as IntersectionObserverEntry],
+          this as unknown as IntersectionObserver,
+        );
+      }
       unobserve() {}
       disconnect() {}
     },
   );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe("DailyLogTimeline", () => {
@@ -110,19 +134,97 @@ describe("DailyLogTimeline", () => {
     expect(tiles[2].children).toHaveLength(6);
   });
 
-  it("shows a text-only notice instead of tiles when nobody checked in that day", async () => {
+  it("shows a text-only notice instead of tiles when nobody met the target", async () => {
     vi.mocked(getDailyLogs).mockResolvedValue(
       page([log({ id: 1, completedCount: 0, totalCount: 5 })]),
     );
 
     const { container } = render(<DailyLogTimeline challengeId={1} />);
     expect(
-      await screen.findByText("이날은 아무도 인증하지 않았어요"),
+      await screen.findByText("이날은 목표를 채운 사람이 없어요"),
     ).toBeInTheDocument();
     // 타일/영상 자리 자체가 없다
     expect(container.querySelectorAll("img")).toHaveLength(0);
     expect(container.querySelector("video")).toBeNull();
     expect(container.querySelector("div.grid")).toBeNull();
+  });
+
+  it("fetches the montage with auth and plays it from an objectURL", async () => {
+    vi.mocked(apiFetchBlob).mockResolvedValue(new Blob(["mp4"]));
+    vi.mocked(getDailyLogs).mockResolvedValue(
+      page([log({ id: 1, videoUrl: "/api/daily-logs/1/media" })]),
+    );
+
+    const { container } = render(<DailyLogTimeline challengeId={1} />);
+
+    // <video src> 로는 Authorization 헤더가 안 실려서, fetch 로 받아 objectURL 로 건다.
+    await waitFor(() =>
+      expect(container.querySelector("video")).toHaveAttribute(
+        "src",
+        "blob:daily-log-1",
+      ),
+    );
+    expect(apiFetchBlob).toHaveBeenCalledWith("/api/daily-logs/1/media");
+    expect(container.querySelector("div.grid")).toBeNull();
+
+    // 풀스크린은 타일이 이미 받아둔 objectURL 을 그대로 쓴다 — 다시 안 내려받는다.
+    screen.getByRole("button", { name: "" }).click();
+    const dialog = await screen.findByRole("dialog", {
+      name: "일일 로그 영상",
+    });
+    expect(dialog.querySelector("video")).toHaveAttribute(
+      "src",
+      "blob:daily-log-1",
+    );
+    expect(apiFetchBlob).toHaveBeenCalledTimes(1);
+  });
+
+  it("holds the placeholder layout until the montage arrives", async () => {
+    // 영상이 안 받히는 동안에도 타일 배치는 그대로 — 붙는 순간 배치가 튀지 않게.
+    // src 를 테스트마다 다르게 둔다: useAuthedImage 의 inflight 맵이 모듈 전역이라
+    // 끝나지 않는 fetch 를 같은 경로로 걸면 다음 테스트가 그 promise 를 물려받는다.
+    vi.mocked(apiFetchBlob).mockReturnValue(new Promise(() => {}));
+    vi.mocked(getDailyLogs).mockResolvedValue(
+      page([
+        log({
+          id: 2,
+          videoUrl: "/api/daily-logs/2/media",
+          completedCount: 4,
+          totalCount: 6,
+        }),
+      ]),
+    );
+
+    const { container } = render(<DailyLogTimeline challengeId={1} />);
+    await screen.findByText(/9월 2일 \(/);
+
+    expect(container.querySelector("video")).toBeNull();
+    expect(container.querySelectorAll(".bg-purple-100")).toHaveLength(4);
+    expect(container.querySelectorAll(".bg-black")).toHaveLength(2);
+  });
+
+  it("shows the montage even on a day nobody met the target", async () => {
+    // 마감 배치가 지난 날 로그를 훑어 영상을 만들기 때문에 completedCount 0 인 날도 영상이 붙는다.
+    vi.mocked(apiFetchBlob).mockResolvedValue(new Blob(["mp4"]));
+    vi.mocked(getDailyLogs).mockResolvedValue(
+      page([
+        log({
+          id: 3,
+          videoUrl: "/api/daily-logs/3/media",
+          completedCount: 0,
+          totalCount: 5,
+        }),
+      ]),
+    );
+
+    const { container } = render(<DailyLogTimeline challengeId={1} />);
+
+    await waitFor(() =>
+      expect(container.querySelector("video")).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByText("이날은 목표를 채운 사람이 없어요"),
+    ).not.toBeInTheDocument();
   });
 
   it("shows the empty state", async () => {

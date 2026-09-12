@@ -4,7 +4,6 @@ import { formatMonthDayWeekday } from "../../../shared/lib/date";
 import { Button } from "../../../shared/ui/Button";
 import { currentMonth } from "../lib/month";
 import { useDailyLogs } from "../lib/useDailyLogs";
-import type { DailyLog } from "../types";
 import { DailyLogPlayer } from "./DailyLogPlayer";
 import { DailyLogTile } from "./DailyLogTile";
 import { LoadMore } from "./LoadMore";
@@ -13,12 +12,13 @@ import { MonthNav } from "./MonthNav";
 /**
  * 챌린지 상세 > 일일 로그 탭. 시안: front/docs/checkin-gallery-wireframe/일일로그.png
  *
- * 월 네비 + "이번 달 N일 기록·평균 X%" 배너 + 타임라인(하루 = 타일 1개).
- * daily-log API 는 후속 PR — 지금은 dev 스텁, videoUrl 이 없어 타일은 placeholder 다.
+ * 월 네비 + 이번 달 기록일수/평균 달성률 배너 + 타임라인(하루 = 타일 1개).
+ * 활동이 있던 날만 row 가 있어, 인증이 없던 날은 타임라인에 아예 안 나온다.
  */
 export function DailyLogTimeline({ challengeId }: { challengeId: number }) {
   const [month, setMonth] = useState(currentMonth);
-  const [playing, setPlaying] = useState<DailyLog | null>(null);
+  // 재생할 영상의 objectURL. 타일이 이미 받아둔 것을 그대로 넘겨받아 다시 안 내려받는다.
+  const [playingSrc, setPlayingSrc] = useState<string | null>(null);
 
   const {
     items,
@@ -67,7 +67,7 @@ export function DailyLogTimeline({ challengeId }: { challengeId: number }) {
                   {formatMonthDayWeekday(log.businessDate)}
                 </h3>
                 <div className="mt-2">
-                  <DailyLogTile log={log} onPlay={() => setPlaying(log)} />
+                  <DailyLogTile log={log} onPlay={setPlayingSrc} />
                 </div>
               </li>
             ))}
@@ -80,11 +80,8 @@ export function DailyLogTimeline({ challengeId }: { challengeId: number }) {
         )}
       </div>
 
-      {playing?.videoUrl && (
-        <DailyLogPlayer
-          src={playing.videoUrl}
-          onClose={() => setPlaying(null)}
-        />
+      {playingSrc && (
+        <DailyLogPlayer src={playingSrc} onClose={() => setPlayingSrc(null)} />
       )}
     </div>
   );

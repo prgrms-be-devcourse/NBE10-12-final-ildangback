@@ -2,6 +2,8 @@ import { CaretRightIcon, ImagesIcon } from "@phosphor-icons/react";
 import { Link } from "react-router";
 import { AuthedImage } from "../../../shared/ui/AuthedImage";
 import { TopBar } from "../../../shared/ui/TopBar";
+import { getMyChallengeCovers } from "../api";
+import { useFetchOnce } from "../lib/useFetchOnce";
 import { useMyChallenges } from "../lib/useMyChallenges";
 import type { MyChallengeSummary } from "../types";
 
@@ -56,7 +58,12 @@ export function ParticipatedChallengesPage() {
 }
 
 function AlbumCard({ challenge }: { challenge: MyChallengeSummary }) {
-  const covers = challenge.recentMediaUrls ?? [];
+  // 카드마다 따로 받는다. 그리드는 먼저 그려지고 커버는 도착하는 대로 채워진다.
+  const covers = useFetchOnce<string[]>(
+    () => getMyChallengeCovers(challenge.challengeId),
+    [challenge.challengeId],
+    [],
+  );
 
   return (
     <Link to={`/profile/challenges/${challenge.challengeId}/album`}>
@@ -66,6 +73,11 @@ function AlbumCard({ challenge }: { challenge: MyChallengeSummary }) {
             <AuthedImage
               key={i}
               src={covers[i]}
+              // 지연 로딩을 끈다. 커버는 이 화면의 본문이고 화면 위쪽에 다 들어오는데,
+              // 커버 목록을 받은 뒤에야 img 가 붙어서 그때 IntersectionObserver 를
+              // 새로 달게 된다. 탭이 백그라운드거나 렌더가 throttle 되면 그 콜백이
+              // 아예 안 와서 커버가 영영 안 뜬다.
+              lazy={false}
               alt=""
               aria-hidden
               className="size-full object-cover"

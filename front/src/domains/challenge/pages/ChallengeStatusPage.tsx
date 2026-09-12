@@ -1,11 +1,12 @@
 import type { GroupDetailResponse } from "../../group/types";
-import { CaretLeftIcon, DotsThreeIcon } from "@phosphor-icons/react";
+import {
+  CaretDownIcon,
+  CaretLeftIcon,
+  DotsThreeIcon,
+} from "@phosphor-icons/react";
 import { useNavigate } from "react-router";
 import { ChallengeDashboard } from "../components/ChallengeDashboard";
-import pencilIcon from "../../../assets/icons/boxicons_pencil.webp";
-import peopleIcon from "../../../assets/icons/people.webp";
 import type { ReactNode } from "react";
-import chatIcon from "../../../assets/icons/ep_chat_dot_round.webp";
 import { useCallback, useState } from "react";
 import { Link, useParams } from "react-router";
 import { ApiError } from "../../../shared/api/client";
@@ -13,19 +14,16 @@ import { useAuth } from "../../../shared/lib/useAuth";
 import { useToast } from "../../../shared/lib/useToast";
 import { Button } from "../../../shared/ui/Button";
 import { FormAlert } from "../../../shared/ui/FormAlert";
+import { ShopIcon } from "../../../shared/ui/icons";
 import { TopBar } from "../../../shared/ui/TopBar";
-import { getGroup, getGroupChallenges, kickGroupMember } from "../../group/api";
+import { getGroup, getGroupChallenges, leaveGroup } from "../../group/api";
 import { ConfirmActionDialog } from "../../group/components/ConfirmActionDialog";
-import { GroupManagement } from "../../group/components/GroupManagement";
 import { useResource } from "../../group/hooks/useResource";
 import {
   getChallenge,
   getChallengeMembers,
   getChallengeCharacters,
-  delegateOwner,
 } from "../api";
-import { ChallengeSettingsEditor } from "../components/ChallengeSettingsEditor";
-import { ChallengeRulesCard } from "../components/ChallengeInfo";
 import type { ChallengeStatusResponse } from "../types";
 
 export function ChallengeStatusPage() {
@@ -59,12 +57,6 @@ function ChallengeStatusContent({ id }: { id: number }) {
           </>
         )}
         {data && <SeasonBrowser initialData={data} />}
-        <Link
-          to="/challenges"
-          className="block py-2 text-center text-sm text-purple-500"
-        >
-          내 그룹으로
-        </Link>
       </main>
     </>
   );
@@ -120,17 +112,18 @@ function SeasonBrowser({
   const options = seasons.data?.length
     ? seasons.data
     : [group.data?.currentChallenge ?? initialData.challenge];
-  const selection = (
-    <div className="space-y-2">
+  // 시즌이 하나뿐이면 고를 것이 없어 제목 아래를 비워 둔다.
+  const seasonPicker = options.length > 1 && (
+    <div className="relative mt-0.5">
       <label className="sr-only" htmlFor="challenge-season">
         시즌 선택
       </label>
       <select
         id="challenge-season"
         value={selectedChallengeId}
-        disabled={selectingInitialSeason || !seasons.data?.length}
+        disabled={selectingInitialSeason}
         onChange={(event) => setSelectedChallengeId(Number(event.target.value))}
-        className="min-h-11 rounded-lg border border-purple-200 bg-white px-3 text-sm font-bold text-purple-700 disabled:opacity-60"
+        className="appearance-none rounded-full bg-purple-50 py-0.5 pr-6 pl-2.5 text-[11px] font-semibold text-purple-700 disabled:opacity-60"
       >
         {!options.some((season) => season.id === selectedChallengeId) && (
           <option value={selectedChallengeId}>선택한 시즌</option>
@@ -141,36 +134,38 @@ function SeasonBrowser({
           </option>
         ))}
       </select>
-      {seasons.loading && (
-        <p role="status" className="text-xs text-gray-500">
-          시즌 목록을 불러오는 중…
-        </p>
-      )}
-      {seasons.error && (
-        <div className="space-y-2">
-          <p role="alert" className="text-xs text-gray-500">
-            시즌 목록을 불러오지 못했어요. 다시 시도해주세요.
-          </p>
-          <Button variant="secondary" onClick={seasons.retry}>
-            시즌 목록 다시 불러오기
-          </Button>
-        </div>
-      )}
+      <CaretDownIcon
+        size={10}
+        weight="bold"
+        aria-hidden
+        className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-purple-700"
+      />
+    </div>
+  );
+  const seasonStatus = seasons.error && (
+    <div className="space-y-2">
+      <p role="alert" className="text-xs text-gray-500">
+        시즌 목록을 불러오지 못했어요. 다시 시도해주세요.
+      </p>
+      <Button variant="secondary" onClick={seasons.retry}>
+        시즌 목록 다시 불러오기
+      </Button>
     </div>
   );
   return detail.data ? (
     <ChallengeContent
       key={selectedChallengeId}
       data={detail.data}
-      onChanged={detail.retry}
       isCurrent={currentId === selectedChallengeId}
       currentKnown={!!group.data}
       group={group}
-      selection={selection}
+      seasonPicker={seasonPicker}
+      seasonStatus={seasonStatus}
     />
   ) : (
     <>
-      {selection}
+      <div className="flex justify-center">{seasonPicker}</div>
+      {seasonStatus}
       {(selectingInitialSeason || detail.loading) && (
         <p role="status" className="py-10 text-center text-sm text-gray-500">
           선택한 시즌을 불러오는 중…
@@ -189,33 +184,25 @@ function SeasonBrowser({
 }
 function ChallengeContent({
   data,
-  onChanged,
   isCurrent,
   currentKnown,
-  selection,
+  seasonPicker,
+  seasonStatus,
   group,
 }: {
   data: ChallengeStatusResponse;
-  onChanged: () => void;
   isCurrent: boolean;
   currentKnown: boolean;
-  selection: ReactNode;
+  seasonPicker: ReactNode;
+  seasonStatus: ReactNode;
   group: ReturnType<typeof useResource<GroupDetailResponse | null>>;
 }) {
   const { challenge } = data;
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const { user } = useAuth();
   const { showToast } = useToast();
-  const [editing, setEditing] = useState(false);
-  const [delegating, setDelegating] = useState(false);
-  const [action, setAction] = useState<{
-    type: "delegate" | "kick";
-    userId: number;
-    nickname: string;
-  } | null>(null);
-  const owner = challenge.ownerId === user?.id;
   const membersLoader = useCallback(
     () => getChallengeMembers(challenge.id),
     [challenge.id],
@@ -227,31 +214,34 @@ function ChallengeContent({
   );
   const characters = useResource(charactersLoader);
   // After a future check-in succeeds, call characters.retry() independently of members.retry().
-  const canDelegate =
-    owner &&
-    (challenge.status === "READY" || challenge.status === "ACTIVE") &&
-    !!members.data?.some((member) => member.userId !== user?.id);
+  const joinedGroup = !!group.data?.members.some(
+    (member) => member.userId === user?.id,
+  );
+  const groupOwner = group.data?.group.ownerId === user?.id;
   return (
     <>
-      <header className="relative flex h-12 items-center justify-between gap-3">
+      <header className="relative flex min-h-12 items-center justify-between gap-1">
         <button
           type="button"
           onClick={() => navigate(-1)}
           aria-label="뒤로 가기"
-          className="p-2"
+          className="shrink-0 p-2"
         >
-          <CaretLeftIcon size={24} />
+          <CaretLeftIcon size={24} weight="bold" />
         </button>
-        <p className="min-w-0 flex-1 truncate text-center font-bold">
-          {group.data?.group.name ?? `시즌 ${challenge.seqNo}`}
-        </p>
+        <div className="flex min-w-0 flex-1 flex-col items-center">
+          <p className="w-full truncate text-center text-[15px] leading-tight font-bold">
+            {group.data?.group.name ?? `시즌 ${challenge.seqNo}`}
+          </p>
+          {seasonPicker}
+        </div>
         <button
           type="button"
-          aria-label="채팅"
-          onClick={() => showToast("채팅 기능은 준비중입니다.")}
-          className="shrink-0 rounded-lg p-2 hover:bg-purple-50"
+          aria-label="그룹 상점"
+          onClick={() => showToast("그룹 상점은 준비중입니다.")}
+          className="shrink-0 rounded-lg p-2 text-purple-600 hover:bg-purple-50"
         >
-          <img src={chatIcon} alt="" className="h-6 w-6 object-contain" />
+          <ShopIcon className="h-6 w-6" />
         </button>
         <button
           type="button"
@@ -261,7 +251,7 @@ function ChallengeContent({
           onClick={() => setMenuOpen(!menuOpen)}
           className="p-2"
         >
-          <DotsThreeIcon size={28} />
+          <DotsThreeIcon size={28} weight="bold" />
         </button>
         {menuOpen && (
           <nav
@@ -277,60 +267,45 @@ function ChallengeContent({
                 className="block rounded-lg px-3 py-3 text-sm hover:bg-purple-50"
                 to={`/challenges/groups/${challenge.groupId}`}
               >
-                그룹 정보 · 관리 · 나가기
+                챌린지 정보
               </Link>
             )}
-            <button
-              type="button"
-              className="w-full rounded-lg px-3 py-3 text-left text-sm hover:bg-purple-50"
-              onClick={() => {
-                setShowDetails(!showDetails);
-                setMenuOpen(false);
-              }}
-            >
-              챌린지 규칙 · 멤버 보기
-            </button>
-            {isCurrent && owner && challenge.status === "READY" && (
-              <button
-                type="button"
-                className="w-full rounded-lg px-3 py-3 text-left text-sm hover:bg-purple-50"
-                onClick={() => {
-                  setShowDetails(true);
-                  setEditing(true);
-                  setMenuOpen(false);
-                }}
-              >
-                챌린지 설정 수정
-              </button>
+            {joinedGroup && (
+              <div className="border-t border-purple-100 pt-1">
+                <button
+                  type="button"
+                  disabled={groupOwner}
+                  onClick={() => {
+                    setLeaving(true);
+                    setMenuOpen(false);
+                  }}
+                  className="w-full rounded-lg px-3 py-3 text-left text-sm text-red-600 hover:bg-red-50 disabled:text-gray-400 disabled:hover:bg-transparent"
+                >
+                  그룹 나가기
+                </button>
+                {groupOwner && (
+                  <p className="px-3 pb-2 text-xs leading-relaxed text-gray-500">
+                    그룹장은 챌린지 정보에서 권한을 위임한 뒤 나갈 수 있어요.
+                  </p>
+                )}
+              </div>
             )}
           </nav>
         )}
       </header>
-      {selection}
-      {!showDetails && (
-        <ChallengeDashboard
-          data={data}
-          isCurrent={isCurrent}
-          currentKnown={currentKnown}
-          name={group.data?.group.name ?? `시즌 ${challenge.seqNo}`}
-          mapType={group.data?.group.mapType}
-          members={members.data ?? null}
-          characters={characters.data ?? null}
-          currentUserId={user?.id}
-          onDelegate={
-            canDelegate
-              ? (member) =>
-                  setAction({
-                    type: "delegate",
-                    userId: member.userId,
-                    nickname: member.nickname,
-                  })
-              : undefined
-          }
-          onExtensionSaved={members.retry}
-        />
-      )}
-      {!showDetails && (characters.loading || characters.error) && (
+      {seasonStatus}
+      <ChallengeDashboard
+        data={data}
+        isCurrent={isCurrent}
+        currentKnown={currentKnown}
+        description={group.data?.group.description}
+        mapType={group.data?.group.mapType}
+        members={members.data ?? null}
+        characters={characters.data ?? null}
+        currentUserId={user?.id}
+        onExtensionSaved={members.retry}
+      />
+      {(characters.loading || characters.error) && (
         <div className="space-y-2">
           {characters.loading && (
             <p role="status" className="text-sm text-gray-500">
@@ -344,23 +319,18 @@ function ChallengeContent({
           )}
         </div>
       )}
-      {!showDetails && members.loading && (
+      {members.loading && (
         <p role="status" className="text-sm text-gray-500">
           멤버를 불러오는 중…
         </p>
       )}
-      {!showDetails && members.error && (
+      {members.error && (
         <div className="space-y-2">
           <FormAlert message={members.error} />
           <Button variant="secondary" onClick={members.retry}>
             멤버 다시 불러오기
           </Button>
         </div>
-      )}
-      {showDetails && (
-        <Button variant="secondary" onClick={() => setShowDetails(false)}>
-          현황으로 돌아가기
-        </Button>
       )}
       {group.error && (
         <div className="space-y-2">
@@ -370,180 +340,16 @@ function ChallengeContent({
           </Button>
         </div>
       )}
-      {showDetails && (
-        <>
-          <ChallengeRulesCard settings={challenge} />
-          {isCurrent &&
-            owner &&
-            challenge.status === "READY" &&
-            (editing ? (
-              <ChallengeSettingsEditor
-                challenge={challenge}
-                onSaved={onChanged}
-                onClose={() => setEditing(false)}
-              />
-            ) : (
-              <Button
-                variant="secondary"
-                className="flex items-center justify-center gap-2"
-                onClick={() => setEditing(true)}
-              >
-                <img
-                  src={pencilIcon}
-                  alt=""
-                  width={20}
-                  height={20}
-                  className="shrink-0 object-contain"
-                />
-                챌린지 설정 수정
-              </Button>
-            ))}
-          <section className="rounded-2xl border border-purple-200 p-4">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="flex items-center gap-2 font-bold">
-                <img
-                  src={peopleIcon}
-                  alt=""
-                  width={20}
-                  height={20}
-                  className="shrink-0 object-contain"
-                />
-                시즌 멤버
-              </h2>
-              {canDelegate && (
-                <button
-                  type="button"
-                  onClick={() => setDelegating((value) => !value)}
-                  className="text-xs font-semibold text-purple-700 underline"
-                >
-                  {delegating ? "위임 취소" : "위임하기"}
-                </button>
-              )}
-            </div>
-            {delegating && (
-              <p className="mt-2 text-xs text-purple-500">
-                위임할 그룹원을 선택해주세요.
-              </p>
-            )}
-            {members.loading && (
-              <p role="status" className="mt-4 text-sm text-gray-500">
-                멤버를 불러오는 중…
-              </p>
-            )}
-            {members.error && (
-              <div className="mt-4 space-y-2">
-                <FormAlert message={members.error} />
-                <Button variant="secondary" onClick={members.retry}>
-                  다시 시도
-                </Button>
-              </div>
-            )}
-            {members.data && (
-              <ul className="mt-4 flex flex-wrap gap-2">
-                {members.data.map((member) => {
-                  const isDelegateTarget =
-                    delegating && canDelegate && member.userId !== user?.id;
-                  return (
-                    <li
-                      key={member.userId}
-                      className={`max-w-full rounded-xl px-3 py-2 text-sm wrap-anywhere ${
-                        isDelegateTarget ? "bg-purple-100" : "bg-purple-50"
-                      }`}
-                    >
-                      {isDelegateTarget ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAction({
-                              type: "delegate",
-                              userId: member.userId,
-                              nickname: member.nickname,
-                            });
-                            setDelegating(false);
-                          }}
-                          aria-label={`${member.nickname} 님에게 그룹장 위임`}
-                          className="cursor-pointer rounded font-semibold text-purple-700 underline decoration-dotted hover:text-purple-900"
-                        >
-                          {member.nickname}
-                        </button>
-                      ) : (
-                        member.nickname
-                      )}
-                      {member.userId === challenge.ownerId && (
-                        <span className="ml-2 text-xs text-purple-500">
-                          그룹장
-                        </span>
-                      )}
-                      {isCurrent &&
-                        group.data &&
-                        group.data.group.ownerId === user?.id &&
-                        group.data.currentChallenge?.status === "ACTIVE" &&
-                        challenge.id === group.data.currentChallenge.id &&
-                        member.userId !== group.data.group.ownerId &&
-                        group.data.members.some(
-                          (item) => item.userId === member.userId,
-                        ) && (
-                          <button
-                            type="button"
-                            className="ml-2 py-1 text-xs text-red-600 underline"
-                            onClick={() =>
-                              setAction({
-                                type: "kick",
-                                userId: member.userId,
-                                nickname: member.nickname,
-                              })
-                            }
-                          >
-                            강퇴
-                          </button>
-                        )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
-          {group.data && (
-            <>
-              <Link
-                className="block text-center text-sm text-purple-500"
-                to={`/challenges/groups/${challenge.groupId}`}
-              >
-                그룹 정보 보기
-              </Link>
-              {isCurrent && <GroupManagement detail={group.data} />}
-            </>
-          )}
-        </>
-      )}
-      {action && (
+      {leaving && (
         <ConfirmActionDialog
-          title={
-            action.type === "delegate"
-              ? "그룹장을 위임할까요?"
-              : "그룹원을 강퇴할까요?"
-          }
-          description={
-            action.type === "delegate"
-              ? `${action.nickname} 님에게 그룹장 권한을 넘깁니다. 첫 시즌 또는 진행 중인 시즌에서는 그룹 전체의 관리 권한도 함께 이전됩니다.`
-              : `${action.nickname} 님의 그룹 및 현재 시즌 참여를 종료합니다. 다시 가입할 수 없어요.`
-          }
-          confirmLabel={action.type === "delegate" ? "위임하기" : "강퇴하기"}
-          onClose={() => setAction(null)}
+          title="그룹에서 나갈까요?"
+          description="나가면 현재 챌린지 참여도 종료됩니다. 참여 이력이 있는 그룹에는 다시 가입할 수 없어요."
+          confirmLabel="나가기"
+          onClose={() => setLeaving(false)}
           onConfirm={async () => {
-            if (action.type === "delegate") {
-              await delegateOwner(challenge.id, {
-                targetUserId: action.userId,
-              });
-              showToast("그룹장을 위임했어요.");
-            } else {
-              await kickGroupMember(challenge.groupId, action.userId);
-              showToast("그룹원을 내보냈어요.");
-            }
-            members.retry();
-            characters.retry();
-            group.retry();
-            onChanged();
+            await leaveGroup(challenge.groupId);
+            showToast("그룹에서 나왔어요.");
+            navigate("/challenges", { replace: true });
           }}
         />
       )}

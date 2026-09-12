@@ -1,15 +1,4 @@
 import { apiFetch } from "../../shared/api/client";
-import {
-  isCheckInStubEnabled,
-  stubChallengeAlbumSummary,
-  stubChallengeMembers,
-  stubDailyLogs,
-  stubGallery,
-  stubMyChallenges,
-  stubMyCheckIns,
-  stubSubmitResult,
-  stubTodayStatus,
-} from "./devStub";
 import type {
   ChallengeAlbumSummary,
   ChallengeMember,
@@ -23,13 +12,14 @@ import type {
   MyChallengeSummary,
   MyCheckIn,
   MyCheckInCursorResponse,
+  RecentCheckIn,
   TodayCheckInStatus,
 } from "./types";
 
 /**
  * 백엔드 SliceResponse(평면: content/hasNext/nextCursor[/totalCount])를
  * 프론트 내부 커서 페이지 모델({ content, meta })로 되감싼다.
- * useCursorPage 가 중첩 meta 를 기대하고, 일일 로그 스텁도 아직 중첩이라 경계에서만 변환.
+ * useCursorPage 가 중첩 meta 를 기대해서 경계에서만 변환한다.
  * 백엔드 근거: feat/20-checkin-mvp "인증 목록 응답을 공통 SliceResponse 로 통일"
  */
 interface FlatSlice<T> {
@@ -106,7 +96,6 @@ function buildQuery(
 export function getTodayCheckInStatus(
   challengeId: number,
 ): Promise<TodayCheckInStatus> {
-  if (isCheckInStubEnabled()) return Promise.resolve(stubTodayStatus());
   return apiFetch(`/api/challenges/${challengeId}/check-ins/today`);
 }
 
@@ -122,12 +111,6 @@ export function submitCheckIn(
   challengeId: number,
   input: SubmitCheckInInput,
 ): Promise<CheckInResultResponse> {
-  if (isCheckInStubEnabled()) {
-    return new Promise((resolve) =>
-      setTimeout(() => resolve(stubSubmitResult({ memo: input.memo })), 400),
-    );
-  }
-
   const form = new FormData();
   form.append("checkInType", input.checkInType);
   form.append("media", input.media, "check-in.jpg");
@@ -158,12 +141,6 @@ export function getChallengeGallery(
   challengeId: number,
   query: GalleryQuery = {},
 ): Promise<CheckInCursorResponse> {
-  if (isCheckInStubEnabled()) {
-    return new Promise((resolve) =>
-      setTimeout(() => resolve(stubGallery(query)), 300),
-    );
-  }
-
   const size = query.size ?? 20;
   const qs = buildQuery({
     month: query.month,
@@ -184,7 +161,6 @@ export function getChallengeGallery(
 export function getChallengeMembers(
   challengeId: number,
 ): Promise<ChallengeMember[]> {
-  if (isCheckInStubEnabled()) return Promise.resolve(stubChallengeMembers());
   return apiFetch(`/api/challenges/${challengeId}/members`);
 }
 
@@ -202,11 +178,6 @@ export interface MyCheckInQuery {
 export function getMyCheckIns(
   query: MyCheckInQuery = {},
 ): Promise<MyCheckInCursorResponse> {
-  if (isCheckInStubEnabled()) {
-    return new Promise((resolve) =>
-      setTimeout(() => resolve(stubMyCheckIns(query)), 300),
-    );
-  }
   const size = query.size ?? 20;
   const qs = buildQuery({
     challengeId: query.challengeId,
@@ -226,10 +197,8 @@ export function getMyCheckIns(
  * 실서버: `GET /api/groups/me` 는 SliceResponse<MyGroupSummaryResponse> 를 준다.
  * 응답은 챌린지 멤버십 단위라 challengeId 는 사실상 항상 채워진다(위 인터페이스 주석 참고).
  * null 필터는 스키마 변경에 대비한 방어 코드로 남겨둔다.
- * 챌린지 앨범 미리보기 커버 이미지(recentMediaUrls)는 아직 백엔드에 없음.
  */
 export function getMyChallenges(): Promise<MyChallengeSummary[]> {
-  if (isCheckInStubEnabled()) return Promise.resolve(stubMyChallenges());
   return apiFetch<FlatSlice<MyGroupSummaryResponse>>(`/api/groups/me`).then(
     (slice) =>
       slice.content
@@ -242,6 +211,20 @@ export function getMyChallenges(): Promise<MyChallengeSummary[]> {
 }
 
 /**
+ * 앨범 카드 커버용 최근 인증 미디어 URL(최신순, 최대 size 장).
+ *
+ * 커버 전용 엔드포인트가 없어 본인 인증 목록의 앞쪽 몇 건을 그대로 쓴다. 앨범 카드가
+ * 보여주는 것도 그 챌린지의 "내 인증" 이라 목록과 같은 자료다. 부족하면 프론트가 빈 칸을 채운다.
+ */
+export async function getMyChallengeCovers(
+  challengeId: number,
+  size = 4,
+): Promise<string[]> {
+  const page = await getMyCheckIns({ challengeId, size });
+  return page.content.map((checkIn) => checkIn.mediaUrl);
+}
+
+/**
  * 그룹 앨범 헤더용 챌린지 요약.
  *
  * 실서버: 챌린지엔 이름·카테고리가 없어 `GET /api/challenges/{id}`(기간·상태·groupId) +
@@ -250,9 +233,6 @@ export function getMyChallenges(): Promise<MyChallengeSummary[]> {
 export function getChallengeAlbumSummary(
   challengeId: number,
 ): Promise<ChallengeAlbumSummary> {
-  if (isCheckInStubEnabled()) {
-    return Promise.resolve(stubChallengeAlbumSummary(challengeId));
-  }
   return apiFetch<ChallengeStatusResponse>(
     `/api/challenges/${challengeId}`,
   ).then(async ({ challenge }) => {
@@ -280,14 +260,17 @@ function toDailyLogPage(
 ): DailyLogCursorResponse {
   const { content, hasNext, nextCursor } = flat;
   const recordDays = content.length;
+  // totalCount 는 그 날 시점 ACTIVE 멤버 스냅샷이라 전원이 떠난 날은 0 이 온다.
+  // 그대로 나누면 배너에 NaN% 가 뜨므로 평균 대상에서 뺀다.
+  const rated = content.filter((d) => d.totalCount > 0);
   const avgRate =
-    recordDays === 0
+    rated.length === 0
       ? 0
       : Math.round(
-          content.reduce(
+          rated.reduce(
             (sum, d) => sum + (d.completedCount / d.totalCount) * 100,
             0,
-          ) / recordDays,
+          ) / rated.length,
         );
   return {
     content,
@@ -295,8 +278,19 @@ function toDailyLogPage(
   };
 }
 
+/** 챌린지의 최근 인증 로그. 현황 탭에 몇 줄만 보여준다. */
+export async function getRecentCheckIns(
+  challengeId: number,
+  size = 3,
+): Promise<RecentCheckIn[]> {
+  const response = await apiFetch<{ items: RecentCheckIn[] }>(
+    `/api/challenges/${challengeId}/check-ins/recent?size=${size}`,
+  );
+  return response.items;
+}
+
 export interface DailyLogQuery {
-  /** yyyy-MM. ⚠️ 낙관적 — daily-logs PR(feat/36)엔 아직 cursor·size 만 있고 month 는 없음. */
+  /** yyyy-MM. 서버가 그 달 1일부터 말일까지로 필터한다. */
   month?: string;
   cursor?: number;
   size?: number;
@@ -307,11 +301,6 @@ export function getDailyLogs(
   challengeId: number,
   query: DailyLogQuery = {},
 ): Promise<DailyLogCursorResponse> {
-  if (isCheckInStubEnabled()) {
-    return new Promise((resolve) =>
-      setTimeout(() => resolve(stubDailyLogs(query)), 300),
-    );
-  }
   const size = query.size ?? 31;
   const qs = buildQuery({
     month: query.month,

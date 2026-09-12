@@ -3,11 +3,15 @@ import { useEffect } from "react";
 import { useBodyScrollLock } from "../../../shared/lib/useBodyScrollLock";
 
 interface Props {
+  /**
+   * 재생할 objectURL. 타일이 fetch 로 받아둔 blob 을 그대로 받는다 — 일일 로그 영상
+   * 엔드포인트는 인증이 필요해 `<video src>` 에 API 경로를 직접 넣으면 401 이다.
+   */
   src: string;
   onClose: () => void;
 }
 
-/** 일일 로그 영상 풀스크린 재생. 닫기: ✕ · 배경 탭 · Esc · 하드웨어 뒤로가기. */
+/** 일일 로그 영상 풀스크린 재생. 닫기: 닫기 버튼, 배경 탭, Esc, 하드웨어 뒤로가기. */
 export function DailyLogPlayer({ src, onClose }: Props) {
   useBodyScrollLock(true);
 
