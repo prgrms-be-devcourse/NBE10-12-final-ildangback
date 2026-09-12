@@ -29,6 +29,7 @@ git -C "$APP_DIR/src" reset --hard FETCH_HEAD
 
 # 2. 배포물을 작업 디렉터리로 동기화
 rsync -a --delete "$APP_DIR/src/infra/nginx/" "$APP_DIR/nginx/"
+rsync -a --delete "$APP_DIR/src/infra/monitoring/" "$APP_DIR/monitoring/"
 cp "$APP_DIR/src/infra/compose/docker-compose.yml" "$APP_DIR/docker-compose.yml"
 cp "$APP_DIR/src/infra/compose/backup.sh"          "$APP_DIR/backup.sh"
 
