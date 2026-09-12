@@ -37,6 +37,7 @@ public enum ErrorCode {
     CHECK_IN_TYPE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "허용되지 않은 인증 방식입니다."),
     DAILY_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "오늘 인증 횟수를 모두 채웠습니다."),
     NOT_CHECK_IN_DAY(HttpStatus.CONFLICT, "오늘은 인증 대상일이 아닙니다."),
+    DAILY_LOG_NOT_FOUND(HttpStatus.NOT_FOUND, "일일로그를 찾을 수 없습니다."),
 
     // ===== group =====
     GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "그룹을 찾을 수 없습니다."),
@@ -72,6 +73,8 @@ public enum ErrorCode {
     POINT_HISTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 포인트 이력입니다."),
 
     // ===== record =====
+    MONTHLY_MERGE_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 월간 머지입니다."),
+    FINAL_MERGE_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 최종 머지입니다."),
 
     // ===== user =====
     EMAIL_DUPLICATED(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),

@@ -1,8 +1,10 @@
 import { readFileSync } from "node:fs";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import { VitePWA } from "vite-plugin-pwa";
+
+import { cloudflare } from "@cloudflare/vite-plugin";
 
 const { version } = JSON.parse(readFileSync("./package.json", "utf-8"));
 
@@ -26,6 +28,7 @@ export default defineConfig({
       },
       devOptions: { enabled: false },
     }),
+    cloudflare(),
   ],
   server: {
     proxy: {
@@ -43,5 +46,11 @@ export default defineConfig({
     // 그러면 프로필 · 설정에서만 쓰는 그림이 초기 번들에 들어가고 base64 라 33% 더 크다.
     // 0 으로 두면 전부 별도 파일이 되어 loading="lazy" 가 실제로 동작한다.
     assetsInlineLimit: 0,
+  },
+  test: {
+    environment: "jsdom",
+    globals: true,
+    setupFiles: ["./src/test/setup.ts"],
+    css: false,
   },
 });

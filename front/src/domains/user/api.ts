@@ -1,3 +1,4 @@
+import type { UserCharactersResponse } from "./types";
 import { apiFetch } from "../../shared/api/client";
 import { tokenStore } from "../../shared/api/tokenStore";
 import type { UserProfileResponse } from "../../shared/api/types";
@@ -40,4 +41,11 @@ export async function deleteAccount(password?: string): Promise<void> {
     body: password ? { password } : {},
   });
   tokenStore.clear();
+}
+
+export function getUserCharacters(userIds: number[]) {
+  const ids = [...new Set(userIds)];
+  if (ids.length === 0) return Promise.resolve<UserCharactersResponse>({});
+  const params = new URLSearchParams({ userIds: ids.join(",") });
+  return apiFetch<UserCharactersResponse>(`/api/users/characters?${params}`);
 }

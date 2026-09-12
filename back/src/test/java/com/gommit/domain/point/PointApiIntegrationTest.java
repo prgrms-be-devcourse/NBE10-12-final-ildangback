@@ -2,6 +2,7 @@ package com.gommit.domain.point;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -10,6 +11,7 @@ import com.gommit.domain.point.entity.UserPointReason;
 import com.gommit.domain.point.service.GroupPointService;
 import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.support.IntegrationTestSupport;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -71,7 +73,75 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
                         + " (name, category, map_type, visibility, max_members, owner_id, status, created_at, updated_at)"
                         + " values ('테스트 그룹', 'EXERCISE', 'GYM', 'PUBLIC', 6, ?, 'ACTIVE', now(), now())",
                 ownerId);
-        return jdbcTemplate.queryForObject("select max(id) from challenge_groups", Long.class);
+        Long groupId = jdbcTemplate.queryForObject("select max(id) from challenge_groups", Long.class);
+        // 그룹 포인트 조회 API는 멤버십을 검증하므로 owner를 ACTIVE 멤버로도 넣어준다.
+        jdbcTemplate.update(
+                "insert into group_members (group_id, user_id, status, created_at, updated_at)"
+                        + " values (?, ?, 'ACTIVE', now(), now())",
+                groupId,
+                ownerId);
+        return groupId;
+    }
+
+    // insertTestGroup(SQL 직접 삽입)과 달리, 실제 그룹 생성/가입 API를 그대로 태워서
+    // "그룹이 실제로 어떻게 인증되는지"(생성 시 owner 자동 가입, /members로 가입)를 검증한다.
+    private ResultActions createGroupViaApi(String accessToken) throws Exception {
+        String body = """
+                {
+                  "name": "테스트 그룹",
+                  "description": "실제 API로 만든 그룹",
+                  "category": "EXERCISE",
+                  "mapType": "GYM",
+                  "visibility": "PUBLIC",
+                  "maxMembers": 6,
+                  "challenge": {
+                    "startDate": "%s",
+                    "endDate": "%s",
+                    "frequencyType": "DAILY",
+                    "frequencyValue": null,
+                    "daysOfWeek": null,
+                    "dailyCheckInCount": 1,
+                    "allowedTypes": ["PHOTO"]
+                  }
+                }
+                """.formatted(LocalDate.now().plusDays(1), LocalDate.now().plusDays(7));
+        return mockMvc.perform(jsonRequest(withToken(post("/api/groups"), accessToken), body));
+    }
+
+    private ResultActions joinGroupViaApi(String accessToken, Long groupId) throws Exception {
+        return mockMvc.perform(withToken(post("/api/groups/" + groupId + "/members"), accessToken));
+    }
+
+    @Nested
+    @DisplayName("실제 그룹 생성/가입 API로 확인하는 그룹 포인트 멤버십")
+    class GroupPointMembershipFlow {
+
+        @Test
+        @DisplayName("그룹을 만들면 owner가 자동으로 멤버가 돼서 바로 포인트 조회가 되고, 나중에 가입한 멤버도 조회된다")
+        void ownerAndJoinedMemberCanReadGroupPoints() throws Exception {
+            var ownerTokens = loginAs(EMAIL, NICKNAME);
+            Long ownerId = userIdOf(EMAIL);
+            createGroupViaApi(ownerTokens.accessToken()).andExpect(status().isCreated());
+            Long groupId = jdbcTemplate.queryForObject(
+                    "select max(id) from challenge_groups where owner_id = ?", Long.class, ownerId);
+
+            // 그룹 생성 직후 - 별도 가입 절차 없이 owner가 이미 멤버라서 바로 조회된다.
+            getGroupBalance(ownerTokens.accessToken(), groupId)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.balance").value(0));
+
+            // 아직 안 들어간 다른 유저는 403.
+            var otherTokens = loginAs("other@example.com", "다른유저");
+            getGroupBalance(otherTokens.accessToken(), groupId)
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("NOT_GROUP_MEMBER"));
+
+            // /members로 실제 가입하면 그때부터 조회된다.
+            joinGroupViaApi(otherTokens.accessToken(), groupId).andExpect(status().isCreated());
+            getGroupBalance(otherTokens.accessToken(), groupId)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.balance").value(0));
+        }
     }
 
     @Nested
@@ -286,6 +356,18 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.balance").value(300));
         }
+
+        @Test
+        @DisplayName("그룹 멤버가 아니면 403")
+        void returns403WhenNotMember() throws Exception {
+            loginAs(EMAIL, NICKNAME);
+            Long groupId = insertTestGroup(userIdOf(EMAIL));
+            var otherTokens = loginAs("other@example.com", "다른유저");
+
+            getGroupBalance(otherTokens.accessToken(), groupId)
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("NOT_GROUP_MEMBER"));
+        }
     }
 
     @Nested
@@ -317,6 +399,18 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].sourceName").value("2번째"))
                     .andExpect(jsonPath("$.content[1].sourceName").value("1번째"));
+        }
+
+        @Test
+        @DisplayName("그룹 멤버가 아니면 403")
+        void returns403WhenNotMember() throws Exception {
+            loginAs(EMAIL, NICKNAME);
+            Long groupId = insertTestGroup(userIdOf(EMAIL));
+            var otherTokens = loginAs("other@example.com", "다른유저");
+
+            getGroupHistories(otherTokens.accessToken(), groupId)
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("NOT_GROUP_MEMBER"));
         }
     }
 
@@ -363,6 +457,20 @@ class PointApiIntegrationTest extends IntegrationTestSupport {
             getGroupHistoryDetail(tokens.accessToken(), otherGroupId, historyId)
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.code").value("POINT_HISTORY_NOT_FOUND"));
+        }
+
+        @Test
+        @DisplayName("그룹 멤버가 아니면 403")
+        void returns403WhenNotMember() throws Exception {
+            loginAs(EMAIL, NICKNAME);
+            Long groupId = insertTestGroup(userIdOf(EMAIL));
+            groupPointService.reward(groupId, 100, GroupPointReason.DAILY_ALL_COMPLETE, "오운완");
+            Long historyId = jdbcTemplate.queryForObject("select max(id) from group_point_histories", Long.class);
+            var otherTokens = loginAs("other@example.com", "다른유저");
+
+            getGroupHistoryDetail(otherTokens.accessToken(), groupId, historyId)
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("NOT_GROUP_MEMBER"));
         }
     }
 

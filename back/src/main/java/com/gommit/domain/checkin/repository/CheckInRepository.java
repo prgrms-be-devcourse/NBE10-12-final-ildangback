@@ -15,6 +15,12 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
 
     int countByChallengeIdAndUserIdAndBusinessDate(Long challengeId, Long userId, LocalDate businessDate);
 
+    public interface CheckInCountByDate {
+        LocalDate getBusinessDate();
+
+        Long getCount();
+    }
+
     @Query("""
             select c.userId from CheckIn c
             where c.challengeId = :challengeId and c.businessDate = :businessDate
@@ -60,7 +66,7 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
             @Param("cursorId") Long cursorId,
             Pageable pageable);
 
-    // 최근 인증 로그 한줄보기 — 갤러리의 축약. maxBusinessDate 규칙 동일. 커서 없음, 상위 N개만.
+    // 최근 인증 로그 한줄보기
     @Query("""
             select c from CheckIn c
             where c.challengeId = :challengeId
@@ -70,7 +76,6 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
     List<CheckIn> findRecent(
             @Param("challengeId") Long challengeId, @Param("maxBusinessDate") LocalDate maxBusinessDate, Limit limit);
 
-    // 내 인증 모아보기 — challengeId / checkInType / 기간(month) 필터, id 커서(내림차순).
     @Query("""
             select c from CheckIn c
             where c.userId = :userId
@@ -104,4 +109,32 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
             @Param("checkInType") CheckInType checkInType,
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
+
+    // DailyLog 몽타주 재료 — 그 날 인증 사진들을 회차 순서로.
+    @Query("""
+            select c from CheckIn c
+            where c.challengeId = :challengeId and c.businessDate = :businessDate
+            order by c.id asc
+            """)
+    List<CheckIn> findByChallengeIdAndBusinessDate(
+            @Param("challengeId") Long challengeId, @Param("businessDate") LocalDate businessDate);
+
+    @Query("""
+            SELECT c.businessDate AS businessDate, COUNT(c) AS count
+            FROM CheckIn c
+            WHERE c.userId = :userId
+                AND c.businessDate BETWEEN :from AND :to
+            GROUP BY c.businessDate
+            """)
+    List<CheckInCountByDate> countByUserIdGroupByDateBetween(
+            @Param("userId") Long userId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    @Query("""
+        SELECT COUNT(DISTINCT c.businessDate)
+        FROM CheckIn c
+        WHERE c.userId = :userId
+            AND c.businessDate BETWEEN :from AND :to
+        """)
+    long countDistinctDatesByUserIdBetween(
+            @Param("userId") Long userId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 }

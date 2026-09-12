@@ -1,14 +1,14 @@
-data "aws_ami" "al2023_arm64" {
+data "aws_ami" "al2023_x86_64" {
   most_recent = true
   owners      = ["amazon"]
 
   filter {
     name   = "name"
-    values = ["al2023-ami-2023.*-arm64"]
+    values = ["al2023-ami-2023.*-x86_64"]
   }
   filter {
     name   = "architecture"
-    values = ["arm64"]
+    values = ["x86_64"]
   }
   filter {
     name   = "virtualization-type"
@@ -17,7 +17,7 @@ data "aws_ami" "al2023_arm64" {
 }
 
 resource "aws_instance" "app" {
-  ami                    = data.aws_ami.al2023_arm64.id
+  ami                    = data.aws_ami.al2023_x86_64.id
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.app.id]
@@ -38,8 +38,7 @@ resource "aws_instance" "app" {
     volume_size = var.root_volume_size
     encrypted   = true
     tags = {
-      Name   = "${var.name_prefix}-app-root"
-      Backup = "true" # DLM 스냅샷 대상
+      Name = "${var.name_prefix}-app-root"
     }
   }
 

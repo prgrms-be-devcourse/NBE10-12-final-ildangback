@@ -1,5 +1,5 @@
 #!/bin/bash
-# Amazon Linux 2023 (arm64) 첫 부팅 프로비저닝.
+# Amazon Linux 2023 (x86_64) 첫 부팅 프로비저닝.
 # cloud-init 이 root 로 1회 실행. 배포물(compose/.env/nginx/certs)은 CD 가 따로 배치.
 set -euxo pipefail
 
@@ -24,10 +24,10 @@ systemctl enable --now docker
 systemctl enable --now crond
 usermod -aG docker ec2-user
 
-# ---- Docker Compose 플러그인 (arm64) --------------------------------------
+# ---- Docker Compose 플러그인 (x86_64) --------------------------------------
 COMPOSE_VERSION=v2.32.4
 mkdir -p /usr/local/lib/docker/cli-plugins
-curl -fsSL "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-aarch64" \
+curl -fsSL "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-x86_64" \
   -o /usr/local/lib/docker/cli-plugins/docker-compose
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 

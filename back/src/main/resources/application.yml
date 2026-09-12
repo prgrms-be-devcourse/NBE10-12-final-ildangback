@@ -73,6 +73,17 @@ app:
   time-zone: Asia/Seoul # 인증 businessDate('오늘') 판정에 쓰는 Clock 빈의 기준 타임존
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
   api-base-url: ${API_BASE_URL:http://localhost:8080}
+  dailylog:
+    ffmpeg-path: ${DAILYLOG_FFMPEG_PATH:ffmpeg} # 배포 이미지에 ffmpeg 없으면 몽타주 생성만 건너뛴다(graceful degrade)
+    montage-max-rounds: 8 # 몽타주에 담는 최대 회차 수(회차당 2초)
+    montage-sweep-cron: "0 0/15 4-17 * * *" # 마감 배치 — 인스턴스가 깨어 있는 04:00~17:45 KST 사이 15분 주기로 백로그를 조금씩 소진
+    montage-sweep-lookback-days: 14 # 마감 배치가 거슬러 훑는 최대 일수 — 이보다 오래된 미생성 날은 재시도 포기(좀비 row 누적 방지)
+    montage-sweep-max-per-run: 60 # sweep 1회(=15분 틱) 처리 상한, 재기동 직후 대량 백로그 대비
+    montage-sweep-budget-seconds: 300 # sweep 1회 시간 예산 — ffmpeg 직렬 처리가 이 시간을 넘으면 남은 건 다음 틱으로.
+    montage-executor: # 몽타주(ffmpeg) 전용 스레드풀 — 마감 무렵 이벤트가 몰려도 ffmpeg 동시 실행 수를 제한
+      core-size: 1
+      max-size: 1 # ffmpeg 인코딩은 CPU 100% — 버스터블 인스턴스에서 앱용 vCPU 를 남기려 동시 1개로 직렬화
+      queue-capacity: 100 # 전원완료 이벤트가 마감 무렵 몰려도(활성 챌린지 수만큼) 큐에 담기게. 넘치면 AbortPolicy 로 버리고 마감 배치가 재시도
 
 media:
   storage:
