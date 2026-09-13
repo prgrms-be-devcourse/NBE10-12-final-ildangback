@@ -8,8 +8,10 @@
         android:name="android.hardware.camera"
         android:required="false" />
 
+    <!-- 웹뷰 localStorage 에 RT 가 들어 있다. 백업에 실리면 복원한 기기가
+         회전된 RT 를 내밀어 재사용 탐지에 걸리고 전 세션이 폐기된다 -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="false"
