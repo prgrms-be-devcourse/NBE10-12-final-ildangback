@@ -104,6 +104,18 @@ cp src/infra/compose/backup.sh .
 cp src/infra/compose/deploy.sh .          # 이후 SSM 배포가 절대경로로 호출. 이후엔 deploy.sh 가 스스로 갱신.
 chmod +x deploy.sh
 rsync -a src/infra/nginx/ nginx/
+
+# blue-green active 색 최초 지정(1회) — nginx 가 include 하는 upstream 정의라 이거 없으면
+# nginx 기동 자체가 실패함. 이후로는 deploy.sh 가 이 파일을 읽고/새로 씀(git 비추적).
+# infra/docs/blue-green-deploy-plan-*.md 참고.
+cat > nginx/conf.d/active-backend.conf <<'EOF'
+# deploy.sh 생성 파일 — git 비추적. 활성 backend 색 = 배포 상태 그 자체.
+upstream backend {
+  server back-blue:8080;
+  keepalive 16;
+}
+EOF
+
 docker compose up -d
 docker compose ps
 ```
@@ -173,7 +185,10 @@ sudo -u ec2-user bash /opt/team1-app/deploy.sh <이전-12자-SHA> <이전-풀-SH
 cd /opt/team1-app
 gunzip -c backups/gommit-YYYYMMDD-HHMM.sql.gz | \
   docker compose exec -T mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" gommit
-docker compose restart back
+# back 은 blue-green 이라 서비스명이 back-blue/back-green 로 나뉜다 — 지금 active 인
+# 쪽만 재시작(비활성 쪽까지 건드리면 안 쓰는 컨테이너가 괜히 뜬다).
+ACTIVE=$(grep -o 'back-[a-z]*' nginx/conf.d/active-backend.conf)
+docker compose restart "$ACTIVE"
 ```
 
 ### 볼륨 복구 (수동 스냅샷에서)
@@ -207,7 +222,9 @@ aws ssm start-session --target <instance-id> --region ap-northeast-2
 
 cd /opt/team1-app
 docker compose ps
-docker compose logs -f --tail=100 back
+# back 은 blue-green(back-blue/back-green) — 지금 active 인 쪽은 conf.d/active-backend.conf 로 확인.
+grep back nginx/conf.d/active-backend.conf
+docker compose logs -f --tail=100 back-blue    # 또는 back-green, 위에서 확인한 쪽
 docker compose logs --tail=50 nginx
 docker stats --no-stream          # 메모리 압박 확인 (2GB 박스)
 free -h; swapon --show
@@ -247,9 +264,9 @@ IAM 을 나눠줄 수 없어 SSM 을 못 쓰는 운영자 1인 전용. 그 외�
 
 | 증상 | 확인 |
 |---|---|
-| 배포 실패 (health check failed) | `docker compose logs back` — Flyway/DB 연결/OOM |
-| `back` 계속 재시작 | `docker stats` 메모리, `-Xmx` 초과? `.env` DB 값? ffmpeg 겹침이면 아래 참고 |
-| `back` OOM-kill 반복 (인코딩 중) | 동시성 1 확인. 2회 이상이면 사이드카 분리 검토 — `infra-design.md` Q24 "ffmpeg 인코딩 확장 사다리" |
+| 배포 실패 (health check failed) | `docker compose logs back-blue`/`back-green`(배포 대상 색) — Flyway/DB 연결/OOM. deploy.sh 는 실패 시 active 색을 안 건드리므로 서비스는 안 끊김 |
+| `back-blue`/`back-green` 계속 재시작 | `docker stats` 메모리, `-Xmx` 초과? `.env` DB 값? ffmpeg 겹침이면 아래 참고 |
+| `back-blue`/`back-green` OOM-kill 반복 (인코딩 중) | 동시성 1 확인. 2회 이상이면 사이드카 분리 검토 — `infra-design.md` Q24 "ffmpeg 인코딩 확장 사다리" |
 | 502 from Cloudflare | nginx up? `certs/origin.*` 존재? `docker compose logs nginx` |
 | 526 (invalid SSL) from Cloudflare | Origin CA 인증서 만료/불일치, SSL 모드 Full(strict) 확인 |
 | ffmpeg 중 앱 느려짐 | 정상 (동시성 1, swap 사용). 지속되면 인코딩을 새벽으로 이동 |

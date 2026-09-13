@@ -1,5 +1,42 @@
-# EC2 /opt/team1-app 에 배치. CD 가 .env 의 IMAGE_TAG 를 갱신하고 `docker compose up -d`.
+# EC2 /opt/team1-app 에 배치. CD 가 .env 의 IMAGE_TAG 를 갱신하고 deploy.sh 를 돌린다.
+#
+# back 은 로컬 blue-green(same-EC2, 상시 2 replica 아님, infra/docs/blue-green-deploy-plan-*.md
+# 참고): back-blue/back-green 둘 다 정의만 해두고, 배포 중에만 비활성 색을 새 이미지로 잠깐
+# 같이 띄운 뒤 nginx upstream 을 그쪽으로 스위치, 이전 색은 내린다. 평상시엔 한쪽만 running.
+# 어느 쪽이 active 인지는 컨테이너 정의가 아니라 nginx/conf.d/active-backend.conf(런타임 생성,
+# git 비추적)가 갖고 있다 — deploy.sh 가 그 파일을 읽고 쓴다.
 name: gommit
+
+x-back-common: &back-common
+  image: ghcr.io/${GHCR_REPO}/back:${IMAGE_TAG:-latest}
+  restart: unless-stopped
+  env_file:
+    - .env
+  environment:
+    JAVA_OPTS: "-Xms256m -Xmx768m -XX:+ExitOnOutOfMemoryError -Duser.timezone=Asia/Seoul"
+    SPRING_PROFILES_ACTIVE: prod
+  volumes:
+    - media-tmp:/app/media-tmp      # ffmpeg 임시파일
+  depends_on:
+    mysql:
+      condition: service_healthy
+  # 1800M = 인스턴스 4GB(t3a.medium) 전환분 반영. DailyLog 몽타주(feat/36, main 미병합) 완화
+  # 실측 최악 1,264~1,327M(6×8회차+갤러리12명 동시)에 안전율(측정환경=Docker Desktop VM, 실 EC2 Linux 오차 보정).
+  # blue/green 이 배포 중 잠깐 같이 뜨는 순간에도 둘이 겹쳐 인스턴스 메모리(4G)를 넘지 않아야 함
+  # — 평상시 1개만 뜨므로 상시 소모는 그대로, 배포 중 순간 최대 back 2×1800M + mysql 600M 고려.
+  deploy:
+    resources:
+      limits:
+        memory: 1800M
+  # 이미지 Dockerfile 의 HEALTHCHECK 와 값을 맞춘다 (드리프트 방지).
+  # retries 5 = start_period 후 ~150s 여유 — 아침 콜드스타트(2분+)에 --wait 가
+  # 조기에 unhealthy 로 판정하지 않도록.
+  healthcheck:
+    test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+    interval: 30s
+    timeout: 3s
+    retries: 5
+    start_period: 90s
 
 services:
   nginx:
@@ -12,41 +49,24 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./certs:/etc/nginx/certs:ro   # origin.pem / origin.key (Cloudflare Origin CA)
     depends_on:
-      back:
-        condition: service_healthy
+      # 항상 둘 다 healthy 일 필요 없음(평상시 한쪽만 뜸) — 존재만 하면 충분. 실제로
+      # 트래픽 받을 수 있는지는 conf.d/active-backend.conf 가 가리키는 쪽에 달림.
+      back-blue:
+        condition: service_started
+      back-green:
+        condition: service_started
     deploy:
       resources:
         limits:
           memory: 64M
 
-  back:
-    image: ghcr.io/${GHCR_REPO}/back:${IMAGE_TAG:-latest}
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      JAVA_OPTS: "-Xms256m -Xmx768m -XX:+ExitOnOutOfMemoryError -Duser.timezone=Asia/Seoul"
-      SPRING_PROFILES_ACTIVE: prod
-    volumes:
-      - media-tmp:/app/media-tmp      # ffmpeg 임시파일
-    depends_on:
-      mysql:
-        condition: service_healthy
-    # 1800M = 인스턴스 4GB(t3a.medium) 전환분 반영. DailyLog 몽타주(feat/36, main 미병합) 완화
-    # 실측 최악 1,264~1,327M(6×8회차+갤러리12명 동시)에 안전율(측정환경=Docker Desktop VM, 실 EC2 Linux 오차 보정).
-    deploy:
-      resources:
-        limits:
-          memory: 1800M
-    # 이미지 Dockerfile 의 HEALTHCHECK 와 값을 맞춘다 (드리프트 방지).
-    # retries 5 = start_period 후 ~150s 여유 — 아침 콜드스타트(2분+)에 --wait 가
-    # 조기에 unhealthy 로 판정하지 않도록.
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 5
-      start_period: 90s
+  back-blue:
+    <<: *back-common
+    container_name: back-blue
+
+  back-green:
+    <<: *back-common
+    container_name: back-green
 
   mysql:
     image: mysql:8.4
