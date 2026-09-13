@@ -32,6 +32,7 @@ public enum ErrorCode {
     EXTENSION_CHOICE_NOT_AVAILABLE(HttpStatus.CONFLICT, "현재 연장 참여 의사를 선택할 수 없는 챌린지입니다."),
     EXTENSION_START_DATE_NOT_EDITABLE(HttpStatus.BAD_REQUEST, "연장 시즌의 시작일은 변경할 수 없습니다."),
 
+
     // ===== checkin =====
     CHECK_IN_NOT_FOUND(HttpStatus.NOT_FOUND, "인증을 찾을 수 없습니다."),
     CHECK_IN_TYPE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "허용되지 않은 인증 방식입니다."),
@@ -72,6 +73,12 @@ public enum ErrorCode {
     NOT_EQUIPPED(HttpStatus.BAD_REQUEST, "착용 중이 아닌 아이템입니다."),
     NOT_ITEM_OWNER(HttpStatus.FORBIDDEN, "본인이 보유한 아이템만 착용할 수 있습니다."),
     ITEM_IN_USE(HttpStatus.CONFLICT, "이미 보유중인 사용자가 있어 삭제할 수 없습니다."),
+
+    // ===== notification =====
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다."),
+    ALREADY_NUDGED(HttpStatus.CONFLICT, "오늘 이미 콕 찌르기를 받은 멤버입니다."),
+    CANNOT_NUDGE_SELF(HttpStatus.BAD_REQUEST, "자기 자신을 콕 찌를 수 없습니다."),
+    ALREADY_CHECKED_IN(HttpStatus.CONFLICT, "오늘 인증을 이미 완료한 멤버입니다."),
 
     // ===== media =====
     EMPTY_FILE(HttpStatus.BAD_REQUEST, "파일이 비어 있습니다."),

@@ -65,3 +65,21 @@ export async function fetchHome(weeks: number): Promise<HomeData> {
 
   return { home, grass, activities: activities.content };
 }
+
+export interface NotificationResponse {
+  id: number;
+  type: string;
+  title: string;
+  body: string | null;
+  refId: number | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export function getNotifications() {
+  return apiFetch<NotificationResponse[]>("/api/notifications");
+}
+
+export function readNotification(id: number) {
+  return apiFetch<void>(`/api/notifications/${id}/read`, { method: "PATCH" });
+}

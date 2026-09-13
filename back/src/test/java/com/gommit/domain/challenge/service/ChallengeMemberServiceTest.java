@@ -1,6 +1,7 @@
 package com.gommit.domain.challenge.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.gommit.domain.challenge.entity.Challenge;
@@ -9,6 +10,11 @@ import com.gommit.domain.challenge.entity.ChallengeMemberRole;
 import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
+import com.gommit.domain.challenge.repository.ChallengeRepository;
+import com.gommit.domain.checkin.repository.CheckInRepository;
+import com.gommit.domain.notification.service.NotificationService;
+import com.gommit.domain.user.repository.UserRepository;
+import com.gommit.global.time.BusinessClock;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,7 +41,14 @@ class ChallengeMemberServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ChallengeMemberService(challengeMemberRepository, new ChallengeProgressCalculator());
+        service = new ChallengeMemberService(
+                challengeMemberRepository,
+                new ChallengeProgressCalculator(),
+                mock(ChallengeRepository.class),
+                mock(CheckInRepository.class),
+                mock(UserRepository.class),
+                mock(NotificationService.class),
+                mock(BusinessClock.class));
     }
 
     private Challenge challenge(FrequencyType type, Integer frequencyValue, String daysOfWeek) {
