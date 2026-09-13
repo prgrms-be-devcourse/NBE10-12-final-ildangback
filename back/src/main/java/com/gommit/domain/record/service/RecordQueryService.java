@@ -264,22 +264,36 @@ public class RecordQueryService {
                         .stream()
                         .collect(Collectors.toMap(FinalMerge::getId, Function.identity()));
 
-        // 파이널 머지는 챌린지 시작~끝 전체 기간을 다시 통째로 재집계한 스냅샷이라(FinalMergeResult
-        // 참고), 파이널이 있는(=종료된) 챌린지는 월별 결과를 같이 더하면 중복 집계된다. 파이널로 대체한다.
+        // 파이널은 챌린지 전체 기간 재집계본이라 총계(allRows)는 파이널로 대체.
+        // 월별 추이/잔디(trendRows)는 파이널 하나로 하면 시작 달에만 몰리니 월간 머지 기준으로.
         Set<Long> challengeIdsWithFinalMerge =
                 finalMergesById.values().stream().map(FinalMerge::getChallengeId).collect(Collectors.toSet());
+        Set<Long> challengeIdsWithMonthlyMerge = monthlyMergesById.values().stream()
+                .map(MonthlyMerge::getChallengeId)
+                .collect(Collectors.toSet());
 
         List<StatRow> allRows = new ArrayList<>();
+        List<StatRow> trendRows = new ArrayList<>();
         for (MonthlyMergeResult result : monthlyResults) {
             MonthlyMerge merge = monthlyMergesById.get(result.getMonthlyMergeId());
-            if (merge != null && !challengeIdsWithFinalMerge.contains(merge.getChallengeId())) {
-                allRows.add(StatRow.of(merge.getChallengeId(), merge, result));
+            if (merge == null) {
+                continue;
+            }
+            StatRow row = StatRow.of(merge.getChallengeId(), merge, result);
+            trendRows.add(row);
+            if (!challengeIdsWithFinalMerge.contains(merge.getChallengeId())) {
+                allRows.add(row);
             }
         }
         for (FinalMergeResult result : finalResults) {
             FinalMerge merge = finalMergesById.get(result.getFinalMergeId());
-            if (merge != null) {
-                allRows.add(StatRow.of(merge.getChallengeId(), merge, result));
+            if (merge == null) {
+                continue;
+            }
+            StatRow row = StatRow.of(merge.getChallengeId(), merge, result);
+            allRows.add(row);
+            if (!challengeIdsWithMonthlyMerge.contains(merge.getChallengeId())) {
+                trendRows.add(row);
             }
         }
 
@@ -290,12 +304,16 @@ public class RecordQueryService {
                 .filter(row -> infoByChallengeId.containsKey(row.challengeId()))
                 .filter(row -> overlaps(row, from, to))
                 .toList();
+        List<StatRow> trendStatRows = trendRows.stream()
+                .filter(row -> infoByChallengeId.containsKey(row.challengeId()))
+                .filter(row -> overlaps(row, from, to))
+                .toList();
 
         return new PersonalStatsResponse(
                 buildSummary(rows),
-                buildMonthlyTrend(rows),
+                buildMonthlyTrend(trendStatRows),
                 buildCategoryBreakdown(rows, infoByChallengeId),
-                buildHeatmap(rows));
+                buildHeatmap(trendStatRows));
     }
 
     private SummaryStatResponse buildSummary(List<StatRow> rows) {
