@@ -31,6 +31,7 @@ import { GroupCreatePage } from "./domains/group/pages/GroupCreatePage";
 import { GroupJoinByCodePage } from "./domains/group/pages/GroupJoinByCodePage";
 import { GroupInvitePreviewPage } from "./domains/group/pages/GroupInvitePreviewPage";
 import { ChallengeStatusPage } from "./domains/challenge/pages/ChallengeStatusPage";
+import { GroupChatPage } from "./domains/chat/pages/GroupChatPage";
 import { HomePage } from "./pages/HomePage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { useAuth } from "./shared/lib/useAuth";
@@ -121,6 +122,12 @@ export function App() {
           <Route
             path="challenges/:challengeId/check-in"
             element={<CheckInPage />}
+          />
+
+          {/* 그룹 채팅 — 입력창이 바닥에 붙어야 해서 하단바 없이 둔다. */}
+          <Route
+            path="challenges/groups/:groupId/chat"
+            element={<GroupChatPage />}
           />
 
           {/* 관리자. 앱 어디에도 링크가 없고 /admin 을 직접 입력해 들어온다.
