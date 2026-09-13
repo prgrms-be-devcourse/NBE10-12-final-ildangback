@@ -2,12 +2,19 @@ package com.gommit.domain.report.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import com.gommit.domain.group.service.GroupService;
 import com.gommit.domain.point.dto.response.PointBalanceResponse;
+import com.gommit.domain.point.entity.UserPointReason;
 import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.domain.report.dto.request.PenaltyCommand;
 import com.gommit.domain.report.entity.Penalty;
@@ -166,5 +173,40 @@ class PenaltyServiceTest {
 
         assertThat(active.getRevokedAt()).isNotNull();
         assertThat(alreadyRevoked.getRevokedAt()).isEqualTo(revokedAt);
+    }
+
+    @Test
+    @DisplayName("인용하면 실제로 깎인 금액만큼 환급한다")
+    void revokeRefundsForfeitedAmount() {
+        Penalty forfeit = Penalty.pointForfeit(REPORT_ID, USER_ID, 200);
+        forfeit.recordForfeited(50);
+        given(penaltyRepository.findAllByReportId(anyLong())).willReturn(List.of(forfeit));
+
+        penaltyService.revokeAllByReport(REPORT_ID);
+
+        verify(personalPointService).refund(eq(USER_ID), eq(50), eq(UserPointReason.PENALTY_REFUND), anyString());
+    }
+
+    @Test
+    @DisplayName("한 푼도 못 깎았으면 환급하지 않는다")
+    void revokeSkipsRefundWhenNothingWasTaken() {
+        Penalty forfeit = Penalty.pointForfeit(REPORT_ID, USER_ID, 200);
+        forfeit.recordForfeited(0);
+        given(penaltyRepository.findAllByReportId(anyLong())).willReturn(List.of(forfeit));
+
+        penaltyService.revokeAllByReport(REPORT_ID);
+
+        verify(personalPointService, never()).refund(anyLong(), anyInt(), any(), anyString());
+    }
+
+    @Test
+    @DisplayName("정지 해제는 환급을 부르지 않는다")
+    void revokeDoesNotRefundForSuspension() {
+        given(penaltyRepository.findAllByReportId(anyLong()))
+                .willReturn(List.of(Penalty.suspension(REPORT_ID, USER_ID, 3)));
+
+        penaltyService.revokeAllByReport(REPORT_ID);
+
+        verify(personalPointService, never()).refund(anyLong(), anyInt(), any(), anyString());
     }
 }

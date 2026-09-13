@@ -171,7 +171,7 @@ public class HomeService {
                             case EXERCISE, HEALTH -> "workout:";
                             case ETC -> "chore:";
                         };
-            case CHALLENGE_BONUS, MONTHLY_MERGE_BONUS -> "feat:";
+            case CHALLENGE_BONUS, MONTHLY_MERGE_BONUS, PENALTY_REFUND -> "feat:";
             case ITEM_PURCHASE -> "chore:";
             case WITHDRAWAL_PENALTY, PENALTY_FORFEIT -> "fix:";
         };

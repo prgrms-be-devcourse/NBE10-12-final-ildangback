@@ -1,6 +1,7 @@
 package com.gommit.domain.report;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -10,6 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.gommit.support.IntegrationTestSupport;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -190,6 +193,11 @@ class ReportApiIntegrationTest extends IntegrationTestSupport {
         Integer balance =
                 jdbcTemplate.queryForObject("SELECT balance FROM user_points WHERE user_id = ?", Integer.class, userId);
         return balance == null ? 0 : balance;
+    }
+
+    private List<Map<String, Object>> pointHistoriesOf(Long userId) {
+        return jdbcTemplate.queryForList(
+                "SELECT reason, amount, balance_after FROM user_point_histories WHERE user_id = ? ORDER BY id", userId);
     }
 
     private Long ownerIdOf(Long groupId) {
@@ -969,6 +977,84 @@ class ReportApiIntegrationTest extends IntegrationTestSupport {
 
             assertThat(activePenaltyCountOf(reportId)).isZero();
             login(TARGET_EMAIL).andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("인용하면 압수한 포인트가 돌아온다")
+        void acceptRefundsForfeitedPoints() throws Exception {
+            var target = loginAs(TARGET_EMAIL, TARGET_NICKNAME);
+            Long targetId = userIdOf(TARGET_EMAIL);
+            givePoints(targetId, 500);
+            Long reportId = acceptWith(pointForfeit(200));
+            assertThat(balanceOf(targetId)).isEqualTo(300);
+
+            Long appealId = submitAppealAndGetId(target.accessToken(), reportId);
+            var admin = loginAsAdmin();
+            decideAppeal(admin.accessToken(), appealId, true).andExpect(status().isOk());
+
+            assertThat(balanceOf(targetId)).isEqualTo(500);
+        }
+
+        @Test
+        @DisplayName("잔액이 모자라 덜 깎였으면 깎인 만큼만 돌아온다")
+        void acceptRefundsOnlyWhatWasTaken() throws Exception {
+            var target = loginAs(TARGET_EMAIL, TARGET_NICKNAME);
+            Long targetId = userIdOf(TARGET_EMAIL);
+            givePoints(targetId, 50);
+            Long reportId = acceptWith(pointForfeit(200));
+            assertThat(balanceOf(targetId)).isZero();
+
+            Long appealId = submitAppealAndGetId(target.accessToken(), reportId);
+            var admin = loginAsAdmin();
+            decideAppeal(admin.accessToken(), appealId, true).andExpect(status().isOk());
+
+            assertThat(balanceOf(targetId)).isEqualTo(50);
+        }
+
+        @Test
+        @DisplayName("압수와 환급이 포인트 이력에 사유와 잔액까지 남는다")
+        void refundLeavesPointHistory() throws Exception {
+            var target = loginAs(TARGET_EMAIL, TARGET_NICKNAME);
+            Long targetId = userIdOf(TARGET_EMAIL);
+            givePoints(targetId, 500);
+            Long reportId = acceptWith(pointForfeit(200));
+
+            Long appealId = submitAppealAndGetId(target.accessToken(), reportId);
+            var admin = loginAsAdmin();
+            decideAppeal(admin.accessToken(), appealId, true).andExpect(status().isOk());
+
+            assertThat(pointHistoriesOf(targetId))
+                    .extracting("reason", "amount", "balance_after")
+                    .containsExactly(tuple("PENALTY_FORFEIT", -200, 300), tuple("PENALTY_REFUND", 200, 500));
+        }
+
+        @Test
+        @DisplayName("한 푼도 못 깎았으면 포인트 이력이 남지 않는다")
+        void noPointHistoryWhenNothingWasTaken() throws Exception {
+            var target = loginAs(TARGET_EMAIL, TARGET_NICKNAME);
+            Long targetId = userIdOf(TARGET_EMAIL);
+            Long reportId = acceptWith(pointForfeit(200));
+
+            Long appealId = submitAppealAndGetId(target.accessToken(), reportId);
+            var admin = loginAsAdmin();
+            decideAppeal(admin.accessToken(), appealId, true).andExpect(status().isOk());
+
+            assertThat(pointHistoriesOf(targetId)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("기각하면 압수한 포인트도 그대로다")
+        void rejectKeepsForfeitedPoints() throws Exception {
+            var target = loginAs(TARGET_EMAIL, TARGET_NICKNAME);
+            Long targetId = userIdOf(TARGET_EMAIL);
+            givePoints(targetId, 500);
+            Long reportId = acceptWith(pointForfeit(200));
+
+            Long appealId = submitAppealAndGetId(target.accessToken(), reportId);
+            var admin = loginAsAdmin();
+            decideAppeal(admin.accessToken(), appealId, false).andExpect(status().isOk());
+
+            assertThat(balanceOf(targetId)).isEqualTo(300);
         }
 
         @Test

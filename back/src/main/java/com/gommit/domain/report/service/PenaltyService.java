@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PenaltyService {
 
     private static final String FORFEIT_SOURCE = "제재 포인트 압수";
+    private static final String REFUND_SOURCE = "이의제기 인용 환급";
 
     private final PenaltyRepository penaltyRepository;
     private final PersonalPointService personalPointService;
@@ -62,7 +63,7 @@ public class PenaltyService {
         penalties.stream().filter(penalty -> !penalty.isRevoked()).forEach(penalty -> {
             penalty.revoke();
             if (penalty.getPenaltyType() == PenaltyType.POINT_FORFEIT) {
-                // TODO: 압수한 포인트 복구
+                refund(penalty);
             }
         });
         return penalties;
@@ -101,6 +102,14 @@ public class PenaltyService {
         penalty.recordForfeited(actual);
         if (actual > 0) {
             personalPointService.deduct(userId, actual, UserPointReason.PENALTY_FORFEIT, FORFEIT_SOURCE);
+        }
+    }
+
+    // 압수한 포인트를 다시 돌려준다
+    private void refund(Penalty penalty) {
+        if (penalty.getAmount() > 0) {
+            personalPointService.refund(
+                    penalty.getUserId(), penalty.getAmount(), UserPointReason.PENALTY_REFUND, REFUND_SOURCE);
         }
     }
 
