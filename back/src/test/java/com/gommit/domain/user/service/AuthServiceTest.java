@@ -10,6 +10,7 @@ import com.gommit.domain.user.UserFixture;
 import com.gommit.domain.user.dto.request.LoginRequest;
 import com.gommit.domain.user.dto.request.SignUpRequest;
 import com.gommit.domain.user.dto.response.LoginResponse;
+import com.gommit.domain.user.dto.response.UserProfileResponse;
 import com.gommit.domain.user.entity.User;
 import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
@@ -36,10 +37,16 @@ class AuthServiceTest {
     private RefreshTokenService refreshTokenService;
 
     @Mock
+    private EmailVerificationService emailVerificationService;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
     private JwtProvider jwtProvider;
+
+    @Mock
+    private UserService userService;
 
     @InjectMocks
     private AuthService authService;
@@ -99,6 +106,7 @@ class AuthServiceTest {
         given(passwordEncoder.matches(anyString(), anyString())).willReturn(true);
         given(jwtProvider.issue(anyLong(), anyString())).willReturn("access-token");
         given(refreshTokenService.issue(user)).willReturn("refresh-token");
+        given(userService.toUserProfileResponse(user)).willReturn(new UserProfileResponse(user, 0));
 
         LoginResponse response = authService.login(new LoginRequest("gommit@example.com", UserFixture.RAW_PASSWORD));
 

@@ -1,7 +1,7 @@
 name: Deploy Backend
 
 # main 에 백엔드/인프라 변경이 머지되면 이미지 빌드 → GHCR → EC2 배포.
-# 프론트는 Cloudflare Pages Git 연동이 자체 처리하므로 여기 없음.
+# 프론트는 별도 워크플로(deploy-front.yml)가 처리 — Cloudflare 쪽 Git 연동이 끊겨 대체
 on:
   push:
     branches: [main]
@@ -37,7 +37,6 @@ jobs:
           # GHCR 는 소문자만 허용 → 리포 경로를 소문자로
           echo "image=ghcr.io/${GITHUB_REPOSITORY,,}/back" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-qemu-action@v3 # arm64 크로스 빌드
       - uses: docker/setup-buildx-action@v3
 
       - uses: docker/login-action@v3
@@ -50,7 +49,7 @@ jobs:
         with:
           context: ./back
           file: ./infra/docker/Dockerfile
-          platforms: linux/arm64
+          platforms: linux/amd64
           push: true
           tags: |
             ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}

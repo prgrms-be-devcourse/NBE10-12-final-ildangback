@@ -10,7 +10,7 @@
 | 항목 | 발급처 | 쓰이는 곳 |
 |---|---|---|
 | AWS IAM 사용자 (인프라 담당자) | 강의 AWS 계정 | `terraform apply`, 수동 조작 |
-| Cloudflare 계정 + 존 | cloudflare.com | DNS, Pages, Origin CA |
+| Cloudflare 계정 + 존 | cloudflare.com | DNS, Workers, Origin CA |
 | Cloudflare API 토큰 (Zone.DNS 편집) | CF 대시보드 → My Profile → API Tokens | `terraform.tfvars` |
 | 도메인 | Cloudflare Registrar (권장) | — |
 | GitHub 리포 관리자 권한 | — | Actions Secrets 등록 |
@@ -108,11 +108,18 @@ docker compose up -d
 docker compose ps
 ```
 
-### 1-5. Cloudflare Pages (프론트)
+### 1-5. Cloudflare Workers (프론트) — Pages 아님, 대시보드가 통합돼 신규 프로젝트는 기본 Workers
 
-1. Pages → Create → Connect to Git → 리포 선택.
+> Git 연동(Workers Builds)이 끊긴 상태라 지금은 `.github/workflows/deploy-front.yml`
+> (GitHub Actions, `wrangler deploy`)로 배포함 — `infra-design.md` Q8 참고. 아래는 연동
+> 복구 시 참고용 원래 절차.
+
+1. Workers & Pages → Create → Connect to Git → 리포 선택.
 2. Build: root `front`, command `pnpm build`, output `dist`, Node 20+.
-3. 환경변수: `VITE_API_BASE_URL=https://api.go-mmit.site` (프론트 코드 기준으로 조정).
+3. 환경변수: `VITE_API_BASE_URL=https://api.go-mmit.site` — `front/.env.production` 은
+   커밋하지 않음(관례상 `.env.example` 외 `.env*` 파일은 git에 안 넣음). Cloudflare 대시보드의
+   프로젝트 환경변수로 직접 등록해야 함. 지금 쓰는 GitHub Actions 경로(`deploy-front.yml`)는
+   같은 값을 repo variable `vars.VITE_API_BASE_URL` 로 등록해 빌드 직전에 주입한다.
 4. Custom domains → `go-mmit.site` 추가 → Cloudflare 가 apex 레코드 자동 생성.
 
 ### 1-6. 확인
@@ -157,7 +164,8 @@ sudo -u ec2-user bash /opt/team1-app/deploy.sh <이전-12자-SHA> <이전-풀-SH
 ## 4. DB 백업 / 복구
 
 - **자동**: 호스트 cron 이 매일 04:20 `backup.sh` → `/opt/team1-app/backups/gommit-YYYYMMDD-HHMM.sql.gz`, 7일 보관.
-- **자동 2차**: DLM 이 매일 18:30 루트 EBS 볼륨 스냅샷, 7일 보관.
+- 볼륨 단위 자동 스냅샷(DLM)은 계정 규칙상 부수 서비스 결재 회피를 위해 제외했다.
+  필요 시 EC2 콘솔에서 루트 볼륨 스냅샷을 수동으로 찍을 수 있다.
 
 ### 논리 복구 (mysqldump 에서)
 
@@ -168,10 +176,11 @@ gunzip -c backups/gommit-YYYYMMDD-HHMM.sql.gz | \
 docker compose restart back
 ```
 
-### 볼륨 복구 (EBS 스냅샷에서)
+### 볼륨 복구 (수동 스냅샷에서)
 
-인스턴스 교체가 필요한 수준의 사고일 때. EC2 콘솔에서 스냅샷 → 볼륨 생성 → 루트 교체,
-또는 `terraform taint aws_instance.app && terraform apply` 후 논리 복구.
+인스턴스 교체가 필요한 수준의 사고일 때. 수동으로 찍어둔 스냅샷이 있으면 EC2 콘솔에서
+스냅샷 → 볼륨 생성 → 루트 교체. 없으면 `terraform taint aws_instance.app && terraform apply`
+로 인스턴스를 새로 만든 뒤 mysqldump 백업에서 논리 복구.
 
 > **규칙**: DB 를 초기화(wipe)하면 미디어 스토리지도 함께 정리한다 (Cloudinary 폴더 / 로컬 dir).
 > 안 그러면 고아 파일이 쌓인다. — `infra/docs/infra-design.md`, 미디어 설계 메모.
@@ -255,5 +264,5 @@ IAM 을 나눠줄 수 없어 SSM 을 못 쓰는 운영자 1인 전용. 그 외�
 cd infra/terraform && terraform destroy
 ```
 
-- Cloudflare Pages 프로젝트 삭제, 도메인 갱신 해제(자동갱신 off).
+- Cloudflare Workers 프로젝트 삭제, 도메인 갱신 해제(자동갱신 off).
 - GHCR 패키지 삭제.

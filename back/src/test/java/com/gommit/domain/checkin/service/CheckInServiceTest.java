@@ -102,6 +102,9 @@ class CheckInServiceTest {
     @Mock
     private ChallengeGroupRepository challengeGroupRepository;
 
+    @Mock
+    private DailyLogService dailyLogService;
+
     private final PointProperties pointProperties = new PointProperties(10, 5, 0, 0);
 
     private CheckInService service;
@@ -120,7 +123,8 @@ class CheckInServiceTest {
                 challengeStreakService,
                 challengeGroupRepository,
                 pointProperties,
-                new BusinessClock(clock));
+                new BusinessClock(clock),
+                dailyLogService);
         lenient().when(userService.findNicknames(anyList())).thenReturn(Map.of(USER_ID, "인증러"));
         lenient().when(challengeGroupRepository.findNameById(1L)).thenReturn(Optional.of("오운완 모임"));
     }

@@ -89,6 +89,10 @@ public class PersonalPointService {
         return SliceResponse.ofCursor(content, size, UserPointHistoryResponse::id);
     }
 
+    public List<UserPointHistory> getRecentHistories(Long userId, int size) {
+        return userPointHistoryRepository.findHistories(userId, null, null, null, null, null, PageRequest.of(0, size));
+    }
+
     public UserPointHistoryResponse getMyHistoryDetail(Long userId, Long historyId) {
         UserPointHistory history = userPointHistoryRepository
                 .findById(historyId)

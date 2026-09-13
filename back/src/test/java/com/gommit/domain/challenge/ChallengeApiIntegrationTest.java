@@ -10,8 +10,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.gommit.domain.challenge.entity.ChallengeMemberRole;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
+import com.gommit.domain.challenge.service.ChallengeService;
 import com.gommit.support.IntegrationTestSupport;
+import jakarta.persistence.EntityManagerFactory;
 import java.time.LocalDate;
+import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -22,6 +25,12 @@ import org.springframework.test.web.servlet.ResultActions;
 
 @DisplayName("챌린지 API")
 class ChallengeApiIntegrationTest extends IntegrationTestSupport {
+
+    @Autowired
+    private ChallengeService challengeService;
+
+    @Autowired
+    private EntityManagerFactory entityManagerFactory;
 
     private static final String EMAIL = "gommit@example.com";
     private static final String NICKNAME = "꼬밋러";
@@ -125,6 +134,70 @@ class ChallengeApiIntegrationTest extends IntegrationTestSupport {
     class ChallengeStatus {
 
         @Test
+        @DisplayName("누적 전원 성공일을 반환하며 날짜 수와 무관하게 상세 조회 SQL은 7회다")
+        void returnsCompletedDaysWithConstantQueryCount() throws Exception {
+            var owner = loginAs(EMAIL, NICKNAME);
+            var other = loginAs("other@example.com", "다른멤버");
+            Long ownerId = userIdOf(EMAIL);
+            Long otherId = userIdOf("other@example.com");
+            Long challengeId = createGroupAndReturnChallengeId(owner.accessToken(), ownerId);
+            Long groupId = latestGroupIdOf(ownerId);
+            joinGroup(other.accessToken(), groupId).andExpect(status().isCreated());
+            LocalDate start = LocalDate.now().minusDays(20);
+            LocalDate end = start.plusDays(10);
+            jdbcTemplate.update(
+                    "update challenges set start_date = ?, end_date = ?, status = 'ENDED', "
+                            + "daily_check_in_count = 2, required_day_count = 11 where id = ?",
+                    start,
+                    end,
+                    challengeId);
+            jdbcTemplate.update(
+                    "update challenge_members set created_at = ? where challenge_id = ?",
+                    start.minusDays(1).atStartOfDay(),
+                    challengeId);
+            for (int day = 0; day < 11; day++) {
+                LocalDate date = start.plusDays(day);
+                seedCheckIn(challengeId, ownerId, date, 1);
+                seedCheckIn(challengeId, ownerId, date, 2);
+                seedCheckIn(challengeId, otherId, date, 1);
+                if (day < 8) seedCheckIn(challengeId, otherId, date, 2);
+            }
+            // 현재 이탈한 멤버도 과거 인증 대상에서 제외하면 안 된다.
+            jdbcTemplate.update(
+                    "update challenge_members set status = 'LEFT', left_at = ? where challenge_id = ? and user_id = ?",
+                    end.plusDays(1).atTime(12, 0),
+                    challengeId,
+                    otherId);
+            // 시즌 밖/미래 기록은 전원이 채웠어도 제외한다.
+            for (LocalDate date : java.util.List.of(
+                    start.minusDays(2), end.plusDays(1), LocalDate.now().plusDays(1))) {
+                for (Long userId : java.util.List.of(ownerId, otherId)) {
+                    seedCheckIn(challengeId, userId, date, 1);
+                    seedCheckIn(challengeId, userId, date, 2);
+                }
+            }
+
+            getChallengeStatus(owner.accessToken(), challengeId)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.challenge.groupCompletedDayCount").value(8));
+
+            var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+            boolean wasEnabled = statistics.isStatisticsEnabled();
+            statistics.setStatisticsEnabled(true);
+            try {
+                statistics.clear();
+                assertThat(challengeService
+                                .getChallengeStatus(challengeId, ownerId)
+                                .challenge()
+                                .groupCompletedDayCount())
+                        .isEqualTo(8);
+                assertThat(statistics.getPrepareStatementCount()).isEqualTo(7);
+            } finally {
+                statistics.setStatisticsEnabled(wasEnabled);
+            }
+        }
+
+        @Test
         @DisplayName("미인증이면 401")
         void requiresAuthentication() throws Exception {
             mockMvc.perform(get("/api/challenges/1"))
@@ -143,6 +216,7 @@ class ChallengeApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.challenge.id").value(challengeId))
                     .andExpect(jsonPath("$.challenge.ownerId").value(ownerId))
+                    .andExpect(jsonPath("$.challenge.groupCompletedDayCount").value(0))
                     .andExpect(jsonPath("$.totalDays").value(7))
                     .andExpect(jsonPath("$.participantCount").value(1))
                     .andExpect(jsonPath("$.myCurrentCount").value(0));
@@ -159,6 +233,18 @@ class ChallengeApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.code").value("CHALLENGE_NOT_MEMBER"));
         }
+    }
+
+    private void seedCheckIn(Long challengeId, Long userId, LocalDate date, int round) {
+        jdbcTemplate.update(
+                "insert into check_ins (challenge_id, user_id, round_no, check_in_type, media_key, media_type, "
+                        + "business_date, created_at, updated_at) values (?, ?, ?, 'PHOTO', 'test.webp', 'IMAGE', ?, ?, ?)",
+                challengeId,
+                userId,
+                round,
+                date,
+                date.atTime(10 + round, 0),
+                date.atTime(10 + round, 0));
     }
 
     @Nested

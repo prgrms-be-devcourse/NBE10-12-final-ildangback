@@ -8,6 +8,8 @@ interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   counter?: string;
   /** 비밀번호 보기 토글을 붙인다. */
   revealable?: boolean;
+  /** 라벨을 화면에서 숨기되 스크린리더에는 남긴다. 옆 맥락으로 뭔지 뻔한 단독 인풋에 쓴다. */
+  hideLabel?: boolean;
 }
 
 export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
@@ -17,6 +19,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
       error,
       counter,
       revealable = false,
+      hideLabel = false,
       type = "text",
       className = "",
       ...props
@@ -31,7 +34,11 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
       <div className={className}>
         <label
           htmlFor={id}
-          className="mb-2 block text-[13px] font-semibold text-gray-900"
+          className={
+            hideLabel
+              ? "sr-only"
+              : "mb-2 block text-[13px] font-semibold text-gray-900"
+          }
         >
           {label}
         </label>

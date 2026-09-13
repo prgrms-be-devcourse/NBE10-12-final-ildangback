@@ -20,9 +20,8 @@ import com.gommit.domain.user.service.UserService;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
+import com.gommit.global.time.BusinessClock;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -49,6 +48,7 @@ public class UserItemService {
     private final ChallengeGroupRepository challengeGroupRepository;
     private final ChallengeMemberRepository challengeMemberRepository;
     private final UserService userService;
+    private final BusinessClock businessClock;
 
     // 아이템 착용
     @Transactional
@@ -163,9 +163,8 @@ public class UserItemService {
         return responseList;
     }
 
-    // TODO: 체크인 도메인이 머지되면 BusinessDateUtil 사용 예정
     private LocalDate businessDate() {
-        return LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusHours(4).toLocalDate();
+        return businessClock.today();
     }
 
     // 여러 유저 캐릭터 조회(DEFAULT 자세 고정)

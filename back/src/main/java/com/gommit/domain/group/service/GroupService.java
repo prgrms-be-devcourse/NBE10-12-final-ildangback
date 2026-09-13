@@ -442,6 +442,81 @@ public class GroupService {
                 .ifPresent(ChallengeMember::kick);
     }
 
+    // 회원 탈퇴 시 그룹 정리
+    @Transactional
+    public void leaveAllGroupsOnAccountDeletion(Long userId) {
+        List<GroupMember> groupMembers =
+                groupMemberRepository.findAllByUserIdAndStatus(userId, GroupMemberStatus.ACTIVE);
+        for (GroupMember groupMember : groupMembers) {
+            groupMember.leave();
+            ChallengeGroup group = groupMember.getGroup();
+            boolean ownerLeaving = group.getOwnerId().equals(userId);
+            Long newOwnerId = ownerLeaving ? pickNewOwner(group.getId(), userId) : null;
+            leaveChallengesOnAccountDeletion(group.getId(), userId, newOwnerId);
+            if (!ownerLeaving) {
+                continue;
+            }
+            if (newOwnerId == null) {
+                group.end();
+            } else {
+                group.changeOwner(newOwnerId);
+            }
+        }
+    }
+
+    // 새 방장 선정
+    private Long pickNewOwner(Long groupId, Long userId) {
+        List<GroupMember> remainingMembers =
+                groupMemberRepository.findAllByGroupIdAndStatus(groupId, GroupMemberStatus.ACTIVE).stream()
+                        .filter(member -> !member.getUserId().equals(userId))
+                        .toList();
+        return remainingMembers.isEmpty()
+                ? null
+                : remainingMembers
+                        .get(SECURE_RANDOM.nextInt(remainingMembers.size()))
+                        .getUserId();
+    }
+
+    // 살아 있는 시즌 정리
+    private void leaveChallengesOnAccountDeletion(Long groupId, Long userId, Long preferredOwnerId) {
+        for (ChallengeStatus status : List.of(ChallengeStatus.ACTIVE, ChallengeStatus.READY)) {
+            challengeRepository
+                    .findFirstByGroupIdAndStatus(groupId, status)
+                    .ifPresent(challenge -> leaveChallengeMemberAndDelegate(challenge, userId, preferredOwnerId));
+        }
+    }
+
+    // 시즌 이탈과 OWNER 이관
+    private void leaveChallengeMemberAndDelegate(Challenge challenge, Long userId, Long preferredOwnerId) {
+        ChallengeMember leavingMember = challengeMemberRepository
+                .findByChallengeIdAndUserId(challenge.getId(), userId)
+                .filter(member -> member.getStatus() == ChallengeMemberStatus.ACTIVE)
+                .orElse(null);
+        if (leavingMember == null) {
+            return;
+        }
+        leavingMember.leave();
+        if (leavingMember.getRole() != ChallengeMemberRole.OWNER) {
+            return;
+        }
+        leavingMember.changeRole(ChallengeMemberRole.MEMBER);
+        List<ChallengeMember> remainingMembers =
+                challengeMemberRepository
+                        .findAllByChallengeIdAndStatus(challenge.getId(), ChallengeMemberStatus.ACTIVE)
+                        .stream()
+                        .filter(member -> !member.getUserId().equals(userId))
+                        .toList();
+        if (remainingMembers.isEmpty()) {
+            challenge.end();
+            return;
+        }
+        ChallengeMember newOwner = remainingMembers.stream()
+                .filter(member -> member.getUserId().equals(preferredOwnerId))
+                .findFirst()
+                .orElseGet(() -> remainingMembers.get(SECURE_RANDOM.nextInt(remainingMembers.size())));
+        newOwner.changeRole(ChallengeMemberRole.OWNER);
+    }
+
     @Transactional
     public GroupJoinResponse joinGroupByInviteCode(String inviteCode, Long userId) {
         ChallengeGroup group = challengeGroupRepository

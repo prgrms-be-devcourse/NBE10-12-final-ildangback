@@ -59,6 +59,7 @@ public class CheckInService {
     private final ChallengeGroupRepository challengeGroupRepository;
     private final PointProperties pointProperties;
     private final BusinessClock businessClock;
+    private final DailyLogService dailyLogService;
 
     public TodayCheckInStatusResponse getTodayStatus(Long userId, Long challengeId) {
         Challenge challenge = preconditions.getActiveChallengeForActiveMember(challengeId, userId);
@@ -111,6 +112,10 @@ public class CheckInService {
 
         // 미디어는 이미 스토리지에 올라갔다. 아래 후처리에서 예외가 나면 @Transactional 이 CheckIn 행은 롤백하지만
         // 파일은 남으므로, uk_check_ins 위반 처리와 같이 best-effort 로 정리하고 되던진다.
+
+        // 첫 체크인시 DailyLog row 확보, 전원 완료 시 몽타주 생성 이벤트 발행 (몽타주 생성은 현 트랜잭션 커밋 후 비동기로 처리됨)
+        dailyLogService.recordCheckIn(challenge, businessDate);
+
         String sourceName =
                 challengeGroupRepository.findNameById(challenge.getGroupId()).orElse("인증");
         int earnedUserPoints = pointProperties.checkInReward();

@@ -47,15 +47,28 @@ public class CloudinaryStorageService implements StorageService {
 
     @Override
     public StorageResult store(MultipartFile file, MediaRole mediaRole) {
-        StoragePolicy policy = properties.policyFor(mediaRole);
         MediaContentType contentType = MediaContentType.fromMimeType(file.getContentType())
                 .orElseThrow(() -> new BusinessException(ErrorCode.UNSUPPORTED_MEDIA_TYPE));
+        try {
+            return upload(file.getBytes(), contentType, mediaRole);
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.MEDIA_STORAGE_FAILED);
+        }
+    }
 
+    // 서버 생성 바이트 저장(업로드 아님) — DailyLog 몽타주처럼 사용자 파일이 아닌 콘텐츠.
+    @Override
+    public StorageResult storeGenerated(byte[] content, MediaContentType contentType, MediaRole mediaRole) {
+        return upload(content, contentType, mediaRole);
+    }
+
+    private StorageResult upload(byte[] content, MediaContentType contentType, MediaRole mediaRole) {
+        StoragePolicy policy = properties.policyFor(mediaRole);
         try {
             Map<?, ?> result = cloudinary
                     .uploader()
                     .upload(
-                            file.getBytes(),
+                            content,
                             ObjectUtils.asMap(
                                     "folder",
                                     uploadFolderFor(policy),

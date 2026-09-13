@@ -45,7 +45,7 @@ jobs:
 
       # 막는 것: 설계 불변식이 조용히 깨지는 것 —
       #   SG 에 22/0.0.0.0/0 개방, 인스턴스 타입 변경, IMDSv2 해제, 루트 볼륨 미암호화,
-      #   user_data_replace_on_change=true, 자동기동 크론/타임존 어긋남, DLM 비활성, DNS proxied 해제.
+      #   user_data_replace_on_change=true, 자동기동 크론/타임존 어긋남, DNS proxied 해제.
       #   (tests/infra.tftest.hcl, mock_provider 라 자격증명·비용 없음)
       - name: test
         run: terraform test -no-color

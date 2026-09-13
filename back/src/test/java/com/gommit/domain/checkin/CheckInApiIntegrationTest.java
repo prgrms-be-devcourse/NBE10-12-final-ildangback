@@ -10,6 +10,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.gommit.domain.checkin.dto.request.SubmitCheckInRequest;
 import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.domain.checkin.service.CheckInService;
+import com.gommit.domain.media.entity.MediaRole;
+import com.gommit.domain.media.service.StorageService;
+import com.gommit.domain.media.support.MediaContentType;
 import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.support.IntegrationTestSupport;
@@ -52,6 +55,9 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
 
     @Autowired
     private CheckInService checkInService;
+
+    @Autowired
+    private StorageService storageService;
 
     // 통합 테스트가 실제 파일을 쓰므로, orphan 여부를 검증할 수 있도록 매 테스트 전에 미디어 디렉토리를 비운다.
     @BeforeEach
@@ -669,6 +675,25 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.code").value("CHALLENGE_NOT_FOUND"));
         }
+
+        @Test
+        @DisplayName("month 필터 — 해당 월만 준다")
+        void filtersByMonth() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+            long challengeId = setUpChallenge(EMAIL, 3);
+            submit(challengeId, tokens.accessToken());
+            long checkInId =
+                    jdbcTemplate.queryForObject("select id from check_ins order by id desc limit 1", Long.class);
+            jdbcTemplate.update(
+                    "update check_ins set business_date = ? where id = ?",
+                    LocalDate.now().minusMonths(1).withDayOfMonth(10),
+                    checkInId);
+
+            String thisMonth = java.time.YearMonth.now().toString();
+            mockMvc.perform(withToken(get("/api/users/me/check-ins").param("month", thisMonth), tokens.accessToken()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content.length()").value(0));
+        }
     }
 
     @Nested
@@ -751,6 +776,163 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
             assertThat(pointRows).isZero();
             // 트랜잭션 롤백은 CheckIn 행만 지운다. 업로드된 파일은 서비스가 best-effort 로 정리해 orphan 이 없어야 한다.
             assertThat(countMediaFiles()).isZero();
+        }
+    }
+
+    @Nested
+    @DisplayName("일일로그 조회")
+    class DailyLogQuery {
+
+        private long dailyLogIdOf(long challengeId) {
+            return jdbcTemplate.queryForObject(
+                    "select id from daily_logs where challenge_id = ? order by id desc limit 1",
+                    Long.class,
+                    challengeId);
+        }
+
+        @Test
+        @DisplayName("목록 — 활동 있던 날만 나열하고 completedCount/totalCount 를 준다")
+        void listsDailyLogs() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+            long challengeId = setUpChallenge(EMAIL, 2);
+            submit(challengeId, tokens.accessToken());
+            long dailyLogId = dailyLogIdOf(challengeId);
+
+            mockMvc.perform(withToken(
+                            get("/api/challenges/{challengeId}/daily-logs", challengeId), tokens.accessToken()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content.length()").value(1))
+                    .andExpect(jsonPath("$.content[0].id").value(dailyLogId))
+                    .andExpect(jsonPath("$.content[0].completedCount").value(0))
+                    .andExpect(jsonPath("$.content[0].totalCount").value(1))
+                    .andExpect(jsonPath("$.content[0].videoUrl").value(Matchers.nullValue()))
+                    .andExpect(jsonPath("$.hasNext").value(false));
+        }
+
+        @Test
+        @DisplayName("목록 — month 필터 (해당 월만) / 형식 오류 400")
+        void listsDailyLogsMonthFilter() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+            long challengeId = setUpChallenge(EMAIL, 2);
+            submit(challengeId, tokens.accessToken());
+            long dailyLogId = dailyLogIdOf(challengeId);
+            jdbcTemplate.update(
+                    "update daily_logs set log_date = ? where id = ?",
+                    LocalDate.now().minusMonths(1).withDayOfMonth(10),
+                    dailyLogId);
+
+            String thisMonth = java.time.YearMonth.now().toString();
+            mockMvc.perform(withToken(
+                            get("/api/challenges/{challengeId}/daily-logs", challengeId)
+                                    .param("month", thisMonth),
+                            tokens.accessToken()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content.length()").value(0));
+
+            mockMvc.perform(withToken(
+                            get("/api/challenges/{challengeId}/daily-logs", challengeId)
+                                    .param("month", "2026/09"),
+                            tokens.accessToken()))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("단건 — 정상 / 없는 날짜 404 / 이탈일 이후 403")
+        void getDailyLog() throws Exception {
+            var owner = loginAs(EMAIL, NICKNAME);
+            long challengeId = setUpChallenge(EMAIL, 2);
+            submit(challengeId, owner.accessToken());
+            LocalDate today = LocalDate.now();
+
+            mockMvc.perform(withToken(
+                            get("/api/challenges/{challengeId}/daily-logs/{date}", challengeId, today),
+                            owner.accessToken()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.businessDate").value(today.toString()))
+                    .andExpect(jsonPath("$.completedCount").value(0))
+                    .andExpect(jsonPath("$.totalCount").value(1));
+
+            mockMvc.perform(withToken(
+                            get("/api/challenges/{challengeId}/daily-logs/{date}", challengeId, today.minusDays(1)),
+                            owner.accessToken()))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("DAILY_LOG_NOT_FOUND"));
+
+            var viewer = loginAs("viewer2@example.com", "이탈자2");
+            long viewerId = userIdOf("viewer2@example.com");
+            seedMember(challengeId, viewerId, "LEFT", today.minusDays(1));
+
+            mockMvc.perform(withToken(
+                            get("/api/challenges/{challengeId}/daily-logs/{date}", challengeId, today),
+                            viewer.accessToken()))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("CHALLENGE_NOT_MEMBER"));
+        }
+    }
+
+    @Nested
+    @DisplayName("일일로그 미디어 조회")
+    class DailyLogMediaServing {
+
+        private long dailyLogIdOf(long challengeId) {
+            return jdbcTemplate.queryForObject(
+                    "select id from daily_logs where challenge_id = ? order by id desc limit 1",
+                    Long.class,
+                    challengeId);
+        }
+
+        @Test
+        @DisplayName("참여자는 몽타주 영상을 받는다")
+        void memberDownloadsMontage() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+            long challengeId = setUpChallenge(EMAIL, 1);
+            submit(challengeId, tokens.accessToken());
+            long dailyLogId = dailyLogIdOf(challengeId);
+            String storageKey = storageService
+                    .storeGenerated(new byte[] {1, 2, 3}, MediaContentType.MP4, MediaRole.DAILYLOG)
+                    .storageKey();
+            jdbcTemplate.update("update daily_logs set video_key = ? where id = ?", storageKey, dailyLogId);
+
+            mockMvc.perform(withToken(get("/api/daily-logs/{id}/media", dailyLogId), tokens.accessToken()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().contentTypeCompatibleWith("video/mp4"));
+        }
+
+        @Test
+        @DisplayName("아직 몽타주가 없으면 404 MEDIA_NOT_FOUND")
+        void noMontageYet() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+            long challengeId = setUpChallenge(EMAIL, 1);
+            submit(challengeId, tokens.accessToken());
+            long dailyLogId = dailyLogIdOf(challengeId);
+
+            mockMvc.perform(withToken(get("/api/daily-logs/{id}/media", dailyLogId), tokens.accessToken()))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("MEDIA_NOT_FOUND"));
+        }
+
+        @Test
+        @DisplayName("비참여자가 접근하면 403 CHALLENGE_NOT_MEMBER")
+        void nonMemberRejected() throws Exception {
+            var owner = loginAs(EMAIL, NICKNAME);
+            long challengeId = setUpChallenge(EMAIL, 1);
+            submit(challengeId, owner.accessToken());
+            long dailyLogId = dailyLogIdOf(challengeId);
+            var outsider = loginAs("outsider2@example.com", "외부인2");
+
+            mockMvc.perform(withToken(get("/api/daily-logs/{id}/media", dailyLogId), outsider.accessToken()))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("CHALLENGE_NOT_MEMBER"));
+        }
+
+        @Test
+        @DisplayName("없는 일일로그면 404 DAILY_LOG_NOT_FOUND")
+        void unknownDailyLogRejected() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+
+            mockMvc.perform(withToken(get("/api/daily-logs/{id}/media", 999_999L), tokens.accessToken()))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("DAILY_LOG_NOT_FOUND"));
         }
     }
 }

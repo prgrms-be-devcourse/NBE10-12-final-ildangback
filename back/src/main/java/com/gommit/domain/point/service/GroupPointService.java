@@ -1,5 +1,7 @@
 package com.gommit.domain.point.service;
 
+import com.gommit.domain.group.entity.GroupMemberStatus;
+import com.gommit.domain.group.repository.GroupMemberRepository;
 import com.gommit.domain.point.dto.request.PeriodFilter;
 import com.gommit.domain.point.dto.request.PointChangeType;
 import com.gommit.domain.point.dto.response.GroupPointBalanceResponse;
@@ -20,7 +22,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// TODO(Point): 그룹 존재/멤버십 검증은 Group 도메인 구현 후 추가
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -28,6 +29,7 @@ public class GroupPointService {
 
     private final GroupPointHistoryRepository groupPointHistoryRepository;
     private final GroupPointRepository groupPointRepository;
+    private final GroupMemberRepository groupMemberRepository;
     private final PointPeriodCalculator periodCalculator;
 
     @Transactional
@@ -54,7 +56,8 @@ public class GroupPointService {
                 GroupPointHistory.of(groupId, sourceName, -amount, reason, point.getBalance()));
     }
 
-    public GroupPointBalanceResponse getBalance(Long groupId) {
+    public GroupPointBalanceResponse getBalance(Long groupId, Long requesterId) {
+        requireActiveMember(groupId, requesterId);
         int balance = groupPointRepository
                 .findByGroupId(groupId)
                 .map(GroupPoint::getBalance)
@@ -64,6 +67,7 @@ public class GroupPointService {
 
     public SliceResponse<GroupPointHistoryResponse> getHistories(
             Long groupId,
+            Long requesterId,
             PeriodFilter period,
             PointChangeType type,
             GroupPointReason reason,
@@ -71,6 +75,7 @@ public class GroupPointService {
             LocalDate to,
             Long cursor,
             int size) {
+        requireActiveMember(groupId, requesterId);
         LocalDateTime[] range = periodCalculator.toDateRange(period, from, to);
         List<GroupPointHistory> rows = groupPointHistoryRepository.findHistories(
                 groupId,
@@ -85,7 +90,8 @@ public class GroupPointService {
         return SliceResponse.ofCursor(content, size, GroupPointHistoryResponse::id);
     }
 
-    public GroupPointHistoryResponse getHistoryDetail(Long groupId, Long historyId) {
+    public GroupPointHistoryResponse getHistoryDetail(Long groupId, Long requesterId, Long historyId) {
+        requireActiveMember(groupId, requesterId);
         GroupPointHistory history = groupPointHistoryRepository
                 .findById(historyId)
                 .filter(h -> h.getGroupId().equals(groupId))
@@ -93,8 +99,14 @@ public class GroupPointService {
         return GroupPointHistoryResponse.from(history);
     }
 
-    // 그룹 하루 완료 판정(멤버 카운트 + 중복 가드)을 호출자 트랜잭션에서 직렬화하기 위해
-    // group_points 행을 미리 잠근다(없으면 0원으로 생성). 이후 같은 tx 의 reward 는 이 잠금을 재사용.
+    private void requireActiveMember(Long groupId, Long userId) {
+        boolean isActiveMember =
+                groupMemberRepository.existsByGroupIdAndUserIdAndStatus(groupId, userId, GroupMemberStatus.ACTIVE);
+        if (!isActiveMember) {
+            throw new BusinessException(ErrorCode.NOT_GROUP_MEMBER);
+        }
+    }
+
     @Transactional
     public void lockForGroupCompletion(Long groupId) {
         lockOrCreatePoint(groupId);

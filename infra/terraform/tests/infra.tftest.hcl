@@ -5,9 +5,13 @@
 # 각 run 블록은 "이 설정이 깨지면 무슨 사고가 나는가"를 error_message 에 적었다.
 
 mock_provider "aws" {
-  # 모의 apply 시 IAM 역할 ARN 이 유효한 형식이어야 scheduler/dlm 의 role_arn 검증을 통과.
+  # 모의 apply 시 IAM 역할 ARN 이 유효한 형식이어야 scheduler 의 role_arn 검증을 통과.
   mock_resource "aws_iam_role" {
     defaults = { arn = "arn:aws:iam::123456789012:role/mock" }
+  }
+  # GitHub OIDC provider 는 계정 싱글턴이라 data 로만 조회한다(iam.tf) — 실제 조회 대신 가짜 응답.
+  mock_data "aws_iam_openid_connect_provider" {
+    defaults = { arn = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com" }
   }
 }
 mock_provider "cloudflare" {}
@@ -81,8 +85,8 @@ run "instance_is_hardened_and_cheap" {
 
   # 막는 사고: 누가 instance_type 을 m5.large 등으로 올림 → 결재 없이 생성 불가 + 예산 초과.
   assert {
-    condition     = can(regex("^t4g[.]", aws_instance.app.instance_type))
-    error_message = "인스턴스 타입이 t4g(ARM 버스터블) 계열이 아니다. small 초과는 결재 필요, 월 8만원 예산도 위험 (design Q3)."
+    condition     = can(regex("^t3a[.]", aws_instance.app.instance_type))
+    error_message = "인스턴스 타입이 t3a(x86 버스터블) 계열이 아니다. medium 초과는 결재 필요, 월 8만원 예산도 위험 (design Q3)."
   }
 
   # 막는 사고: 누가 metadata_options 를 지움 → IMDSv1 허용 → SSRF 한 방으로 인스턴스 역할 크레덴셜 탈취.
@@ -91,10 +95,10 @@ run "instance_is_hardened_and_cheap" {
     error_message = "IMDSv2 가 강제되지 않는다. SSRF 취약점 하나로 SSM 역할 자격증명이 유출될 수 있다."
   }
 
-  # 막는 사고: 누가 encrypted 를 뺌 → 루트 볼륨·DLM 스냅샷이 평문 → 유출 시 DB·미디어 임시파일 노출.
+  # 막는 사고: 누가 encrypted 를 뺌 → 루트 볼륨이 평문 → 유출 시 DB·미디어 임시파일 노출.
   assert {
     condition     = aws_instance.app.root_block_device[0].encrypted == true
-    error_message = "루트 EBS 가 암호화되지 않는다. 스냅샷/볼륨 유출 시 평문."
+    error_message = "루트 EBS 가 암호화되지 않는다. 볼륨 유출 시 평문."
   }
 
   # 막는 사고: 누가 true 로 되돌림 → 부트스트랩 스크립트 한 줄만 고쳐도 인스턴스 재생성
@@ -125,18 +129,6 @@ run "auto_start_before_batch" {
   assert {
     condition     = aws_scheduler_schedule.ec2_start.schedule_expression_timezone == "Asia/Seoul"
     error_message = "스케줄 타임존이 Asia/Seoul 이 아니다. UTC 로 해석되면 기동 시각이 9시간 어긋난다."
-  }
-}
-
-# -----------------------------------------------------------------------------
-run "backup_policy_enabled" {
-  command = plan
-
-  # 막는 사고: 누가 state 를 DISABLED 로 두거나 정책을 지움 → EBS 스냅샷 없음
-  #           → mysqldump 도 실패한 날 사고 나면 복구 불가.
-  assert {
-    condition     = aws_dlm_lifecycle_policy.ebs_daily.state == "ENABLED"
-    error_message = "DLM 스냅샷 정책이 ENABLED 가 아니다. 볼륨 단위 2차 백업이 사라진다 (design Q13)."
   }
 }
 

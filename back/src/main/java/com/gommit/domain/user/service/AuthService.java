@@ -4,7 +4,6 @@ import com.gommit.domain.user.dto.request.LoginRequest;
 import com.gommit.domain.user.dto.request.SignUpRequest;
 import com.gommit.domain.user.dto.response.LoginResponse;
 import com.gommit.domain.user.dto.response.TokenResponse;
-import com.gommit.domain.user.dto.response.UserProfileResponse;
 import com.gommit.domain.user.dto.response.UserSummaryResponse;
 import com.gommit.domain.user.entity.User;
 import com.gommit.domain.user.repository.UserRepository;
@@ -12,6 +11,7 @@ import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import com.gommit.global.security.jwt.JwtProvider;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -24,8 +24,10 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final RefreshTokenService refreshTokenService;
+    private final EmailVerificationService emailVerificationService;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
+    private final UserService userService;
 
     // 회원가입
     @Transactional
@@ -42,10 +44,13 @@ public class AuthService {
 
         User user = new User(email, passwordEncoder.encode(request.password()), nickname);
         try {
-            return new UserSummaryResponse(userRepository.saveAndFlush(user));
-        } catch (DataIntegrityViolationException e) {
+            user = userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException | ConcurrencyFailureException e) {
             throw new BusinessException(ErrorCode.ACCOUNT_INFO_DUPLICATED);
         }
+
+        emailVerificationService.send(user);
+        return new UserSummaryResponse(user);
     }
 
     // 로그인
@@ -55,12 +60,12 @@ public class AuthService {
                 .findByEmailAndDeletedAtIsNull(request.email())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS));
 
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+        if (user.getPassword() == null || !passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
 
         TokenResponse tokens = new TokenResponse(issueAccessToken(user), refreshTokenService.issue(user));
-        return new LoginResponse(tokens, new UserProfileResponse(user));
+        return new LoginResponse(tokens, userService.toUserProfileResponse(user), false);
     }
 
     // 토큰 재발급

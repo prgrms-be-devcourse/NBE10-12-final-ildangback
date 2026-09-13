@@ -1,5 +1,6 @@
 import { XIcon } from "@phosphor-icons/react";
 import { useEffect, useRef } from "react";
+import { useBodyScrollLock } from "../lib/useBodyScrollLock";
 import { Button } from "./Button";
 
 interface Props {
@@ -16,19 +17,16 @@ interface Props {
 export function TermsModal({ isOpen, onClose, title, content }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
+  useBodyScrollLock(isOpen);
+
   useEffect(() => {
     const dialog = dialogRef.current;
     if (isOpen) {
       // StrictMode 가 effect 를 두 번 돌린다. 이미 열린 모달에 showModal 을 또 부르면 던진다.
       if (dialog && !dialog.open) dialog.showModal();
-      document.body.style.overflow = "hidden";
     } else {
       dialog?.close();
-      document.body.style.overflow = "";
     }
-    return () => {
-      document.body.style.overflow = "";
-    };
   }, [isOpen]);
 
   return (

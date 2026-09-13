@@ -38,6 +38,16 @@
  * 다크모드는 토큰만 정의하고 스위처는 만들지 않았다. 요구되면 그때 켠다.
  */
 
+/* 머지 결과 화면 챌린지명 전용 한글 픽셀 폰트. Press Start 2P는 한글이 없어서
+   대신 이걸 쓴다 (OFL, public/fonts/에 자체 호스팅). */
+@font-face {
+  font-family: "NeoDunggeunmo";
+  src: url("/fonts/neodgm.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
