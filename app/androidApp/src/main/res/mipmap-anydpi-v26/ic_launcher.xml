@@ -11,4 +11,10 @@
             android:drawable="@mipmap/ic_launcher_foreground"
             android:inset="8%" />
     </foreground>
+    <!-- 테마 아이콘용. 원본에서 어두운 픽셀만 남긴 실루엣이고 알파만 쓰인다 -->
+    <monochrome>
+        <inset
+            android:drawable="@mipmap/ic_launcher_monochrome"
+            android:inset="8%" />
+    </monochrome>
 </adaptive-icon>
