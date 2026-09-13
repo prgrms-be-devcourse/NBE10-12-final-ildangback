@@ -447,11 +447,10 @@ public class GroupService {
             throw new BusinessException(ErrorCode.NOT_GROUP_MEMBER);
         }
         targetMember.kick();
-        kickChallengeMember(activeChallenge.getId(), targetUserId);
+        kickChallengeMember(activeChallenge.getId(), targetUserId, group.getName());
         challengeRepository
                 .findFirstByGroupIdAndStatus(groupId, ChallengeStatus.READY)
-                .ifPresent(ready -> kickChallengeMember(ready.getId(), targetUserId));
-        kickChallengeMember(activeChallenge.getId(), targetUserId, group.getName());
+                .ifPresent(ready -> kickChallengeMember(ready.getId(), targetUserId, group.getName()));
 
         backgroundPurchaseService.recountVotes(groupId);
     }
