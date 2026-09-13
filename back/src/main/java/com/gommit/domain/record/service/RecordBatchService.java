@@ -103,8 +103,7 @@ public class RecordBatchService {
     private void publishMonthlyMerge(Challenge challenge, int seqNo, LocalDate periodStart, LocalDate periodEnd) {
         List<ChallengeMember> members = activeMembers(challenge.getId());
         if (members.isEmpty()) {
-            log.info(
-                    "월간 머지 스킵(ACTIVE 멤버 없음) - challengeId={}, seqNo={}", challenge.getId(), seqNo);
+            log.info("월간 머지 스킵(ACTIVE 멤버 없음) - challengeId={}, seqNo={}", challenge.getId(), seqNo);
             return;
         }
         MergeInputs inputs = collectMergeInputs(challenge, members, periodStart, periodEnd);

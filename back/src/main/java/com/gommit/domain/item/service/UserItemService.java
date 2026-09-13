@@ -123,7 +123,6 @@ public class UserItemService {
         return new CharacterResponse(toSlotMap(equippedItems, Pose.DEFAULT));
     }
 
-
     // 챌린지 멤버 캐릭터 조회
     public List<ChallengeCharacterResponse> getChallengeCharacters(Long challengeId, Long actorId) {
         Challenge challenge = challengeRepository
