@@ -808,6 +808,33 @@ class GroupServiceTest {
             assertThat(activeMember.getStatus()).isEqualTo(ChallengeMemberStatus.LEFT);
             verify(personalPointService).recoverChallengePoints(2L, 50L, "오운완 모임");
         }
+
+        @Test
+        @DisplayName("OWNER가 마지막 남은 멤버로서 탈퇴하면 챌린지를 종료한다")
+        void endsChallengeWhenLastOwnerLeaves() {
+            // given
+            ChallengeGroup group = group(12L, "오운완 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            Challenge activeChallenge = challenge(50L, 12L, ChallengeStatus.ACTIVE);
+            GroupMember groupMember = groupMember(30L, group, 1L);
+            ChallengeMember ownerMember = challengeMember(70L, activeChallenge, 1L, ChallengeMemberRole.OWNER);
+            when(groupMemberRepository.findAllByUserIdAndStatus(1L, GroupMemberStatus.ACTIVE))
+                    .thenReturn(List.of(groupMember));
+            when(groupMemberRepository.findAllByGroupIdAndStatus(12L, GroupMemberStatus.ACTIVE))
+                    .thenReturn(List.of());
+            when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.ACTIVE))
+                    .thenReturn(Optional.of(activeChallenge));
+            when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.READY))
+                    .thenReturn(Optional.empty());
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(ownerMember));
+            when(challengeMemberRepository.findAllByChallengeIdAndStatus(50L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(List.of());
+
+            // when
+            groupService.leaveAllGroupsOnAccountDeletion(1L);
+
+            // then
+            assertThat(activeChallenge.getStatus()).isEqualTo(ChallengeStatus.ENDED);
+        }
     }
 
     @Nested

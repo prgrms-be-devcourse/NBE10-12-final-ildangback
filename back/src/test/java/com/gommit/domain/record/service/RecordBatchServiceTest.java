@@ -22,6 +22,8 @@ import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.checkin.repository.CheckInRepository.UserBusinessDate;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
+import com.gommit.domain.item.entity.ItemSlot;
+import com.gommit.domain.item.service.UserItemService;
 import com.gommit.domain.point.config.PointProperties;
 import com.gommit.domain.point.entity.UserPointReason;
 import com.gommit.domain.point.repository.UserPointHistoryRepository;
@@ -30,6 +32,7 @@ import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.domain.record.entity.FinalMerge;
 import com.gommit.domain.record.entity.FinalMergeResult;
 import com.gommit.domain.record.entity.MonthlyMerge;
+import com.gommit.domain.record.entity.MonthlyMergeResult;
 import com.gommit.domain.record.repository.FinalMergeRepository;
 import com.gommit.domain.record.repository.FinalMergeResultRepository;
 import com.gommit.domain.record.repository.MonthlyMergeRepository;
@@ -41,6 +44,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -65,6 +69,9 @@ class RecordBatchServiceTest {
 
     @Mock
     private ChallengeGroupRepository challengeGroupRepository;
+
+    @Mock
+    private UserItemService userItemService;
 
     @Mock
     private CheckInRepository checkInRepository;
@@ -99,6 +106,7 @@ class RecordBatchServiceTest {
                 challengeRepository,
                 challengeMemberRepository,
                 challengeGroupRepository,
+                userItemService,
                 checkInRepository,
                 userPointHistoryRepository,
                 monthlyMergeRepository,
@@ -110,6 +118,9 @@ class RecordBatchServiceTest {
                 new ChallengeMergeCycleCalculator(),
                 new RecordCompletionCalculator(),
                 businessClock);
+
+        // 캐릭터 스냅샷은 대부분 테스트에서 신경 안 쓰는 값이라 기본은 빈 맵.
+        lenient().when(userItemService.getCharacters(anyList())).thenReturn(Map.of());
 
         // save()는 실제 DB에서는 IDENTITY 전략으로 엔티티에 id를 채워 넣는다(같은 인스턴스를
         // 리턴) - 목에서도 같은 동작을 흉내내야 이후 코드의 merge.getId() 호출이 유효하다.
@@ -231,6 +242,34 @@ class RecordBatchServiceTest {
             assertThat(saved.getTotalCheckInCount()).isEqualTo(3);
 
             verify(monthlyMergeResultRepository, times(2)).save(any());
+        }
+
+        @Test
+        @DisplayName("발행 시점 캐릭터 스냅샷이 결과에 같이 저장된다")
+        void savesCharacterSnapshotOnResult() {
+            LocalDate startDate = TODAY.minusDays(31);
+            Challenge challenge = challenge(1L, startDate, startDate.plusDays(179));
+            ChallengeMember member = member(10L, challenge, 100L);
+            when(challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE)).thenReturn(List.of(challenge));
+            when(monthlyMergeRepository.countByChallengeId(1L)).thenReturn(0);
+            when(monthlyMergeRepository.existsByChallengeIdAndSeqNo(1L, 1)).thenReturn(false);
+            when(challengeMemberRepository.findAllByChallengeIdAndStatus(1L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(List.of(member));
+            when(checkInRepository.findBusinessDatesByChallengeIdAndUserIdInAndBusinessDateBetween(
+                            any(), anyList(), any(), any()))
+                    .thenReturn(List.of());
+            when(userPointHistoryRepository.sumEarnedByChallengeIdAndUserIdInBetween(any(), anyList(), any(), any()))
+                    .thenReturn(List.of());
+            when(userItemService.getCharacters(List.of(100L)))
+                    .thenReturn(Map.of(100L, Map.of(ItemSlot.HEAD, "head.png", ItemSlot.TOP, "top.png")));
+
+            recordBatchService.generateDueMonthlyMerges();
+
+            ArgumentCaptor<MonthlyMergeResult> captor = ArgumentCaptor.forClass(MonthlyMergeResult.class);
+            verify(monthlyMergeResultRepository).save(captor.capture());
+            assertThat(captor.getValue().getHeadImageUrl()).isEqualTo("head.png");
+            assertThat(captor.getValue().getTopImageUrl()).isEqualTo("top.png");
+            assertThat(captor.getValue().getBottomImageUrl()).isNull();
         }
 
         @Test
@@ -460,6 +499,36 @@ class RecordBatchServiceTest {
                     .orElseThrow();
             assertThat(result100.getRanking()).isEqualTo(1);
             assertThat(result200.getRanking()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("밀린 월간 머지가 있으면 최종 머지 생성 전에 먼저 채운다")
+        void backfillsDueMonthlyMergesBeforeGeneratingFinalMerge() {
+            // given: 60일 챌린지, 1회차(30일)가 이미 끝났는데 아직 안 만들어진 상태.
+            // ChallengeLifecycleService가 먼저 ENDED로 넘겨서 generateFinalMerge만
+            // 불려도, 밀린 1회차 월간 머지가 같이 만들어져야 한다.
+            LocalDate startDate = TODAY.minusDays(65);
+            LocalDate endDate = startDate.plusDays(59);
+            Challenge challenge = challenge(1L, startDate, endDate);
+            ChallengeMember member = member(10L, challenge, 100L);
+            when(finalMergeRepository.existsByChallengeId(1L)).thenReturn(false);
+            when(challengeRepository.findById(1L)).thenReturn(Optional.of(challenge));
+            when(monthlyMergeRepository.countByChallengeId(1L)).thenReturn(0);
+            when(monthlyMergeRepository.existsByChallengeIdAndSeqNo(1L, 1)).thenReturn(false);
+            when(challengeMemberRepository.findAllByChallengeIdAndStatus(1L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(List.of(member));
+            when(checkInRepository.findBusinessDatesByChallengeIdAndUserIdInAndBusinessDateBetween(
+                            any(), anyList(), any(), any()))
+                    .thenReturn(List.of());
+            when(userPointHistoryRepository.sumEarnedByChallengeIdAndUserIdInBetween(any(), anyList(), any(), any()))
+                    .thenReturn(List.of());
+
+            // when
+            recordBatchService.generateFinalMerge(1L);
+
+            // then
+            verify(monthlyMergeRepository).save(any());
+            verify(finalMergeRepository).save(any());
         }
 
         @Test

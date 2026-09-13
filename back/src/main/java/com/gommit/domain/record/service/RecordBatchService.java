@@ -9,6 +9,8 @@ import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.checkin.repository.CheckInRepository.UserBusinessDate;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
+import com.gommit.domain.item.entity.ItemSlot;
+import com.gommit.domain.item.service.UserItemService;
 import com.gommit.domain.point.config.PointProperties;
 import com.gommit.domain.point.entity.UserPointReason;
 import com.gommit.domain.point.repository.UserPointHistoryRepository;
@@ -35,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,6 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 // RecordCompletionCalculator에 이미 짜여 있어서, 여기서는 대상을 찾고 체크인/포인트
 // 데이터를 뽑아 넘긴 뒤 결과를 저장하는 역할만 한다. (Should) 중도 탈퇴자는 그 시점 이미
 // 포인트가 회수되므로(PersonalPointService.recoverChallengePoints), 머지 집계 대상에서도 뺀다.
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RecordBatchService {
@@ -52,6 +56,7 @@ public class RecordBatchService {
     private final ChallengeRepository challengeRepository;
     private final ChallengeMemberRepository challengeMemberRepository;
     private final ChallengeGroupRepository challengeGroupRepository;
+    private final UserItemService userItemService;
     private final CheckInRepository checkInRepository;
     private final UserPointHistoryRepository userPointHistoryRepository;
     private final MonthlyMergeRepository monthlyMergeRepository;
@@ -68,7 +73,9 @@ public class RecordBatchService {
     @Transactional
     public void generateDueMonthlyMerges() {
         LocalDate today = businessClock.today();
-        for (Challenge challenge : challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE)) {
+        List<Challenge> activeChallenges = challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE);
+        log.info("월간 머지 배치 시작 - today={}, ACTIVE 챌린지 {}개", today, activeChallenges.size());
+        for (Challenge challenge : activeChallenges) {
             generateDueMonthlyMerges(challenge, today);
         }
     }
@@ -96,6 +103,8 @@ public class RecordBatchService {
     private void publishMonthlyMerge(Challenge challenge, int seqNo, LocalDate periodStart, LocalDate periodEnd) {
         List<ChallengeMember> members = activeMembers(challenge.getId());
         if (members.isEmpty()) {
+            log.info(
+                    "월간 머지 스킵(ACTIVE 멤버 없음) - challengeId={}, seqNo={}", challenge.getId(), seqNo);
             return;
         }
         MergeInputs inputs = collectMergeInputs(challenge, members, periodStart, periodEnd);
@@ -125,8 +134,19 @@ public class RecordBatchService {
                     stat.earnedPoints,
                     stat.contributionRate,
                     joinLabels(trend),
-                    joinCounts(trend)));
+                    joinCounts(trend),
+                    stat.characterSlots.get(ItemSlot.HEAD),
+                    stat.characterSlots.get(ItemSlot.TOP),
+                    stat.characterSlots.get(ItemSlot.BOTTOM),
+                    stat.characterSlots.get(ItemSlot.SHOES)));
         }
+        log.info(
+                "월간 머지 생성 완료 - challengeId={}, seqNo={}, periodStart={}, periodEnd={}, 참여자 {}명",
+                challenge.getId(),
+                seqNo,
+                periodStart,
+                periodEnd,
+                members.size());
     }
 
     // 챌린지를 ENDED로 바꾸는 트랜잭션 안에서 Challenge 도메인이 호출한다.
@@ -139,6 +159,10 @@ public class RecordBatchService {
         Challenge challenge = challengeRepository
                 .findById(challengeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_FOUND));
+        // 최종 머지를 만들기 전에 밀린 월간 회차부터 채운다. RecordScheduler와
+        // ChallengeLifecycleService(ENDED 전환)가 같은 크론이라 실행 순서가 보장 안
+        // 돼서, 여기서 안 챙기면 ENDED로 넘어가는 순간 밀린 월간 머지가 영영 안 만들어진다.
+        generateDueMonthlyMerges(challenge, businessClock.today());
         List<ChallengeMember> members = activeMembers(challengeId);
         if (members.isEmpty()) {
             return;
@@ -174,7 +198,11 @@ public class RecordBatchService {
                     stat.earnedPoints,
                     stat.contributionRate,
                     joinLabels(trend),
-                    joinCounts(trend)));
+                    joinCounts(trend),
+                    stat.characterSlots.get(ItemSlot.HEAD),
+                    stat.characterSlots.get(ItemSlot.TOP),
+                    stat.characterSlots.get(ItemSlot.BOTTOM),
+                    stat.characterSlots.get(ItemSlot.SHOES)));
             if (bonus > 0 && stat.completionRate >= CHALLENGE_BONUS_MIN_COMPLETION_RATE) {
                 personalPointService.reward(
                         stat.userId, challengeId, bonus, UserPointReason.CHALLENGE_BONUS, groupName);
@@ -208,10 +236,13 @@ public class RecordBatchService {
                 .stream()
                 .collect(Collectors.toMap(UserEarnedAmount::getUserId, UserEarnedAmount::getAmount));
 
+        Map<Long, Map<ItemSlot, String>> characterSlotsByUserId = userItemService.getCharacters(userIds);
+
         int totalDays = totalDays(periodStart, periodEnd);
         int totalCheckInCount =
                 checkInDatesByUserId.values().stream().mapToInt(List::size).sum();
-        return new MergeInputs(checkInDatesByUserId, earnedPointsByUserId, totalDays, totalCheckInCount);
+        return new MergeInputs(
+                checkInDatesByUserId, earnedPointsByUserId, characterSlotsByUserId, totalDays, totalCheckInCount);
     }
 
     private List<MemberStat> buildMemberStats(
@@ -231,7 +262,8 @@ public class RecordBatchService {
                     totalCheckInCount,
                     completionCalculator.bestStreakInPeriod(checkInDates),
                     inputs.earnedPointsByUserId.getOrDefault(userId, 0),
-                    completionCalculator.contributionRate(totalCheckInCount, inputs.totalCheckInCount)));
+                    completionCalculator.contributionRate(totalCheckInCount, inputs.totalCheckInCount),
+                    inputs.characterSlotsByUserId.getOrDefault(userId, Map.of())));
         }
         assignRankings(stats);
         return stats;
@@ -274,10 +306,11 @@ public class RecordBatchService {
         return trend.counts().stream().map(String::valueOf).collect(Collectors.joining(","));
     }
 
-    // 챌린지 전체 참여자 대상 체크인/포인트 조회 결과를 한데 묶어 넘기는 내부 전달용 값.
+    // 챌린지 전체 참여자 대상 체크인/포인트/캐릭터 조회 결과를 한데 묶어 넘기는 내부 전달용 값.
     private record MergeInputs(
             Map<Long, List<LocalDate>> checkInDatesByUserId,
             Map<Long, Integer> earnedPointsByUserId,
+            Map<Long, Map<ItemSlot, String>> characterSlotsByUserId,
             int totalDays,
             int totalCheckInCount) {}
 
@@ -291,6 +324,7 @@ public class RecordBatchService {
         private final int bestStreakInPeriod;
         private final int earnedPoints;
         private final int contributionRate;
+        private final Map<ItemSlot, String> characterSlots;
         private int ranking;
 
         private MemberStat(
@@ -301,7 +335,8 @@ public class RecordBatchService {
                 int totalCheckInCount,
                 int bestStreakInPeriod,
                 int earnedPoints,
-                int contributionRate) {
+                int contributionRate,
+                Map<ItemSlot, String> characterSlots) {
             this.userId = userId;
             this.checkInDates = checkInDates;
             this.completedDayCount = completedDayCount;
@@ -310,6 +345,7 @@ public class RecordBatchService {
             this.bestStreakInPeriod = bestStreakInPeriod;
             this.earnedPoints = earnedPoints;
             this.contributionRate = contributionRate;
+            this.characterSlots = characterSlots;
         }
     }
 }

@@ -33,8 +33,10 @@ public class ChallengeLifecycleService {
     public void activateChallengesDueToday() {
         LocalDate today = businessClock.today();
         List<Challenge> readyChallenges = challengeRepository.findAllByStatus(ChallengeStatus.READY);
+        // startDate가 오늘이거나 이미 지났으면 활성화한다(정확히 그날만 보면 배치가
+        // 하루라도 못 돈 사이 놓친 챌린지는 영영 못 따라잡는다).
         List<Challenge> challengesDueToday = readyChallenges.stream()
-                .filter(challenge -> challenge.getStartDate().equals(today))
+                .filter(challenge -> !challenge.getStartDate().isAfter(today))
                 .toList();
         Set<Long> groupIds =
                 challengesDueToday.stream().map(Challenge::getGroupId).collect(Collectors.toSet());
@@ -62,8 +64,10 @@ public class ChallengeLifecycleService {
     public void endChallengesDueToday() {
         LocalDate today = businessClock.today();
         List<Challenge> activeChallenges = challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE);
+        // endDate가 지났으면(오늘 포함 안 함) 종료한다 - 활성화와 동일한 이유로
+        // 정확히 다음날만 보면 안 된다.
         List<Challenge> challengesDueToday = activeChallenges.stream()
-                .filter(challenge -> challenge.getEndDate().plusDays(1).equals(today))
+                .filter(challenge -> challenge.getEndDate().isBefore(today))
                 .toList();
         Set<Long> groupIdsToEnd = new HashSet<>();
         for (Challenge challenge : challengesDueToday) {

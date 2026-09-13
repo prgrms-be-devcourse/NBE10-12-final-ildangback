@@ -2,9 +2,11 @@ package com.gommit.domain.record.scheduler;
 
 import com.gommit.domain.record.service.RecordBatchService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class RecordScheduler {
@@ -15,6 +17,8 @@ public class RecordScheduler {
     // 여기서 다루지 않는다 - ChallengeLifecycleService.endChallengesDueToday 참고)
     @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
     public void generateMonthlyMerges() {
+        log.info("[RecordScheduler] generateDueMonthlyMerges 실행");
         recordBatchService.generateDueMonthlyMerges();
+        log.info("[RecordScheduler] generateDueMonthlyMerges 종료");
     }
 }
