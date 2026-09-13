@@ -140,8 +140,8 @@ fi
 if nginx_running; then
   # reload 는 기존 연결을 끊지 않지만, 그 연결이 실제로 물고 있는 back-${CURRENT_COLOR} 를
   # 곧장 stop 하면 응답 중이던 요청까지 끊긴다(앱이 graceful shutdown 을 안 씀). 옛 워커가
-  # in-flight 요청을 끝낼 시간을 잠깐 준다.
-  sleep 5
+  # in-flight 요청을 끝낼 시간을 잠깐 준다. ffmpeg 몽타주처럼 오래 걸리는 요청 감안해 15초.
+  sleep 15
   docker compose stop "back-${CURRENT_COLOR}" || true
 else
   echo "nginx 미기동 — back-${CURRENT_COLOR} 유지(정지 생략). nginx 상태 확인 후 재배포 권장." >&2
