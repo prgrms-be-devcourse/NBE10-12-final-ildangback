@@ -50,9 +50,12 @@ export function ChangePasswordPage() {
       // 서버가 본인의 모든 RT 를 폐기한다. 우리 RT 도 이미 죽었으므로
       // 들고 있어봐야 다음 갱신에서 401 이다. 토큰만 지우면 AuthProvider 상태가
       // 로그인인 채 남으므로 signOut 으로 상태까지 비운다.
+      // /login 으로 먼저 나간 뒤 상태를 비운다. 순서를 바꾸면 anonymous 커밋 순간
+      // 아직 이 화면이라 RequireAuth 가 state.from 에 이 경로를 실어 튕겨내고,
+      // 재로그인하면 비밀번호 변경 화면으로 되돌아온다.
       setFlash("비밀번호를 변경했어요. 다시 로그인해 주세요.");
-      await signOut();
       navigate("/login", { replace: true });
+      await signOut();
     } catch (error) {
       setFormError(
         applyApiError(error, setError, {

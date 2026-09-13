@@ -35,6 +35,7 @@ import com.gommit.domain.group.entity.Visibility;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
 import com.gommit.domain.group.repository.GroupMemberCount;
 import com.gommit.domain.group.repository.GroupMemberRepository;
+import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.domain.user.entity.User;
 import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
@@ -87,6 +88,9 @@ class GroupServiceTest {
 
     @Mock
     private ChallengeProgressCalculator challengeProgressCalculator;
+
+    @Mock
+    private PersonalPointService personalPointService;
 
     @Mock
     private BusinessClock businessClock;
@@ -697,6 +701,9 @@ class GroupServiceTest {
             assertThat(groupMember.getStatus()).isEqualTo(GroupMemberStatus.LEFT);
             assertThat(activeMember.getStatus()).isEqualTo(ChallengeMemberStatus.LEFT);
             assertThat(readyMember.getStatus()).isEqualTo(ChallengeMemberStatus.LEFT);
+            // 탈퇴한 시즌마다 그 챌린지에서 번 포인트를 회수한다.
+            verify(personalPointService).recoverChallengePoints(2L, 50L, "오운완 모임");
+            verify(personalPointService).recoverChallengePoints(2L, 51L, "오운완 모임");
         }
 
         @Test
@@ -774,6 +781,36 @@ class GroupServiceTest {
             // then
             assertThat(groupMember.getStatus()).isEqualTo(GroupMemberStatus.LEFT);
             assertThat(readyMember.getStatus()).isEqualTo(ChallengeMemberStatus.LEFT);
+        }
+    }
+
+    @Nested
+    @DisplayName("leaveAllGroupsOnAccountDeletion - 회원 탈퇴 시 그룹/시즌 정리")
+    class LeaveAllGroupsOnAccountDeletion {
+
+        @Test
+        @DisplayName("일반 멤버가 탈퇴하면 참여 중인 시즌에서도 이탈 처리하고 그 챌린지에서 번 포인트를 회수한다")
+        void leavesChallengesAndRecoversPointsOnAccountDeletion() {
+            // given
+            ChallengeGroup group = group(12L, "오운완 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            Challenge activeChallenge = challenge(50L, 12L, ChallengeStatus.ACTIVE);
+            GroupMember groupMember = groupMember(30L, group, 2L);
+            ChallengeMember activeMember = challengeMember(70L, activeChallenge, 2L, ChallengeMemberRole.MEMBER);
+            when(groupMemberRepository.findAllByUserIdAndStatus(2L, GroupMemberStatus.ACTIVE))
+                    .thenReturn(List.of(groupMember));
+            when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.ACTIVE))
+                    .thenReturn(Optional.of(activeChallenge));
+            when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.READY))
+                    .thenReturn(Optional.empty());
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(activeMember));
+
+            // when
+            groupService.leaveAllGroupsOnAccountDeletion(2L);
+
+            // then
+            assertThat(groupMember.getStatus()).isEqualTo(GroupMemberStatus.LEFT);
+            assertThat(activeMember.getStatus()).isEqualTo(ChallengeMemberStatus.LEFT);
+            verify(personalPointService).recoverChallengePoints(2L, 50L, "오운완 모임");
         }
     }
 
@@ -1011,6 +1048,7 @@ class GroupServiceTest {
             assertThat(member.getStatus()).isEqualTo(GroupMemberStatus.KICKED);
             assertThat(seasonMember.getStatus()).isEqualTo(ChallengeMemberStatus.KICKED);
             org.mockito.Mockito.verifyNoInteractions(checkInRepository);
+            verify(personalPointService).recoverChallengePoints(2L, 50L, "그룹");
         }
 
         @ParameterizedTest
