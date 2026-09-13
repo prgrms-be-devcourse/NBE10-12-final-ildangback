@@ -116,7 +116,14 @@ upstream backend {
 }
 EOF
 
-docker compose up -d
+# 순서 기동(중요) — bare `docker compose up -d` 로 한 번에 올리지 않는다.
+# nginx 는 back-blue/back-green 에 대한 compose depends_on 이 없으므로(정적으로
+# "active 색"을 표현할 수 없어서 의도적으로 뺌), mysql → active 색(blue) → nginx
+# 순서로 직접 맞춰야 back-green 이 같이 뜨지 않고 nginx 도 콜드스타트 중에
+# proxying 을 시작하지 않는다.
+docker compose up -d mysql
+docker compose up -d --wait --wait-timeout 300 back-blue
+docker compose up -d nginx
 docker compose ps
 ```
 
@@ -208,7 +215,16 @@ docker compose restart "$ACTIVE"
 - **기동**: 매일 03:30 EventBridge Scheduler (`team1-ec2-start-0330`). 이미 running 이면 무시.
 - **수동 기동**: `aws ec2 start-instances --instance-ids <id> --region ap-northeast-2`
 - 기동 후 컨테이너는 `systemd team1-app.service` + `restart: unless-stopped` 로 자동 복귀.
-  안 뜨면: `sudo systemctl start team1-app` 또는 `cd /opt/team1-app && docker compose up -d`.
+  안 뜨면: `sudo systemctl start team1-app`. 그래도 안 되면 수동 기동하되 **bare `docker
+  compose up -d` 금지** — active 아닌 색(back-blue/back-green 중 하나)까지 같이 떠서
+  "평상시 한쪽만 running" 이 깨진다. active 색 확인 후 그 색만 지정:
+  ```bash
+  cd /opt/team1-app
+  grep back nginx/conf.d/active-backend.conf   # 예: back-blue
+  docker compose up -d mysql
+  docker compose up -d --wait --wait-timeout 300 back-blue   # 위에서 확인한 색으로 교체
+  docker compose up -d nginx
+  ```
 - EIP 덕분에 정지/기동 후에도 공인 IP 는 그대로 → DNS 수정 불필요.
 
 ---

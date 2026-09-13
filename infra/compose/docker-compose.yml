@@ -50,13 +50,13 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./certs:/etc/nginx/certs:ro   # origin.pem / origin.key (Cloudflare Origin CA)
-    depends_on:
-      # 항상 둘 다 healthy 일 필요 없음(평상시 한쪽만 뜸) — 존재만 하면 충분. 실제로
-      # 트래픽 받을 수 있는지는 conf.d/active-backend.conf 가 가리키는 쪽에 달림.
-      back-blue:
-        condition: service_started
-      back-green:
-        condition: service_started
+    # back-blue/back-green 에 대한 depends_on 없음 — 의도적. compose depends_on 은 정적이라
+    # "지금 active 인 색"을 표현 못 한다: 평상시엔 한쪽만 떠 있어서 둘 다 service_started 로
+    # 걸면 `docker compose up -d` 인자 없이 부를 때 비활성 색까지 같이 기동돼버리고
+    # (평소 한쪽만 running 이라는 불변식이 깨짐), service_healthy 로 걸면 반대로 비활성
+    # 색이 영원히 안 떠서 nginx 기동이 block 된다. 그래서 시작 순서는 여기서 강제하지
+    # 않고 infra-runbook.md 의 절차(mysql → active 색 --wait healthy → nginx)로 명시적으로
+    # 맞춘다. deploy.sh 는 재배포 시 nginx 를 새로 띄우지 않고 reload 만 하므로 영향 없음.
     deploy:
       resources:
         limits:
