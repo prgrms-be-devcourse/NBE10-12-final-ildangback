@@ -1,5 +1,6 @@
 package com.gommit.domain.user.service;
 
+import com.gommit.domain.report.service.PenaltyGate;
 import com.gommit.domain.user.dto.request.LoginRequest;
 import com.gommit.domain.user.dto.request.SignUpRequest;
 import com.gommit.domain.user.dto.response.LoginResponse;
@@ -28,6 +29,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
     private final UserService userService;
+    private final PenaltyGate penaltyGate;
 
     // 회원가입
     @Transactional
@@ -63,6 +65,7 @@ public class AuthService {
         if (user.getPassword() == null || !passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
+        penaltyGate.verifyNotBlocked(user.getId());
 
         TokenResponse tokens = new TokenResponse(issueAccessToken(user), refreshTokenService.issue(user));
         return new LoginResponse(tokens, userService.toUserProfileResponse(user), false);
@@ -72,6 +75,7 @@ public class AuthService {
     @Transactional
     public TokenResponse refresh(String rawRefreshToken) {
         RefreshTokenService.RotateResult rotated = refreshTokenService.rotate(rawRefreshToken);
+        penaltyGate.verifyNotBlocked(rotated.user().getId());
         return new TokenResponse(issueAccessToken(rotated.user()), rotated.refreshToken());
     }
 

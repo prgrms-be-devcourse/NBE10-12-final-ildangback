@@ -32,6 +32,8 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
@@ -48,6 +50,8 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class CheckInService {
+
+    private static final String REPORTED_CONTENT_FORMAT = "미디어: %s | 메모: %s";
 
     private final CheckInRepository checkInRepository;
     private final CheckInPreconditions preconditions;
@@ -307,6 +311,33 @@ public class CheckInService {
                     .setCause(ex)
                     .log();
         }
+    }
+
+    // 신고 판정용 조회. 스냅샷 문자열은 mediaKey 를 아는 이쪽에서 만든다.
+    public Optional<ReportedCheckIn> findForReport(Long checkInId) {
+        return checkInRepository
+                .findById(checkInId)
+                .map(checkIn -> new ReportedCheckIn(
+                        checkIn.getUserId(),
+                        REPORTED_CONTENT_FORMAT.formatted(
+                                checkIn.getMediaKey(), Objects.requireNonNullElse(checkIn.getMemo(), ""))));
+    }
+
+    // 신고가 들고 갈 것만 담는다. 엔티티를 도메인 밖으로 내보내지 않는다.
+    public record ReportedCheckIn(Long userId, String reportedContent) {}
+
+    // 신고 승인 시 인증 삭제
+    @Transactional
+    public void deleteByAdmin(Long checkInId) {
+        checkInRepository.findById(checkInId).ifPresent(checkIn -> {
+            checkInRepository.delete(checkIn);
+            checkInRepository.flush();
+            try {
+                mediaStore.delete(checkIn.getMediaKey());
+            } catch (Exception e) {
+                log.warn("인증 미디어 삭제 실패: checkInId={}, mediaKey={}", checkInId, checkIn.getMediaKey(), e);
+            }
+        });
     }
 
     private String nicknameOf(Long userId, Long checkInId) {

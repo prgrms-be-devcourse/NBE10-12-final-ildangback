@@ -173,7 +173,7 @@ public class HomeService {
                         };
             case CHALLENGE_BONUS, MONTHLY_MERGE_BONUS -> "feat:";
             case ITEM_PURCHASE -> "chore:";
-            case WITHDRAWAL_PENALTY -> "fix:";
+            case WITHDRAWAL_PENALTY, PENALTY_FORFEIT -> "fix:";
         };
     }
 }
