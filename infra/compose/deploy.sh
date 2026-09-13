@@ -27,8 +27,9 @@ fi
 # 직전 fetch 결과로 고정 — shallow 에서 SHA 는 로컬 ref 가 안 생김
 git -C "$APP_DIR/src" reset --hard FETCH_HEAD
 
-# 2. 배포물을 작업 디렉터리로 동기화
-rsync -a --delete "$APP_DIR/src/infra/nginx/" "$APP_DIR/nginx/"
+# 2. 배포물을 작업 디렉터리로 동기화.
+ # htpasswd는 repo에 없는 실물 시크릿으로 삭제 제외
+rsync -a --delete --exclude '*.htpasswd' "$APP_DIR/src/infra/nginx/" "$APP_DIR/nginx/"
 rsync -a --delete "$APP_DIR/src/infra/monitoring/" "$APP_DIR/monitoring/"
 cp "$APP_DIR/src/infra/compose/docker-compose.yml" "$APP_DIR/docker-compose.yml"
 cp "$APP_DIR/src/infra/compose/backup.sh"          "$APP_DIR/backup.sh"
