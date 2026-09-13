@@ -20,14 +20,16 @@ x-back-common: &back-common
   depends_on:
     mysql:
       condition: service_healthy
-  # 1800M = 인스턴스 4GB(t3a.medium) 전환분 반영. DailyLog 몽타주(feat/36, main 미병합) 완화
+  # 1600M = 인스턴스 4GB(t3a.medium) 전환분 반영. DailyLog 몽타주(feat/36, main 미병합) 완화
   # 실측 최악 1,264~1,327M(6×8회차+갤러리12명 동시)에 안전율(측정환경=Docker Desktop VM, 실 EC2 Linux 오차 보정).
-  # blue/green 이 배포 중 잠깐 같이 뜨는 순간에도 둘이 겹쳐 인스턴스 메모리(4G)를 넘지 않아야 함
-  # — 평상시 1개만 뜨므로 상시 소모는 그대로, 배포 중 순간 최대 back 2×1800M + mysql 600M 고려.
+  # blue/green 이 배포 중 잠깐 같이 뜨는 순간에도 둘이 겹쳐 인스턴스 메모리(4G)를 넘으면 안 됨
+  # — 평상시 1개만 뜨므로 상시 소모는 그대로, 배포 중 순간 최대 back 2×1600M + mysql 600M + nginx 64M
+  # = 3864M. 1800M×2 였을 땐 4200M 로 4096M(4GB) 를 넘어 health-check 대기 구간에서
+  # OOM-kill 위험이 있었음 — 1600M 로 낮춰 OS/도커 데몬 몫(약 230M)을 남긴다.
   deploy:
     resources:
       limits:
-        memory: 1800M
+        memory: 1600M
   # 이미지 Dockerfile 의 HEALTHCHECK 와 값을 맞춘다 (드리프트 방지).
   # retries 5 = start_period 후 ~150s 여유 — 아침 콜드스타트(2분+)에 --wait 가
   # 조기에 unhealthy 로 판정하지 않도록.
