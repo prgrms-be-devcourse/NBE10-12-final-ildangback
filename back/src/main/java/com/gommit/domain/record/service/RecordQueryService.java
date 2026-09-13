@@ -299,15 +299,8 @@ public class RecordQueryService {
 
         Map<Long, ChallengeInfo> infoByChallengeId = challengeInfoByChallengeId(
                 allRows.stream().map(StatRow::challengeId).distinct().toList());
-        // 그룹/챌린지가 삭제되는 등 정합성이 깨져 정보를 못 찾은 회차는 통계에서 제외한다.
-        List<StatRow> rows = allRows.stream()
-                .filter(row -> infoByChallengeId.containsKey(row.challengeId()))
-                .filter(row -> overlaps(row, from, to))
-                .toList();
-        List<StatRow> trendStatRows = trendRows.stream()
-                .filter(row -> infoByChallengeId.containsKey(row.challengeId()))
-                .filter(row -> overlaps(row, from, to))
-                .toList();
+        List<StatRow> rows = filterValidRows(allRows, infoByChallengeId, from, to);
+        List<StatRow> trendStatRows = filterValidRows(trendRows, infoByChallengeId, from, to);
 
         return new PersonalStatsResponse(
                 buildSummary(rows),
@@ -379,6 +372,15 @@ public class RecordQueryService {
                         entry.getKey(),
                         Math.min(HEATMAP_LEVELS, averageCompletionRate(entry.getValue()) * HEATMAP_LEVELS / 100)))
                 .sorted(Comparator.comparing(HeatmapCellResponse::month))
+                .toList();
+    }
+
+    // 정보를 못 찾은(그룹/챌린지 삭제 등) 회차 제외 + 조회 기간과 안 겹치는 회차 제외.
+    private List<StatRow> filterValidRows(
+            List<StatRow> rows, Map<Long, ChallengeInfo> infoByChallengeId, LocalDate from, LocalDate to) {
+        return rows.stream()
+                .filter(row -> infoByChallengeId.containsKey(row.challengeId()))
+                .filter(row -> overlaps(row, from, to))
                 .toList();
     }
 
