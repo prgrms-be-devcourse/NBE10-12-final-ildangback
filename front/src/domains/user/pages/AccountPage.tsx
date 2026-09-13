@@ -5,6 +5,7 @@ import { useAuth } from "../../../shared/lib/useAuth";
 import { pixelIcons } from "../../../shared/ui/pixelIcons";
 import { PixelIcon } from "../../../shared/ui/PixelIcon";
 import { TopBar } from "../../../shared/ui/TopBar";
+import { EmailVerificationNotice } from "../../auth/components/EmailVerificationNotice";
 
 /**
  * 설정 > 계정 관리. 비밀번호 변경과 탈퇴가 여기 모인다.
@@ -34,18 +35,23 @@ export function AccountPage() {
           </div>
         </section>
 
+        <EmailVerificationNotice />
+
         <nav className="mt-5 overflow-hidden rounded-2xl bg-purple-50 [&>*+*]:border-t [&>*+*]:border-purple-100">
-          <button
-            type="button"
-            onClick={() => navigate("/profile/password")}
-            className="flex w-full items-center gap-3 px-4 py-3 text-left"
-          >
-            <PixelIcon src={pixelIcons.privacyLock} />
-            <span className="flex-1 text-[14px] text-gray-900">
-              비밀번호 변경
-            </span>
-            <CaretRightIcon size={16} className="text-gray-500" aria-hidden />
-          </button>
+          {/* 비밀번호가 없는 계정에는 바꿀 것이 없다. 눌러도 서버가 401 이다. */}
+          {user?.hasPassword && (
+            <button
+              type="button"
+              onClick={() => navigate("/profile/password")}
+              className="flex w-full items-center gap-3 px-4 py-3 text-left"
+            >
+              <PixelIcon src={pixelIcons.privacyLock} />
+              <span className="flex-1 text-[14px] text-gray-900">
+                비밀번호 변경
+              </span>
+              <CaretRightIcon size={16} className="text-gray-500" aria-hidden />
+            </button>
+          )}
 
           <button
             type="button"

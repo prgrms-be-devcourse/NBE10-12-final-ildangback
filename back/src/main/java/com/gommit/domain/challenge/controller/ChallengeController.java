@@ -5,6 +5,7 @@ import com.gommit.domain.challenge.dto.request.ExtensionChoiceRequest;
 import com.gommit.domain.challenge.dto.request.OwnerDelegationRequest;
 import com.gommit.domain.challenge.dto.response.*;
 import com.gommit.domain.challenge.service.ChallengeExtensionService;
+import com.gommit.domain.challenge.service.ChallengeMemberService;
 import com.gommit.domain.challenge.service.ChallengeService;
 import com.gommit.global.security.CurrentUser;
 import com.gommit.global.security.SecurityUser;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 public class ChallengeController {
     private final ChallengeService challengeService;
     private final ChallengeExtensionService challengeExtensionService;
+    private final ChallengeMemberService challengeMemberService;
 
     @Operation(summary = "챌린지 현황 조회", description = "챌린지의 진행 현황과 내 인증 상태를 조회합니다.")
     @GetMapping("/{challengeId}")
@@ -72,5 +74,13 @@ public class ChallengeController {
                 challengeExtensionService.updateExtensionChoice(challengeId, actor.getId(), request);
 
         return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "체크인 콕 찌르기", description = "챌린지 멤버에게 오늘 체크인을 하도록 알림을 전송합니다.")
+    @PostMapping("/{challengeId}/members/{userId}/nudge")
+    public ResponseEntity<Void> nudgeMember(
+            @PathVariable Long challengeId, @PathVariable Long userId, @CurrentUser SecurityUser actor) {
+        challengeMemberService.nudgeMember(challengeId, actor.getId(), userId);
+        return ResponseEntity.noContent().build();
     }
 }

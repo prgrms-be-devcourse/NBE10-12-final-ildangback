@@ -58,8 +58,10 @@ fi
 git -C "$APP_DIR/src" reset --hard FETCH_HEAD
 
 # 2. 배포물을 작업 디렉터리로 동기화.
-#    active-backend.conf 는 repo 에 없는 런타임 생성 파일로 --delete 대상에서 제외 (지울 시 blue green 색 삭제됨)
-rsync -a --delete --exclude 'conf.d/active-backend.conf' "$APP_DIR/src/infra/nginx/" "$APP_DIR/nginx/"
+#    active-backend.conf 는 repo 에 없는 런타임 생성 파일(지울 시 blue/green 색 삭제됨),
+#    htpasswd 는 repo 에 없는 실물 시크릿 — 둘 다 --delete 대상에서 제외.
+rsync -a --delete --exclude 'conf.d/active-backend.conf' --exclude '*.htpasswd' "$APP_DIR/src/infra/nginx/" "$APP_DIR/nginx/"
+rsync -a --delete "$APP_DIR/src/infra/monitoring/" "$APP_DIR/monitoring/"
 cp "$APP_DIR/src/infra/compose/docker-compose.yml" "$APP_DIR/docker-compose.yml"
 cp "$APP_DIR/src/infra/compose/backup.sh"          "$APP_DIR/backup.sh"
 

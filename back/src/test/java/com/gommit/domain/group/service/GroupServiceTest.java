@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.gommit.domain.background.service.BackgroundPurchaseService;
 import com.gommit.domain.challenge.dto.request.InitialChallengeSettingRequest;
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.ChallengeMember;
@@ -34,6 +35,7 @@ import com.gommit.domain.group.entity.Visibility;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
 import com.gommit.domain.group.repository.GroupMemberCount;
 import com.gommit.domain.group.repository.GroupMemberRepository;
+import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.domain.user.entity.User;
 import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.exception.BusinessException;
@@ -88,7 +90,13 @@ class GroupServiceTest {
     private ChallengeProgressCalculator challengeProgressCalculator;
 
     @Mock
+    private PersonalPointService personalPointService;
+
+    @Mock
     private BusinessClock businessClock;
+
+    @Mock
+    private BackgroundPurchaseService backgroundPurchaseService;
 
     @InjectMocks
     private GroupService groupService;
@@ -693,6 +701,9 @@ class GroupServiceTest {
             assertThat(groupMember.getStatus()).isEqualTo(GroupMemberStatus.LEFT);
             assertThat(activeMember.getStatus()).isEqualTo(ChallengeMemberStatus.LEFT);
             assertThat(readyMember.getStatus()).isEqualTo(ChallengeMemberStatus.LEFT);
+            // 탈퇴한 시즌마다 그 챌린지에서 번 포인트를 회수한다.
+            verify(personalPointService).recoverChallengePoints(2L, 50L, "오운완 모임");
+            verify(personalPointService).recoverChallengePoints(2L, 51L, "오운완 모임");
         }
 
         @Test
@@ -770,6 +781,36 @@ class GroupServiceTest {
             // then
             assertThat(groupMember.getStatus()).isEqualTo(GroupMemberStatus.LEFT);
             assertThat(readyMember.getStatus()).isEqualTo(ChallengeMemberStatus.LEFT);
+        }
+    }
+
+    @Nested
+    @DisplayName("leaveAllGroupsOnAccountDeletion - 회원 탈퇴 시 그룹/시즌 정리")
+    class LeaveAllGroupsOnAccountDeletion {
+
+        @Test
+        @DisplayName("일반 멤버가 탈퇴하면 참여 중인 시즌에서도 이탈 처리하고 그 챌린지에서 번 포인트를 회수한다")
+        void leavesChallengesAndRecoversPointsOnAccountDeletion() {
+            // given
+            ChallengeGroup group = group(12L, "오운완 모임", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            Challenge activeChallenge = challenge(50L, 12L, ChallengeStatus.ACTIVE);
+            GroupMember groupMember = groupMember(30L, group, 2L);
+            ChallengeMember activeMember = challengeMember(70L, activeChallenge, 2L, ChallengeMemberRole.MEMBER);
+            when(groupMemberRepository.findAllByUserIdAndStatus(2L, GroupMemberStatus.ACTIVE))
+                    .thenReturn(List.of(groupMember));
+            when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.ACTIVE))
+                    .thenReturn(Optional.of(activeChallenge));
+            when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.READY))
+                    .thenReturn(Optional.empty());
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(activeMember));
+
+            // when
+            groupService.leaveAllGroupsOnAccountDeletion(2L);
+
+            // then
+            assertThat(groupMember.getStatus()).isEqualTo(GroupMemberStatus.LEFT);
+            assertThat(activeMember.getStatus()).isEqualTo(ChallengeMemberStatus.LEFT);
+            verify(personalPointService).recoverChallengePoints(2L, 50L, "오운완 모임");
         }
     }
 
@@ -1007,6 +1048,7 @@ class GroupServiceTest {
             assertThat(member.getStatus()).isEqualTo(GroupMemberStatus.KICKED);
             assertThat(seasonMember.getStatus()).isEqualTo(ChallengeMemberStatus.KICKED);
             org.mockito.Mockito.verifyNoInteractions(checkInRepository);
+            verify(personalPointService).recoverChallengePoints(2L, 50L, "그룹");
         }
 
         @ParameterizedTest
@@ -1170,6 +1212,48 @@ class GroupServiceTest {
             ReflectionTestUtils.setField(group, "inviteCode", "ABC123");
             when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
             assertBusinessException(() -> groupService.getInviteCode(12L, 1L), ErrorCode.INVITE_CODE_NOT_FOUND);
+        }
+    }
+
+    @Nested
+    @DisplayName("채팅 읽음 커서")
+    class MessageReadCursor {
+        @Test
+        @DisplayName("갱신 대상 멤버가 없으면 실패한다")
+        void givenNonMemberWhenMarkMessagesReadThenNotGroupMember() {
+            when(groupMemberRepository.findByGroupIdAndUserId(12L, 2L)).thenReturn(Optional.empty());
+            assertBusinessException(() -> groupService.markMessagesRead(12L, 2L, 5L), ErrorCode.NOT_GROUP_MEMBER);
+        }
+
+        @Test
+        @DisplayName("멤버면 커서를 갱신한다")
+        void givenMemberWhenMarkMessagesReadThenCursorAdvances() {
+            ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            GroupMember member = groupMember(30L, group, 2L);
+            when(groupMemberRepository.findByGroupIdAndUserId(12L, 2L)).thenReturn(Optional.of(member));
+
+            groupService.markMessagesRead(12L, 2L, 5L);
+
+            assertThat(member.getLastReadMessageId()).isEqualTo(5L);
+        }
+
+        @Test
+        @DisplayName("멤버가 아니면 커서가 없다")
+        void givenNonMemberWhenFindReadCursorThenNull() {
+            when(groupMemberRepository.findByGroupIdAndUserId(12L, 2L)).thenReturn(Optional.empty());
+
+            assertThat(groupService.findReadCursor(12L, 2L)).isNull();
+        }
+
+        @Test
+        @DisplayName("멤버면 저장된 커서를 돌려준다")
+        void givenMemberWhenFindReadCursorThenReturnsCursor() {
+            ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            GroupMember member = groupMember(30L, group, 2L);
+            member.markRead(3L);
+            when(groupMemberRepository.findByGroupIdAndUserId(12L, 2L)).thenReturn(Optional.of(member));
+
+            assertThat(groupService.findReadCursor(12L, 2L)).isEqualTo(3L);
         }
     }
 

@@ -4,5 +4,6 @@
 *.env
 !*.env.example
 
-# nginx basic auth (grafana 등) — 해시라도 로컬 생성물, 커밋 대상 아님.
+# grafana.conf 의 nginx Basic Auth 실물 파일
 *.htpasswd
+!*.htpasswd.example

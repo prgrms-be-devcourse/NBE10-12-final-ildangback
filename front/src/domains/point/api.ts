@@ -1,5 +1,8 @@
 import { apiFetch } from "../../shared/api/client";
 import type {
+  GroupPointBalanceResponse,
+  GroupPointHistoryResponse,
+  GroupPointReason,
   PeriodFilter,
   PointBalanceResponse,
   PointChangeType,
@@ -20,8 +23,54 @@ export interface GetMyHistoriesParams {
   size?: number;
 }
 
+export interface GetGroupHistoriesParams {
+  period?: PeriodFilter;
+  type?: PointChangeType;
+  reason?: GroupPointReason;
+  from?: string;
+  to?: string;
+  cursor?: number | null;
+  size?: number;
+}
+
 export function getMyBalance(): Promise<PointBalanceResponse> {
   return apiFetch("/api/users/me/points");
+}
+
+export function getGroupBalance(
+  groupId: number,
+): Promise<GroupPointBalanceResponse> {
+  return apiFetch(`/api/groups/${groupId}/points`);
+}
+
+export function getGroupHistories(
+  groupId: number,
+  params: GetGroupHistoriesParams = {},
+): Promise<SliceResponse<GroupPointHistoryResponse>> {
+  const query = new URLSearchParams();
+  if (params.period && params.period !== "ALL" && params.period !== "CUSTOM") {
+    query.set("period", params.period);
+  }
+  if (params.type && params.type !== "ALL") {
+    query.set("type", params.type);
+  }
+  if (params.reason) query.set("reason", params.reason);
+  if (params.from) query.set("from", params.from);
+  if (params.to) query.set("to", params.to);
+  if (params.cursor != null) query.set("cursor", String(params.cursor));
+  if (params.size != null) query.set("size", String(params.size));
+
+  const queryString = query.toString();
+  return apiFetch(
+    `/api/groups/${groupId}/points/histories${queryString ? `?${queryString}` : ""}`,
+  );
+}
+
+export function getGroupHistoryDetail(
+  groupId: number,
+  historyId: number,
+): Promise<GroupPointHistoryResponse> {
+  return apiFetch(`/api/groups/${groupId}/points/histories/${historyId}`);
 }
 
 export function getMyHistories(

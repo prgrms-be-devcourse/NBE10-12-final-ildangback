@@ -602,6 +602,74 @@ class RecordQueryServiceTest {
         }
 
         @Test
+        @DisplayName("같은 챌린지에 최종 머지가 있으면 월간 결과는 집계에서 빠진다(중복 집계 방지)")
+        void excludesMonthlyResultsWhenFinalMergeExistsForSameChallenge() {
+            // 챌린지 1이 끝나서 월간 머지 2건(10L, 11L) + 최종 머지(20L)가 모두 같은
+            // challengeId=1을 가리킨다. 최종은 챌린지 전체 기간을 다시 재집계한 값이라,
+            // 월간 두 건까지 같이 더하면 중복 집계된다.
+            when(monthlyMergeResultRepository.findAllByUserId(1L))
+                    .thenReturn(List.of(monthlyMergeResult(1L, 10L, 1L), monthlyMergeResult(2L, 11L, 1L)));
+            when(finalMergeResultRepository.findAllByUserId(1L)).thenReturn(List.of(finalMergeResult(3L, 20L, 1L)));
+            when(monthlyMergeRepository.findAllById(List.of(10L, 11L)))
+                    .thenReturn(List.of(monthlyMerge(10L, 1L, 1), monthlyMerge(11L, 1L, 2)));
+            when(finalMergeRepository.findAllById(List.of(20L))).thenReturn(List.of(finalMerge(20L, 1L)));
+            when(challengeRepository.findAllById(List.of(1L)))
+                    .thenReturn(List.of(challenge(1L, 10L, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 8, 31))));
+            when(challengeGroupRepository.findAllById(List.of(10L)))
+                    .thenReturn(List.of(challengeGroup(10L, "오운완", GroupCategory.EXERCISE)));
+
+            PersonalStatsResponse response = recordQueryService.getMyStats(1L, null, null);
+
+            // 총계는 최종 머지 값(169)만 - 월간 두 건 더해지면 안 됨.
+            assertThat(response.summary().totalCheckInCount()).isEqualTo(169);
+            assertThat(response.summary().completedDayCount()).isEqualTo(169);
+            assertThat(response.summary().completedChallengeCount()).isEqualTo(1);
+            assertThat(response.summary().inProgressChallengeCount()).isZero();
+            // 월별 추이는 월간 머지 기준(2026-08 하나로 묶임).
+            assertThat(response.monthlyTrend())
+                    .extracting(MonthlyTrendItemResponse::month, MonthlyTrendItemResponse::checkInCount)
+                    .containsExactly(tuple("2026-08", 27 + 27));
+        }
+
+        @Test
+        @DisplayName("여러 달짜리 챌린지가 끝나도 월별 추이/잔디는 달마다 나뉘어 표시된다")
+        void monthlyTrendSpansMultipleMonthsEvenAfterChallengeEnds() {
+            // 3~5월 월간 머지 3건 + 최종 머지(3/1~5/30) 같은 챌린지.
+            MonthlyMerge march = MonthlyMerge.create(
+                    1L, 1, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 30), 30, 30, 100, LocalDateTime.now());
+            ReflectionTestUtils.setField(march, "id", 10L);
+            MonthlyMerge april = MonthlyMerge.create(
+                    1L, 2, LocalDate.of(2026, 4, 1), LocalDate.of(2026, 4, 30), 30, 30, 100, LocalDateTime.now());
+            ReflectionTestUtils.setField(april, "id", 11L);
+            MonthlyMerge may = MonthlyMerge.create(
+                    1L, 3, LocalDate.of(2026, 5, 1), LocalDate.of(2026, 5, 30), 30, 30, 100, LocalDateTime.now());
+            ReflectionTestUtils.setField(may, "id", 12L);
+
+            when(monthlyMergeResultRepository.findAllByUserId(1L))
+                    .thenReturn(List.of(
+                            monthlyMergeResult(1L, 10L, 1L),
+                            monthlyMergeResult(2L, 11L, 1L),
+                            monthlyMergeResult(3L, 12L, 1L)));
+            when(finalMergeResultRepository.findAllByUserId(1L)).thenReturn(List.of(finalMergeResult(4L, 20L, 1L)));
+            when(monthlyMergeRepository.findAllById(List.of(10L, 11L, 12L))).thenReturn(List.of(march, april, may));
+            when(finalMergeRepository.findAllById(List.of(20L))).thenReturn(List.of(finalMerge(20L, 1L)));
+            when(challengeRepository.findAllById(List.of(1L)))
+                    .thenReturn(List.of(challenge(1L, 10L, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 5, 30))));
+            when(challengeGroupRepository.findAllById(List.of(10L)))
+                    .thenReturn(List.of(challengeGroup(10L, "오운완", GroupCategory.EXERCISE)));
+
+            PersonalStatsResponse response = recordQueryService.getMyStats(1L, null, null);
+
+            assertThat(response.monthlyTrend())
+                    .extracting(MonthlyTrendItemResponse::month)
+                    .containsExactly("2026-03", "2026-04", "2026-05");
+            assertThat(response.heatmap())
+                    .extracting(HeatmapCellResponse::month)
+                    .containsExactly("2026-03", "2026-04", "2026-05");
+            assertThat(response.summary().totalCheckInCount()).isEqualTo(169);
+        }
+
+        @Test
         @DisplayName("참여한 머지가 없으면 전부 0/빈 값이다")
         void returnsEmptyStatsWhenNoParticipation() {
             when(monthlyMergeResultRepository.findAllByUserId(1L)).thenReturn(List.of());

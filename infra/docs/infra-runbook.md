@@ -104,6 +104,7 @@ cp src/infra/compose/backup.sh .
 cp src/infra/compose/deploy.sh .          # 이후 SSM 배포가 절대경로로 호출. 이후엔 deploy.sh 가 스스로 갱신.
 chmod +x deploy.sh
 rsync -a src/infra/nginx/ nginx/
+rsync -a src/infra/monitoring/ monitoring/
 
 # blue-green active 색 최초 지정(1회) — nginx 가 include 하는 upstream 정의라 이거 없으면
 # nginx 기동 자체가 실패함. 이후로는 deploy.sh 가 이 파일을 읽고/새로 씀(git 비추적).
@@ -124,6 +125,9 @@ EOF
 docker compose up -d mysql
 docker compose up -d --wait --wait-timeout 300 back-blue
 docker compose up -d nginx
+
+# 나머지(모니터링 등)는 순서 상관없어서 한 번에.
+docker compose up -d
 docker compose ps
 ```
 
