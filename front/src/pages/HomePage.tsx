@@ -1,5 +1,5 @@
 import { CheckIcon } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import homeChangesCards from "../assets/illustrations/home-changes-cards.webp";
 import homeHeroCard from "../assets/illustrations/home-hero-card.webp";
@@ -9,7 +9,8 @@ import { toCharacterArt } from "../domains/item/lib/shop";
 import type { TodayChallengeResponse } from "../shared/api/types";
 import { formatMonthDay } from "../shared/lib/date";
 import { useAuth } from "../shared/lib/useAuth";
-import { useToast } from "../shared/lib/useToast";
+import { useNotifications } from "../domains/home/hooks/useNotifications";
+import { NotificationPanel } from "../domains/home/components/NotificationPanel";
 import { CATEGORY_ART, CATEGORY_ICON } from "../shared/ui/categoryIcons";
 import { designArt } from "../shared/ui/designArt";
 import { ContributionGrid } from "../shared/ui/ContributionGrid";
@@ -43,7 +44,9 @@ export function HomePage() {
 function SignedInHome() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { showToast } = useToast();
+  const notifications = useNotifications();
+  const notificationBellRef = useRef<HTMLButtonElement>(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const [data, setData] = useState<HomeData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -82,6 +85,7 @@ function SignedInHome() {
     );
   }
 
+  const { unreadCount } = notifications;
   const { home, grass } = data;
   const characterArt = toCharacterArt(home.character.slots);
   // 카드 높이와 점 잇는 세로선이 세 줄에 맞춰져 있다. 나머지는 "전체 보기" 로 간다.
@@ -93,19 +97,53 @@ function SignedInHome() {
         <Logo className="-ml-3 h-[51px]" />
         <button
           type="button"
-          onClick={() => showToast("알림 기능은 다음 업데이트에 오픈됩니다.")}
+          ref={notificationBellRef}
+          onClick={() => {
+            setNotificationsOpen(true);
+            void notifications.reload();
+          }}
+          aria-haspopup="dialog"
+          aria-expanded={notificationsOpen}
+          aria-controls={notificationsOpen ? "home-notifications" : undefined}
           aria-label="알림"
           className="relative rounded-lg p-1.5 focus-visible:ring-2 focus-visible:ring-purple-300 focus-visible:outline-none after:absolute after:-inset-[5px] after:content-['']"
         >
           <PixelIcon src={designArt.notificationBell} size={28} />
-          {home.hasUnreadNotification && (
+          {unreadCount > 0 && (
             <span
-              className="absolute top-[4px] right-[6px] h-[7px] w-[7px] rounded-full"
-              style={{ backgroundColor: DEEP }}
-            />
+              role="status"
+              aria-label={`읽지 않은 알림 ${unreadCount}개`}
+              className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-semibold text-white ring-2 ring-white"
+            >
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
           )}
         </button>
       </header>
+      {notificationsOpen && (
+        <NotificationPanel
+          anchorRef={notificationBellRef}
+          notifications={notifications.notifications}
+          loading={notifications.loading}
+          error={notifications.error}
+          pendingId={notifications.pendingId}
+          onRetry={() => void notifications.reload()}
+          onSelect={async (notification) => {
+            if (await notifications.markRead(notification)) {
+              if (
+                notification.type === "CHECK_IN_NUDGE" &&
+                notification.refId !== null &&
+                Number.isSafeInteger(notification.refId) &&
+                notification.refId > 0
+              ) {
+                setNotificationsOpen(false);
+                navigate(`/challenges/${notification.refId}`);
+              }
+            }
+          }}
+          onClose={() => setNotificationsOpen(false)}
+        />
+      )}
 
       <div className="mt-[9px] flex items-center justify-between gap-2">
         <h2 className="text-[18px] leading-[22px] font-bold text-gray-900">

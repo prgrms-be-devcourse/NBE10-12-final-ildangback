@@ -3,7 +3,9 @@ import { PlainLayout } from "./app/PlainLayout";
 import { RequireAuth } from "./app/RequireAuth";
 import { RequireAdmin } from "./domains/admin/RequireAdmin";
 import { AdminHomePage } from "./domains/admin/pages/AdminHomePage";
+import { BackgroundAdminPage } from "./domains/admin/pages/BackgroundAdminPage";
 import { ItemAdminPage } from "./domains/admin/pages/ItemAdminPage";
+import { GroupShopPage } from "./domains/background/pages/GroupShopPage";
 import { TabLayout } from "./app/TabLayout";
 import { ForgotPasswordPage } from "./domains/auth/pages/ForgotPasswordPage";
 import { LoginPage } from "./domains/auth/pages/LoginPage";
@@ -24,6 +26,8 @@ import { EditProfilePage } from "./domains/user/pages/EditProfilePage";
 import { PointHistoryDetailPage } from "./domains/point/pages/PointHistoryDetailPage";
 import { PersonalStatsPage } from "./domains/record/pages/PersonalStatsPage";
 import { PointHistoryPage } from "./domains/point/pages/PointHistoryPage";
+import { GroupPointHistoryPage } from "./domains/point/pages/GroupPointHistoryPage";
+import { GroupPointHistoryDetailPage } from "./domains/point/pages/GroupPointHistoryDetailPage";
 import { FinalMergeResultPage } from "./domains/record/pages/FinalMergeResultPage";
 import { MergeListPage } from "./domains/record/pages/MergeListPage";
 import { MonthlyMergeResultPage } from "./domains/record/pages/MonthlyMergeResultPage";
@@ -36,6 +40,7 @@ import { GroupCreatePage } from "./domains/group/pages/GroupCreatePage";
 import { GroupJoinByCodePage } from "./domains/group/pages/GroupJoinByCodePage";
 import { GroupInvitePreviewPage } from "./domains/group/pages/GroupInvitePreviewPage";
 import { ChallengeStatusPage } from "./domains/challenge/pages/ChallengeStatusPage";
+import { GroupChatPage } from "./domains/chat/pages/GroupChatPage";
 import { HomePage } from "./pages/HomePage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { useAuth } from "./shared/lib/useAuth";
@@ -135,6 +140,18 @@ export function App() {
             path="challenges/:challengeId/final-merge"
             element={<FinalMergeResultPage />}
           />
+          <Route
+            path="challenges/groups/:groupId/shop"
+            element={<GroupShopPage />}
+          />
+          <Route
+            path="challenges/groups/:groupId/points"
+            element={<GroupPointHistoryPage />}
+          />
+          <Route
+            path="challenges/groups/:groupId/points/:historyId"
+            element={<GroupPointHistoryDetailPage />}
+          />
 
           {/* 체크인 제출 플로우 — 카메라 중심의 집중 화면이라 하단바 없이 둔다. */}
           <Route
@@ -142,11 +159,18 @@ export function App() {
             element={<CheckInPage />}
           />
 
+          {/* 그룹 채팅 — 입력창이 바닥에 붙어야 해서 하단바 없이 둔다. */}
+          <Route
+            path="challenges/groups/:groupId/chat"
+            element={<GroupChatPage />}
+          />
+
           {/* 관리자. 앱 어디에도 링크가 없고 /admin 을 직접 입력해 들어온다.
               가드는 화면을 안 그리는 것뿐이고 차단은 서버가 한다 (RequireAdmin 주석). */}
           <Route path="admin" element={<RequireAdmin />}>
             <Route index element={<AdminHomePage />} />
             <Route path="items" element={<ItemAdminPage />} />
+            <Route path="backgrounds" element={<BackgroundAdminPage />} />
           </Route>
         </Route>
       </Route>

@@ -1,5 +1,6 @@
 package com.gommit.domain.group.service;
 
+import com.gommit.domain.background.service.BackgroundPurchaseService;
 import com.gommit.domain.challenge.dto.request.InitialChallengeSettingRequest;
 import com.gommit.domain.challenge.dto.response.ChallengeSummaryResponse;
 import com.gommit.domain.challenge.entity.*;
@@ -47,6 +48,7 @@ public class GroupService {
     private final ChallengeProgressCalculator challengeProgressCalculator;
     private final PersonalPointService personalPointService;
     private final BusinessClock businessClock;
+    private final BackgroundPurchaseService backgroundPurchaseService;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final String INVITE_CODE_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final int INVITE_CODE_LENGTH = 6;
@@ -297,6 +299,8 @@ public class GroupService {
         challengeRepository
                 .findFirstByGroupIdAndStatus(groupId, ChallengeStatus.READY)
                 .ifPresent(challenge -> leaveChallengeMember(challenge.getId(), userId, group.getName()));
+
+        backgroundPurchaseService.recountVotes(groupId);
     }
 
     private void leaveChallengeMember(Long challengeId, Long userId, String groupName) {
@@ -440,6 +444,8 @@ public class GroupService {
         }
         targetMember.kick();
         kickChallengeMember(activeChallenge.getId(), targetUserId, group.getName());
+
+        backgroundPurchaseService.recountVotes(groupId);
     }
 
     private void kickChallengeMember(Long challengeId, Long userId, String groupName) {
@@ -575,6 +581,30 @@ public class GroupService {
             throw new BusinessException(ErrorCode.INVITE_CODE_NOT_FOUND);
         }
         return new InviteCodeResponse(group.getInviteCode());
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isActiveMember(Long groupId, Long userId) {
+        return groupMemberRepository
+                .findByGroupIdAndUserId(groupId, userId)
+                .filter(member -> member.getStatus() == GroupMemberStatus.ACTIVE)
+                .isPresent();
+    }
+
+    @Transactional
+    public void markMessagesRead(Long groupId, Long userId, Long lastReadMessageId) {
+        GroupMember member = groupMemberRepository
+                .findByGroupIdAndUserId(groupId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_GROUP_MEMBER));
+        member.markRead(lastReadMessageId);
+    }
+
+    @Transactional(readOnly = true)
+    public Long findReadCursor(Long groupId, Long userId) {
+        return groupMemberRepository
+                .findByGroupIdAndUserId(groupId, userId)
+                .map(GroupMember::getLastReadMessageId)
+                .orElse(null);
     }
 
     @Transactional(readOnly = true)

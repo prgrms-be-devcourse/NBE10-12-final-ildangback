@@ -104,6 +104,26 @@ export interface UserPointHistoryResponse {
   createdAt: string;
 }
 
+/** 개인 UserPointReason 과 다른 별개 enum이다 — 그룹 포인트는 사유가 3개뿐이다. */
+export type GroupPointReason =
+  "DAILY_ALL_COMPLETE" | "MERGE_BONUS" | "BACKGROUND_PURCHASE";
+
+/** monthlyEarned/monthlySpent/totalEarned 이 없다 — 그룹 잔액은 현재값만 준다. */
+export interface GroupPointBalanceResponse {
+  groupId: number;
+  balance: number;
+}
+
+export interface GroupPointHistoryResponse {
+  id: number;
+  groupId: number;
+  sourceName: string;
+  amount: number;
+  reason: GroupPointReason;
+  balanceAfter: number;
+  createdAt: string;
+}
+
 /** 재설정 링크가 어느 계정 것인지 사용자가 확인할 수 있게, 가린 이메일만 준다. */
 export interface PasswordResetTargetResponse {
   email: string;
