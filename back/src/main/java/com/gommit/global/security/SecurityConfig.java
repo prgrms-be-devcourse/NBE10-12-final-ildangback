@@ -44,6 +44,7 @@ public class SecurityConfig {
         "/actuator/health",
     };
 
+    private static final String WEBSOCKET_ENDPOINT = "/ws/**";
     private static final String[] PROMETHEUS_ENDPOINT = {
         "/actuator/prometheus",
     };
@@ -89,6 +90,8 @@ public class SecurityConfig {
                         .requestMatchers(HEALTH_ENDPOINTS)
                         .permitAll()
                         .requestMatchers(PROMETHEUS_ENDPOINT)
+                        .permitAll()
+                        .requestMatchers(WEBSOCKET_ENDPOINT)
                         .permitAll()
                         .requestMatchers("/api/admin/**")
                         .hasRole("ADMIN")

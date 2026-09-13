@@ -584,6 +584,30 @@ public class GroupService {
     }
 
     @Transactional(readOnly = true)
+    public boolean isActiveMember(Long groupId, Long userId) {
+        return groupMemberRepository
+                .findByGroupIdAndUserId(groupId, userId)
+                .filter(member -> member.getStatus() == GroupMemberStatus.ACTIVE)
+                .isPresent();
+    }
+
+    @Transactional
+    public void markMessagesRead(Long groupId, Long userId, Long lastReadMessageId) {
+        GroupMember member = groupMemberRepository
+                .findByGroupIdAndUserId(groupId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_GROUP_MEMBER));
+        member.markRead(lastReadMessageId);
+    }
+
+    @Transactional(readOnly = true)
+    public Long findReadCursor(Long groupId, Long userId) {
+        return groupMemberRepository
+                .findByGroupIdAndUserId(groupId, userId)
+                .map(GroupMember::getLastReadMessageId)
+                .orElse(null);
+    }
+
+    @Transactional(readOnly = true)
     public List<SeasonSummary> getGroupChallenges(Long groupId, Long userId) {
         challengeGroupRepository.findById(groupId).orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
 

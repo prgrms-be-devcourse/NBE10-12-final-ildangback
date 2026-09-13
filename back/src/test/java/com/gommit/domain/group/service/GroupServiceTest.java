@@ -1215,6 +1215,48 @@ class GroupServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("채팅 읽음 커서")
+    class MessageReadCursor {
+        @Test
+        @DisplayName("갱신 대상 멤버가 없으면 실패한다")
+        void givenNonMemberWhenMarkMessagesReadThenNotGroupMember() {
+            when(groupMemberRepository.findByGroupIdAndUserId(12L, 2L)).thenReturn(Optional.empty());
+            assertBusinessException(() -> groupService.markMessagesRead(12L, 2L, 5L), ErrorCode.NOT_GROUP_MEMBER);
+        }
+
+        @Test
+        @DisplayName("멤버면 커서를 갱신한다")
+        void givenMemberWhenMarkMessagesReadThenCursorAdvances() {
+            ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            GroupMember member = groupMember(30L, group, 2L);
+            when(groupMemberRepository.findByGroupIdAndUserId(12L, 2L)).thenReturn(Optional.of(member));
+
+            groupService.markMessagesRead(12L, 2L, 5L);
+
+            assertThat(member.getLastReadMessageId()).isEqualTo(5L);
+        }
+
+        @Test
+        @DisplayName("멤버가 아니면 커서가 없다")
+        void givenNonMemberWhenFindReadCursorThenNull() {
+            when(groupMemberRepository.findByGroupIdAndUserId(12L, 2L)).thenReturn(Optional.empty());
+
+            assertThat(groupService.findReadCursor(12L, 2L)).isNull();
+        }
+
+        @Test
+        @DisplayName("멤버면 저장된 커서를 돌려준다")
+        void givenMemberWhenFindReadCursorThenReturnsCursor() {
+            ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            GroupMember member = groupMember(30L, group, 2L);
+            member.markRead(3L);
+            when(groupMemberRepository.findByGroupIdAndUserId(12L, 2L)).thenReturn(Optional.of(member));
+
+            assertThat(groupService.findReadCursor(12L, 2L)).isEqualTo(3L);
+        }
+    }
+
     @Test
     @DisplayName("그룹과 생성자 멤버를 저장하고 첫 챌린지를 만든다")
     void givenCodeOnlyWhenCreateThenSixUppercaseAlphanumericCode() {
