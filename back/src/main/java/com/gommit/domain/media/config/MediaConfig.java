@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestClient;
 
 // media.storage.provider 값에 따라 StorageService 구현을 local과 cloudinary 중 하나로 등록
 @Configuration
@@ -21,7 +22,9 @@ public class MediaConfig {
 
     @Bean
     @ConditionalOnProperty(name = "media.storage.provider", havingValue = "cloudinary")
-    public StorageService cloudinaryStorageService(MediaStorageProperties properties) {
-        return new CloudinaryStorageService(CloudinaryClientFactory.create(properties.cloudinary()), properties);
+    public StorageService cloudinaryStorageService(
+            MediaStorageProperties properties, RestClient.Builder restClientBuilder) {
+        return new CloudinaryStorageService(
+                CloudinaryClientFactory.create(properties.cloudinary()), properties, restClientBuilder);
     }
 }

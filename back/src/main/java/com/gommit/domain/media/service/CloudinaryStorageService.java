@@ -10,14 +10,15 @@ import com.gommit.domain.media.support.MediaContentType;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.HttpClientSettings;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.multipart.MultipartFile;
 
 // Cloudinary 스토리지 구현.
@@ -36,13 +37,34 @@ public class CloudinaryStorageService implements StorageService {
 
     private final MediaStorageProperties properties;
     private final Cloudinary cloudinary;
-    private final HttpClient httpClient =
-            HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build();
+    private final RestClient restClient;
 
     // Cloudinary 클라이언트는 MediaConfig 가 CloudinaryClientFactory 로 만들어 주입한다.
+    // RestClient.Builder 없이 만들 때는 Boot 오토컨피그 기본 빌더를 새로 하나 뽑아 쓴다 —
+    // load() 는 baseUrl 없이 매번 절대 URL(서명 URL)로 요청하므로 그걸로 충분하다.
     public CloudinaryStorageService(Cloudinary cloudinary, MediaStorageProperties properties) {
+        this(cloudinary, properties, RestClient.builder());
+    }
+
+    public CloudinaryStorageService(
+            Cloudinary cloudinary, MediaStorageProperties properties, RestClient.Builder restClientBuilder) {
+        this(cloudinary, properties, restClientBuilder, CONNECT_TIMEOUT, REQUEST_TIMEOUT);
+    }
+
+    // 테스트 전용 — 특성화 테스트가 느린 응답 케이스를 30초 실측 대기 없이 짧은 타임아웃으로 검증할 수 있게 함.
+    CloudinaryStorageService(
+            Cloudinary cloudinary,
+            MediaStorageProperties properties,
+            RestClient.Builder restClientBuilder,
+            Duration connectTimeout,
+            Duration requestTimeout) {
         this.cloudinary = cloudinary;
         this.properties = properties;
+        ClientHttpRequestFactory requestFactory = ClientHttpRequestFactoryBuilder.detect()
+                .build(HttpClientSettings.defaults()
+                        .withConnectTimeout(connectTimeout)
+                        .withReadTimeout(requestTimeout));
+        this.restClient = restClientBuilder.requestFactory(requestFactory).build();
     }
 
     @Override
@@ -91,29 +113,35 @@ public class CloudinaryStorageService implements StorageService {
     @Override
     public Resource load(String storageKey, MediaRole mediaRole) {
         String signedUrl = buildUrl(storageKey, deliveryType(properties.policyFor(mediaRole)), true);
+        return fetchResource(signedUrl, filenameOf(storageKey));
+    }
+
+    // URL 계산(buildUrl)과 분리된 GET + 상태코드/예외 매핑 부분. Cloudinary 서명 URL 생성기가
+    // res.cloudinary.com 도메인을 강제하기 때문에, 클라이언트 종류(HttpClient/RestClient)에
+    // 안 가리는 와이어레벨 특성화 테스트가 임의 URL(로컬 HttpServer)을 직접 넣을 수 있도록
+    // package-private 으로 뺀 것.
+    // 상태코드 != 200 은 전부 MEDIA_NOT_FOUND, 그 외 RestClientException(타임아웃/연결 실패 등
+    // I/O 실패)은 MEDIA_STORAGE_FAILED — HttpClient 시절 시맨틱 그대로(회귀 아님, docs/media-restclient-migration.md 보강 5번).
+    Resource fetchResource(String url, String filename) {
+        byte[] body;
         try {
-            HttpResponse<byte[]> response = httpClient.send(
-                    HttpRequest.newBuilder(URI.create(signedUrl))
-                            .timeout(REQUEST_TIMEOUT)
-                            .GET()
-                            .build(),
-                    HttpResponse.BodyHandlers.ofByteArray());
-            if (response.statusCode() != 200) {
-                throw new BusinessException(ErrorCode.MEDIA_NOT_FOUND);
-            }
-            String filename = filenameOf(storageKey);
-            return new ByteArrayResource(response.body()) {
-                @Override
-                public String getFilename() {
-                    return filename;
-                }
-            };
-        } catch (IOException e) {
-            throw new BusinessException(ErrorCode.MEDIA_STORAGE_FAILED);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            body = restClient
+                    .get()
+                    .uri(url)
+                    .retrieve()
+                    .onStatus(status -> status.value() != 200, (req, res) -> {
+                        throw new BusinessException(ErrorCode.MEDIA_NOT_FOUND);
+                    })
+                    .body(byte[].class);
+        } catch (RestClientException e) {
             throw new BusinessException(ErrorCode.MEDIA_STORAGE_FAILED);
         }
+        return new ByteArrayResource(body) {
+            @Override
+            public String getFilename() {
+                return filename;
+            }
+        };
     }
 
     @Override
