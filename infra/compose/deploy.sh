@@ -136,6 +136,10 @@ fi
 #    nginx 가 안 떠 있으면 스위치가 실제로 확인된 적이 없으므로 이전 색은 그대로 두고 경고만
 #    남긴다 — 유일하게 확인된 backend 를 이유 없이 내려서 복구 여지를 줄이지 않기 위함.
 if nginx_running; then
+  # reload 는 기존 연결을 끊지 않지만, 그 연결이 실제로 물고 있는 back-${CURRENT_COLOR} 를
+  # 곧장 stop 하면 응답 중이던 요청까지 끊긴다(앱이 graceful shutdown 을 안 씀). 옛 워커가
+  # in-flight 요청을 끝낼 시간을 잠깐 준다.
+  sleep 5
   docker compose stop "back-${CURRENT_COLOR}" || true
 else
   echo "nginx 미기동 — back-${CURRENT_COLOR} 유지(정지 생략). nginx 상태 확인 후 재배포 권장." >&2
