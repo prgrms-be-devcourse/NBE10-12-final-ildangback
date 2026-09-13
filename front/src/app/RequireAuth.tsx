@@ -13,7 +13,12 @@ export function RequireAuth() {
   const location = useLocation();
 
   if (status === "loading") return <LoadingScreen />;
-  if (status === "anonymous")
+  if (status === "anonymous") {
+    // 이미 다른 곳으로 나가는 중이면 끼어들지 않는다. 주소는 바뀌었는데 라우터가 아직
+    // 커밋을 안 한 순간이라 이 화면이 그려져 있다 — 여기서 튕겨내면 state.from 에
+    // 떠나는 화면이 실려 재로그인 때 그리로 돌아간다.
+    if (window.location.pathname !== location.pathname) return null;
     return <Navigate to="/login" replace state={{ from: location }} />;
+  }
   return <Outlet />;
 }

@@ -59,6 +59,10 @@ export function VerifyResultPage() {
           </Button>
         )}
       </div>
+
+      <p className="mt-6 text-center text-[13px] text-gray-500">
+        이 창은 닫아도 괜찮아요.
+      </p>
     </div>
   );
 }

@@ -44,10 +44,12 @@ export function DeleteAccountPage() {
     try {
       await deleteAccount(password || undefined);
 
-      // 이 화면은 RequireAuth 안에 있어서, 로그인 상태가 비는 순간 RequireAuth 가
-      // /login 으로 튕겨낸다. 그게 탈퇴 뒤 갈 곳으로도 맞다 — 같은 이메일로 재가입이
-      // 되고 링크가 거기 있다. 문구만 flash 로 넘겨 리다이렉트와 경쟁하지 않게 한다.
+      // 탈퇴 뒤 갈 곳은 /login 이다 — 같은 이메일로 재가입이 되고 링크가 거기 있다.
+      // RequireAuth 의 리다이렉트에 맡기지 않고 직접 나간다. 맡기면 state.from 에 이
+      // 화면이 실려 그 로그인 화면에서 로그인한 사람이 탈퇴 화면으로 들어간다.
+      // 문구는 flash 로 넘겨 리다이렉트와 경쟁하지 않게 한다.
       setFlash("탈퇴가 완료됐어요.");
+      navigate("/login", { replace: true });
 
       // 서버가 모든 RT 를 폐기하고 api 쪽에서 토큰을 지웠다.
       // AuthProvider 상태만 비우면 된다 — 로그아웃 호출은 이미 죽은 RT 라 의미가 없다.
