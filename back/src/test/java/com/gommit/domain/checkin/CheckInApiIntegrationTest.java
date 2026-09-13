@@ -15,6 +15,7 @@ import com.gommit.domain.media.service.StorageService;
 import com.gommit.domain.media.support.MediaContentType;
 import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.global.exception.BusinessException;
+import com.gommit.global.time.BusinessClock;
 import com.gommit.support.IntegrationTestSupport;
 import com.jayway.jsonpath.JsonPath;
 import java.io.IOException;
@@ -58,6 +59,9 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
 
     @Autowired
     private StorageService storageService;
+
+    @Autowired
+    private BusinessClock businessClock;
 
     // 통합 테스트가 실제 파일을 쓰므로, orphan 여부를 검증할 수 있도록 매 테스트 전에 미디어 디렉토리를 비운다.
     @BeforeEach
@@ -842,7 +846,7 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
             var owner = loginAs(EMAIL, NICKNAME);
             long challengeId = setUpChallenge(EMAIL, 2);
             submit(challengeId, owner.accessToken());
-            LocalDate today = LocalDate.now();
+            LocalDate today = businessClock.today();
 
             mockMvc.perform(withToken(
                             get("/api/challenges/{challengeId}/daily-logs/{date}", challengeId, today),

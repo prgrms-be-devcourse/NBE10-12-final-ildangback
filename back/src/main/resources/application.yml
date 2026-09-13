@@ -51,12 +51,15 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,prometheus
   endpoint:
     health:
       probes:
         enabled: true
       show-details: never
+  metrics:
+    tags:
+      application: ${spring.application.name} # Grafana 대시보드(JVM Micrometer)가 이 라벨로 필터링(Q29)
 
 point: # [임시값] 기획 확정 시 조정. 없으면 PointProperties 의 @DefaultValue 로 뜬다.
   check-in-reward: 10          # 개인 인증 1건

@@ -29,6 +29,9 @@ spring:
 logging:
   level:
     root: info
+  structured:
+    format:
+      console: logstash   # Loki 연동. fluent API(log.atWarn()...addKeyValue())와 함께 켜야 효과 있음
 
 media:
   storage:

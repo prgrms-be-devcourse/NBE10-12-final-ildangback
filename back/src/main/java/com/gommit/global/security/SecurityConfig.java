@@ -40,11 +40,12 @@ public class SecurityConfig {
         "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**",
     };
 
-    // 인프라(nginx / Docker HEALTHCHECK / deploy.sh / deploy.yml)는 전부 GET /actuator/health 만
-    // 호출한다. health 그룹 하위 경로(liveness 등)는 아무도 안 쓰므로 와일드카드를 배제하고
-    // 정확히 한 경로만 공개한다(심층방어 — exposure.include=health 와 이중).
-    private static final String[] MONITORING_ENDPOINTS = {
+    private static final String[] HEALTH_ENDPOINTS = {
         "/actuator/health",
+    };
+
+    private static final String[] PROMETHEUS_ENDPOINT = {
+        "/actuator/prometheus",
     };
 
     private static final String H2_CONSOLE = "/h2-console/**";
@@ -85,7 +86,9 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers(DOCS_ENDPOINTS)
                         .permitAll()
-                        .requestMatchers(MONITORING_ENDPOINTS)
+                        .requestMatchers(HEALTH_ENDPOINTS)
+                        .permitAll()
+                        .requestMatchers(PROMETHEUS_ENDPOINT)
                         .permitAll()
                         .requestMatchers("/api/admin/**")
                         .hasRole("ADMIN")

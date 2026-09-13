@@ -104,6 +104,7 @@ cp src/infra/compose/backup.sh .
 cp src/infra/compose/deploy.sh .          # 이후 SSM 배포가 절대경로로 호출. 이후엔 deploy.sh 가 스스로 갱신.
 chmod +x deploy.sh
 rsync -a src/infra/nginx/ nginx/
+rsync -a src/infra/monitoring/ monitoring/
 docker compose up -d
 docker compose ps
 ```
