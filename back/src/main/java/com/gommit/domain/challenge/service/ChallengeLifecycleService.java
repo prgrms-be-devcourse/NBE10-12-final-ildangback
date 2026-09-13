@@ -4,7 +4,6 @@ import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.ChallengeMember;
 import com.gommit.domain.challenge.entity.ChallengeMemberRole;
 import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
-import com.gommit.domain.challenge.entity.ChallengeStatus;
 import com.gommit.domain.challenge.event.ChallengeEndedEvent;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
@@ -83,10 +82,25 @@ public class ChallengeLifecycleService {
         }
     }
 
+    private void notifySeasonEnded(Challenge challenge) {
+        for (ChallengeMember member : challengeMemberRepository.findAllByChallengeIdAndStatus(
+                challenge.getId(), ChallengeMemberStatus.ACTIVE)) {
+            if (notificationRepository.existsByUserIdAndTypeAndRefId(
+                    member.getUserId(), NotificationType.SEASON_ENDED, challenge.getId())) continue;
+            notificationRepository.save(new Notification(
+                    member.getUserId(),
+                    NotificationType.SEASON_ENDED,
+                    "이번 시즌이 종료됐어요!",
+                    "이번 시즌이 종료됐어요! 기록을 확인해보세요 🎉",
+                    challenge.getId()));
+        }
+    }
+
     @Transactional
     public void endChallengesDueToday() {
         LocalDate today = businessClock.today();
-        List<Challenge> activeChallenges = challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE);
+        // ACTIVE 조회에 잠금을 적용해 동시 종료와 종료 알림 생성을 직렬화한다.
+        List<Challenge> activeChallenges = challengeRepository.findActiveForEnding();
         // endDate가 지났으면(오늘 포함 안 함) 종료한다 - 활성화와 동일한 이유로
         // 정확히 다음날만 보면 안 된다.
         List<Challenge> challengesDueToday = activeChallenges.stream()
@@ -99,6 +113,7 @@ public class ChallengeLifecycleService {
             // 트랜잭션 안에서 동기 실행하면 락 점유가 길어진다 - 커밋 후 비동기로
             // 분리한다(ChallengeEndedEventListener).
             eventPublisher.publishEvent(new ChallengeEndedEvent(challenge.getId()));
+            notifySeasonEnded(challenge);
             Optional<Challenge> nextChallenge =
                     challengeRepository.findByGroupIdAndSeqNo(challenge.getGroupId(), challenge.getSeqNo() + 1);
             if (nextChallenge.isPresent()) {

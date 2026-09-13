@@ -319,4 +319,64 @@ class ChallengeNudgeApiIntegrationTest extends IntegrationTestSupport {
         assertThat(challenges.findById(challenge.getId()).orElseThrow().getStatus())
                 .isEqualTo(ChallengeStatus.READY);
     }
+
+    @Test
+    void seasonEndNotifiesActiveMembersIncludingDeclineOnlyOnce() {
+        jdbcTemplate.update(
+                "UPDATE challenges SET start_date = ?, end_date = ? WHERE id = ?",
+                today.minusDays(7),
+                today.minusDays(1),
+                challenge.getId());
+        jdbcTemplate.update("UPDATE challenge_members SET extension_choice = 'DECLINE' WHERE user_id = ?", receiverId);
+        // The current season must notify even when there is a next season.
+        challenges.saveAndFlush(Challenge.builder()
+                .groupId(challenge.getGroupId())
+                .seqNo(2)
+                .startDate(today)
+                .endDate(today.plusDays(7))
+                .frequencyType(FrequencyType.DAILY)
+                .dailyCheckInCount(3)
+                .requiredDayCount(8)
+                .allowPhoto(true)
+                .build());
+        lifecycle.endChallengesDueToday();
+        assertThat(challenges.findById(challenge.getId()).orElseThrow().getStatus())
+                .isEqualTo(ChallengeStatus.ENDED);
+        assertThat(notifications.findAll()).hasSize(2).allSatisfy(n -> {
+            assertThat(n.getType()).isEqualTo(NotificationType.SEASON_ENDED);
+            assertThat(n.getRefId()).isEqualTo(challenge.getId());
+            assertThat(n.getBody()).isEqualTo("이번 시즌이 종료됐어요! 기록을 확인해보세요 🎉");
+        });
+        assertThat(notifications.findAll())
+                .extracting(n -> n.getUserId())
+                .containsExactlyInAnyOrder(senderId, receiverId);
+        jdbcTemplate.update("UPDATE notifications SET read_at = ?", today.atTime(5, 0));
+        lifecycle.endChallengesDueToday();
+        assertThat(notifications.count()).isEqualTo(2);
+        jdbcTemplate.update("UPDATE challenges SET status = 'ACTIVE' WHERE id = ?", challenge.getId());
+        lifecycle.endChallengesDueToday();
+        assertThat(notifications.count()).isEqualTo(2);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"LEFT", "KICKED"})
+    void seasonEndExcludesDepartedMembers(String status) {
+        jdbcTemplate.update(
+                "UPDATE challenges SET start_date = ?, end_date = ? WHERE id = ?",
+                today.minusDays(7),
+                today.minusDays(1),
+                challenge.getId());
+        jdbcTemplate.update("UPDATE challenge_members SET status = ? WHERE user_id = ?", status, receiverId);
+        lifecycle.endChallengesDueToday();
+        assertThat(notifications.findAll()).hasSize(1);
+        assertThat(notifications.findAll().getFirst().getUserId()).isEqualTo(senderId);
+    }
+
+    @Test
+    void seasonEndSkipsFutureEndDate() {
+        lifecycle.endChallengesDueToday();
+        assertThat(notifications.count()).isZero();
+        assertThat(challenges.findById(challenge.getId()).orElseThrow().getStatus())
+                .isEqualTo(ChallengeStatus.ACTIVE);
+    }
 }

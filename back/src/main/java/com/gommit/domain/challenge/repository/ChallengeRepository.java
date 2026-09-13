@@ -25,6 +25,11 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
             "select c from Challenge c where c.status = com.gommit.domain.challenge.entity.ChallengeStatus.READY order by c.id")
     List<Challenge> findReadyForActivation();
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+            "select c from Challenge c where c.status = com.gommit.domain.challenge.entity.ChallengeStatus.ACTIVE order by c.id")
+    List<Challenge> findActiveForEnding();
+
     List<Challenge> findAllByStatus(ChallengeStatus status);
 
     List<Challenge> findAllByGroupIdOrderBySeqNoAsc(Long groupId);

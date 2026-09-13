@@ -242,7 +242,7 @@ class ChallengeLifecycleServiceTest {
             Challenge challenge = challenge(50L, 1, ChallengeStatus.ACTIVE, today.minusDays(7), today.minusDays(1));
             ChallengeGroup group = group(12L, 1L);
             group.activate();
-            when(challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE)).thenReturn(List.of(challenge));
+            when(challengeRepository.findActiveForEnding()).thenReturn(List.of(challenge));
             when(challengeRepository.findByGroupIdAndSeqNo(12L, 2)).thenReturn(Optional.empty());
             when(challengeGroupRepository.findAllById(Set.of(12L))).thenReturn(List.of(group));
 
@@ -262,7 +262,7 @@ class ChallengeLifecycleServiceTest {
             // given
             LocalDate today = LocalDate.now(KST);
             Challenge challenge = challenge(50L, 1, ChallengeStatus.ACTIVE, today.minusDays(7), today);
-            when(challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE)).thenReturn(List.of(challenge));
+            when(challengeRepository.findActiveForEnding()).thenReturn(List.of(challenge));
 
             // when
             challengeLifecycleService.endChallengesDueToday();
@@ -280,7 +280,7 @@ class ChallengeLifecycleServiceTest {
             LocalDate today = LocalDate.now(KST);
             Challenge challenge = challenge(50L, 1, ChallengeStatus.ACTIVE, today.minusDays(7), today.minusDays(1));
             Challenge nextChallenge = challenge(51L, 2, ChallengeStatus.READY, today, today.plusDays(6));
-            when(challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE)).thenReturn(List.of(challenge));
+            when(challengeRepository.findActiveForEnding()).thenReturn(List.of(challenge));
             when(challengeRepository.findByGroupIdAndSeqNo(12L, 2)).thenReturn(Optional.of(nextChallenge));
 
             // when
@@ -298,7 +298,7 @@ class ChallengeLifecycleServiceTest {
             // given
             LocalDate today = LocalDate.now(KST);
             Challenge challenge = challenge(50L, 1, ChallengeStatus.ACTIVE, today.minusDays(7), today.minusDays(1));
-            when(challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE)).thenReturn(List.of(challenge));
+            when(challengeRepository.findActiveForEnding()).thenReturn(List.of(challenge));
             when(challengeRepository.findByGroupIdAndSeqNo(12L, 2)).thenReturn(Optional.empty());
             when(challengeGroupRepository.findAllById(Set.of(12L))).thenReturn(List.of());
 
