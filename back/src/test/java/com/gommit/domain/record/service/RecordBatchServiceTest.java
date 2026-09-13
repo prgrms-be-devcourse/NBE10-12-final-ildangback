@@ -7,7 +7,6 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -100,8 +99,8 @@ class RecordBatchServiceTest {
     @BeforeEach
     void setUp() {
         PointProperties pointProperties = new PointProperties(10, 5, 150, 0);
-        BusinessClock businessClock = new BusinessClock(
-                Clock.fixed(TODAY.atStartOfDay(ZoneId.of("Asia/Seoul")).toInstant(), ZoneId.of("Asia/Seoul")));
+        Clock clock = Clock.fixed(TODAY.atStartOfDay(ZoneId.of("Asia/Seoul")).toInstant(), ZoneId.of("Asia/Seoul"));
+        BusinessClock businessClock = new BusinessClock(clock);
         recordBatchService = new RecordBatchService(
                 challengeRepository,
                 challengeMemberRepository,
@@ -117,7 +116,11 @@ class RecordBatchServiceTest {
                 pointProperties,
                 new ChallengeMergeCycleCalculator(),
                 new RecordCompletionCalculator(),
-                businessClock);
+                businessClock,
+                clock);
+        // 프록시 없이 만든 인스턴스라 self는 자기 자신으로 채워야 self.xxx() 호출이 동작한다
+        // (REQUIRES_NEW는 단위 테스트에서 적용되지 않지만 호출 자체는 실제 메소드로 위임돼야 한다).
+        ReflectionTestUtils.setField(recordBatchService, "self", recordBatchService);
 
         // 캐릭터 스냅샷은 대부분 테스트에서 신경 안 쓰는 값이라 기본은 빈 맵.
         lenient().when(userItemService.getCharacters(anyList())).thenReturn(Map.of());
@@ -241,7 +244,9 @@ class RecordBatchServiceTest {
             assertThat(saved.getTotalDays()).isEqualTo(30);
             assertThat(saved.getTotalCheckInCount()).isEqualTo(3);
 
-            verify(monthlyMergeResultRepository, times(2)).save(any());
+            ArgumentCaptor<List<MonthlyMergeResult>> resultsCaptor = ArgumentCaptor.forClass(List.class);
+            verify(monthlyMergeResultRepository).saveAll(resultsCaptor.capture());
+            assertThat(resultsCaptor.getValue()).hasSize(2);
         }
 
         @Test
@@ -265,11 +270,12 @@ class RecordBatchServiceTest {
 
             recordBatchService.generateDueMonthlyMerges();
 
-            ArgumentCaptor<MonthlyMergeResult> captor = ArgumentCaptor.forClass(MonthlyMergeResult.class);
-            verify(monthlyMergeResultRepository).save(captor.capture());
-            assertThat(captor.getValue().getHeadImageUrl()).isEqualTo("head.png");
-            assertThat(captor.getValue().getTopImageUrl()).isEqualTo("top.png");
-            assertThat(captor.getValue().getBottomImageUrl()).isNull();
+            ArgumentCaptor<List<MonthlyMergeResult>> captor = ArgumentCaptor.forClass(List.class);
+            verify(monthlyMergeResultRepository).saveAll(captor.capture());
+            MonthlyMergeResult saved = captor.getValue().get(0);
+            assertThat(saved.getHeadImageUrl()).isEqualTo("head.png");
+            assertThat(saved.getTopImageUrl()).isEqualTo("top.png");
+            assertThat(saved.getBottomImageUrl()).isNull();
         }
 
         @Test
@@ -392,9 +398,9 @@ class RecordBatchServiceTest {
             assertThat(mergeCaptor.getValue().getTotalDays()).isEqualTo(10);
             assertThat(mergeCaptor.getValue().getTotalCheckInCount()).isEqualTo(8);
 
-            ArgumentCaptor<FinalMergeResult> resultCaptor = ArgumentCaptor.forClass(FinalMergeResult.class);
-            verify(finalMergeResultRepository, times(2)).save(resultCaptor.capture());
-            List<FinalMergeResult> results = resultCaptor.getAllValues();
+            ArgumentCaptor<List<FinalMergeResult>> resultCaptor = ArgumentCaptor.forClass(List.class);
+            verify(finalMergeResultRepository).saveAll(resultCaptor.capture());
+            List<FinalMergeResult> results = resultCaptor.getValue();
             FinalMergeResult resultA = results.stream()
                     .filter(r -> r.getUserId().equals(100L))
                     .findFirst()
@@ -446,9 +452,9 @@ class RecordBatchServiceTest {
             recordBatchService.generateFinalMerge(1L);
 
             // then
-            ArgumentCaptor<FinalMergeResult> resultCaptor = ArgumentCaptor.forClass(FinalMergeResult.class);
-            verify(finalMergeResultRepository, times(2)).save(resultCaptor.capture());
-            List<FinalMergeResult> results = resultCaptor.getAllValues();
+            ArgumentCaptor<List<FinalMergeResult>> resultCaptor = ArgumentCaptor.forClass(List.class);
+            verify(finalMergeResultRepository).saveAll(resultCaptor.capture());
+            List<FinalMergeResult> results = resultCaptor.getValue();
             FinalMergeResult result200 = results.stream()
                     .filter(r -> r.getUserId().equals(200L))
                     .findFirst()
@@ -486,9 +492,9 @@ class RecordBatchServiceTest {
 
             recordBatchService.generateFinalMerge(1L);
 
-            ArgumentCaptor<FinalMergeResult> resultCaptor = ArgumentCaptor.forClass(FinalMergeResult.class);
-            verify(finalMergeResultRepository, times(2)).save(resultCaptor.capture());
-            List<FinalMergeResult> results = resultCaptor.getAllValues();
+            ArgumentCaptor<List<FinalMergeResult>> resultCaptor = ArgumentCaptor.forClass(List.class);
+            verify(finalMergeResultRepository).saveAll(resultCaptor.capture());
+            List<FinalMergeResult> results = resultCaptor.getValue();
             FinalMergeResult result100 = results.stream()
                     .filter(r -> r.getUserId().equals(100L))
                     .findFirst()

@@ -4,11 +4,11 @@ import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.ChallengeMember;
 import com.gommit.domain.challenge.entity.ChallengeMemberRole;
 import com.gommit.domain.challenge.entity.ChallengeStatus;
+import com.gommit.domain.challenge.event.ChallengeEndedEvent;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.group.entity.ChallengeGroup;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
-import com.gommit.domain.record.service.RecordBatchService;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import com.gommit.global.time.BusinessClock;
@@ -17,6 +17,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,7 +27,7 @@ public class ChallengeLifecycleService {
     private final ChallengeRepository challengeRepository;
     private final ChallengeMemberRepository challengeMemberRepository;
     private final ChallengeGroupRepository challengeGroupRepository;
-    private final RecordBatchService recordBatchService;
+    private final ApplicationEventPublisher eventPublisher;
     private final BusinessClock businessClock;
 
     @Transactional
@@ -72,7 +73,10 @@ public class ChallengeLifecycleService {
         Set<Long> groupIdsToEnd = new HashSet<>();
         for (Challenge challenge : challengesDueToday) {
             challenge.end();
-            recordBatchService.generateFinalMerge(challenge.getId());
+            // 최종 머지 생성은 무거운 집계/포인트 지급을 동반해서 상태 전환
+            // 트랜잭션 안에서 동기 실행하면 락 점유가 길어진다 - 커밋 후 비동기로
+            // 분리한다(ChallengeEndedEventListener).
+            eventPublisher.publishEvent(new ChallengeEndedEvent(challenge.getId()));
             Optional<Challenge> nextChallenge =
                     challengeRepository.findByGroupIdAndSeqNo(challenge.getGroupId(), challenge.getSeqNo() + 1);
             if (nextChallenge.isPresent()) {

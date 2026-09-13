@@ -29,6 +29,7 @@ import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import com.gommit.global.time.BusinessClock;
 import com.gommit.global.time.BusinessDayCutoff;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -38,7 +39,10 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 // 월간/최종 머지 "생성" 담당. 회차 계산은 ChallengeMergeCycleCalculator, 통계 계산은
@@ -68,19 +72,32 @@ public class RecordBatchService {
     private final ChallengeMergeCycleCalculator cycleCalculator;
     private final RecordCompletionCalculator completionCalculator;
     private final BusinessClock businessClock;
+    private final Clock clock;
+
+    // REQUIRES_NEW가 프록시를 거쳐야 적용돼서 자기 자신을 주입받아 호출한다(순환
+    // 생성 방지를 위해 @Lazy).
+    @Lazy
+    @Autowired
+    private RecordBatchService self;
 
     // 스케줄러가 매일 호출. ACTIVE 챌린지 중 30일 주기가 지난 걸 찾아 월간 머지를 생성한다.
-    @Transactional
+    // 챌린지 하나가 예외를 던져도 나머지 챌린지 처리는 계속돼야 해서, 챌린지 단위로
+    // 트랜잭션(REQUIRES_NEW)과 예외를 분리한다.
     public void generateDueMonthlyMerges() {
         LocalDate today = businessClock.today();
         List<Challenge> activeChallenges = challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE);
         log.info("월간 머지 배치 시작 - today={}, ACTIVE 챌린지 {}개", today, activeChallenges.size());
         for (Challenge challenge : activeChallenges) {
-            generateDueMonthlyMerges(challenge, today);
+            try {
+                self.generateDueMonthlyMergesForChallenge(challenge, today);
+            } catch (Exception e) {
+                log.error("월간 머지 생성 실패 - challengeId={}", challenge.getId(), e);
+            }
         }
     }
 
-    private void generateDueMonthlyMerges(Challenge challenge, LocalDate today) {
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void generateDueMonthlyMergesForChallenge(Challenge challenge, LocalDate today) {
         int totalMonthlyMergeCount =
                 cycleCalculator.totalMonthlyMergeCount(challenge.getStartDate(), challenge.getEndDate());
         int seqNo = cycleCalculator.nextSeqNo(monthlyMergeRepository.countByChallengeId(challenge.getId()));
@@ -117,12 +134,13 @@ public class RecordBatchService {
                 inputs.totalDays,
                 inputs.totalCheckInCount,
                 averageCompletionRate(stats),
-                LocalDateTime.now());
+                LocalDateTime.now(clock));
         monthlyMergeRepository.save(merge);
 
+        List<MonthlyMergeResult> results = new ArrayList<>();
         for (MemberStat stat : stats) {
             TrendData trend = completionCalculator.weeklyTrend(stat.checkInDates, periodStart, inputs.totalDays);
-            monthlyMergeResultRepository.save(MonthlyMergeResult.of(
+            results.add(MonthlyMergeResult.of(
                     merge.getId(),
                     stat.userId,
                     stat.ranking,
@@ -139,6 +157,7 @@ public class RecordBatchService {
                     stat.characterSlots.get(ItemSlot.BOTTOM),
                     stat.characterSlots.get(ItemSlot.SHOES)));
         }
+        monthlyMergeResultRepository.saveAll(results);
         log.info(
                 "월간 머지 생성 완료 - challengeId={}, seqNo={}, periodStart={}, periodEnd={}, 참여자 {}명",
                 challenge.getId(),
@@ -161,7 +180,7 @@ public class RecordBatchService {
         // 최종 머지를 만들기 전에 밀린 월간 회차부터 채운다. RecordScheduler와
         // ChallengeLifecycleService(ENDED 전환)가 같은 크론이라 실행 순서가 보장 안
         // 돼서, 여기서 안 챙기면 ENDED로 넘어가는 순간 밀린 월간 머지가 영영 안 만들어진다.
-        generateDueMonthlyMerges(challenge, businessClock.today());
+        self.generateDueMonthlyMergesForChallenge(challenge, businessClock.today());
         List<ChallengeMember> members = activeMembers(challengeId);
         if (members.isEmpty()) {
             return;
@@ -178,15 +197,16 @@ public class RecordBatchService {
                 inputs.totalDays,
                 inputs.totalCheckInCount,
                 averageCompletionRate(stats),
-                LocalDateTime.now());
+                LocalDateTime.now(clock));
         finalMergeRepository.save(merge);
 
         String groupName =
                 challengeGroupRepository.findNameById(challenge.getGroupId()).orElse("챌린지");
         int bonus = pointProperties.mergeBonus();
+        List<FinalMergeResult> results = new ArrayList<>();
         for (MemberStat stat : stats) {
             TrendData trend = completionCalculator.monthlyTrend(stat.checkInDates, periodStart, periodEnd);
-            finalMergeResultRepository.save(FinalMergeResult.of(
+            results.add(FinalMergeResult.of(
                     merge.getId(),
                     stat.userId,
                     stat.ranking,
@@ -207,6 +227,7 @@ public class RecordBatchService {
                         stat.userId, challengeId, bonus, UserPointReason.CHALLENGE_BONUS, groupName);
             }
         }
+        finalMergeResultRepository.saveAll(results);
     }
 
     private List<ChallengeMember> activeMembers(Long challengeId) {
