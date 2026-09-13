@@ -140,13 +140,16 @@ class MainActivity : ComponentActivity() {
 
     // 구글이 임베디드 웹뷰의 OAuth 요청을 차단한다. 밖으로 나가는 주소는 전부 시스템 브라우저로 뺀다
     private fun openOutside(url: Uri) {
-        val intent = if (url.scheme == "http" || url.scheme == "https") {
-            CustomTabsIntent.Builder().build().intent.setData(url)
-        } else {
-            Intent(Intent.ACTION_VIEW, url)
+        if (url.scheme == "http" || url.scheme == "https") {
+            try {
+                CustomTabsIntent.Builder().build().launchUrl(this, url)
+                return
+            } catch (_: ActivityNotFoundException) {
+                // Custom Tabs 를 지원하는 브라우저가 없다. 아래 ACTION_VIEW 로 내려간다
+            }
         }
         try {
-            startActivity(intent)
+            startActivity(Intent(Intent.ACTION_VIEW, url))
         } catch (_: ActivityNotFoundException) {
             // 열 수 있는 앱이 없으면 아무것도 하지 않는다
         }

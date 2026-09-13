@@ -48,7 +48,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // 2.1MB -> 0.3MB. 실기기 확인 후 켰다.
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
             signingConfig = signingConfigs.findByName("release")
         }
     }
