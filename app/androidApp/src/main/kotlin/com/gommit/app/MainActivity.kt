@@ -87,6 +87,11 @@ class MainActivity : ComponentActivity() {
             // 인증 촬영의 카메라 미리보기가 사용자 제스처 없이 시작된다
             mediaPlaybackRequiresUserGesture = false
 
+            // 원격 URL 만 로드한다. file:// 과 content:// 를 쓸 일이 없다.
+            // allowFileAccess 는 targetSdk 30 부터 이미 false 지만 명시해 둔다.
+            allowFileAccess = false
+            allowContentAccess = false
+
             userAgentString = "$userAgentString $APP_USER_AGENT_SUFFIX"
         }
 
@@ -104,6 +109,12 @@ class MainActivity : ComponentActivity() {
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onPermissionRequest(request: PermissionRequest) {
+                // 요청한 프레임이 우리 origin 이 아니면 거절한다.
+                // 이게 없으면 iframe 이나 리다이렉트로 들어온 남의 페이지가 카메라를 가져간다.
+                if (originOf(request.origin) != webOrigin) {
+                    request.deny()
+                    return
+                }
                 if (!request.resources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
                     request.deny()
                     return
@@ -190,6 +201,15 @@ class MainActivity : ComponentActivity() {
     }
 
     private val webHost: String? by lazy { BuildConfig.WEB_URL.toUri().host }
+
+    private val webOrigin: String? by lazy { originOf(BuildConfig.WEB_URL.toUri()) }
+
+    // scheme://host[:port] 만 남긴다. 경로나 끝의 / 가 붙어 와도 같은 값이 나온다
+    private fun originOf(uri: Uri?): String? {
+        val scheme = uri?.scheme ?: return null
+        val authority = uri.authority ?: return null
+        return "$scheme://$authority"
+    }
 
     companion object {
         private const val APP_USER_AGENT_SUFFIX = "Gommit-App/1.0"
