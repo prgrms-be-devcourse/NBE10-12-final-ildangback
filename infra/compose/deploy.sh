@@ -121,8 +121,12 @@ if nginx_running; then
     docker compose stop "back-${NEW_COLOR}" || true
     exit 1
   fi
+  if ! docker compose exec -T nginx nginx -s reload; then
+    echo "nginx reload 실패 — active-backend.conf 롤백(active 는 여전히 back-${CURRENT_COLOR}), 배포 중단. back-${NEW_COLOR} 는 healthy 상태라 살려둠(nginx 만 문제)." >&2
+    mv "$ACTIVE_CONF.bak" "$ACTIVE_CONF"
+    exit 1
+  fi
   rm -f "$ACTIVE_CONF.bak"
-  docker compose exec -T nginx nginx -s reload
   echo "nginx reloaded → active=back-${NEW_COLOR}"
 else
   mv "$APP_DIR/nginx/conf.d/active-backend.conf.new" "$ACTIVE_CONF"
