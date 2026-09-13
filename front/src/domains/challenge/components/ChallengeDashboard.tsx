@@ -30,6 +30,7 @@ export function ChallengeDashboard({
   data,
   description,
   mapType,
+  backgroundImageUrl,
   members,
   characters,
   isCurrent,
@@ -40,6 +41,8 @@ export function ChallengeDashboard({
   data: ChallengeStatusResponse;
   description?: string | null;
   mapType?: MapType;
+  /** 그룹이 상점에서 산 배경을 적용했으면 그 그림, 아니면 기본 지도 그림을 쓴다. */
+  backgroundImageUrl?: string | null;
   members: MemberTodayStatusResponse[] | null;
   characters: ChallengeCharacterResponse[] | null;
   isCurrent: boolean;
@@ -183,8 +186,14 @@ export function ChallengeDashboard({
               {mapType ? (
                 <div className="relative isolate">
                   <img
-                    src={gym ? sportsMap : studyMap}
-                    alt={gym ? "운동 챌린지 공간" : "공부 챌린지 공간"}
+                    src={backgroundImageUrl ?? (gym ? sportsMap : studyMap)}
+                    alt={
+                      backgroundImageUrl
+                        ? "그룹이 적용한 배경"
+                        : gym
+                          ? "운동 챌린지 공간"
+                          : "공부 챌린지 공간"
+                    }
                     className="aspect-[4/3] w-full object-cover"
                   />
                   <div className="absolute bottom-5 left-1/2 flex w-[min(16rem,calc(100%-2rem))] -translate-x-1/2 flex-wrap items-end justify-center gap-x-2 gap-y-2 min-[400px]:gap-x-3">

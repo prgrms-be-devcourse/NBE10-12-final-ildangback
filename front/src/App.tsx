@@ -3,10 +3,17 @@ import { PlainLayout } from "./app/PlainLayout";
 import { RequireAuth } from "./app/RequireAuth";
 import { RequireAdmin } from "./domains/admin/RequireAdmin";
 import { AdminHomePage } from "./domains/admin/pages/AdminHomePage";
+import { BackgroundAdminPage } from "./domains/admin/pages/BackgroundAdminPage";
 import { ItemAdminPage } from "./domains/admin/pages/ItemAdminPage";
+import { GroupShopPage } from "./domains/background/pages/GroupShopPage";
 import { TabLayout } from "./app/TabLayout";
+import { ForgotPasswordPage } from "./domains/auth/pages/ForgotPasswordPage";
 import { LoginPage } from "./domains/auth/pages/LoginPage";
+import { OAuthCallbackPage } from "./domains/auth/pages/OAuthCallbackPage";
+import { ResetPasswordPage } from "./domains/auth/pages/ResetPasswordPage";
 import { SignUpPage } from "./domains/auth/pages/SignUpPage";
+import { SocialOnboardingPage } from "./domains/auth/pages/SocialOnboardingPage";
+import { VerifyResultPage } from "./domains/auth/pages/VerifyResultPage";
 import { CheckInPage } from "./domains/checkin/pages/CheckInPage";
 import { MyChallengeAlbumPage } from "./domains/checkin/pages/MyChallengeAlbumPage";
 import { MyCheckInsPage } from "./domains/checkin/pages/MyCheckInsPage";
@@ -19,6 +26,8 @@ import { EditProfilePage } from "./domains/user/pages/EditProfilePage";
 import { PointHistoryDetailPage } from "./domains/point/pages/PointHistoryDetailPage";
 import { PersonalStatsPage } from "./domains/record/pages/PersonalStatsPage";
 import { PointHistoryPage } from "./domains/point/pages/PointHistoryPage";
+import { GroupPointHistoryPage } from "./domains/point/pages/GroupPointHistoryPage";
+import { GroupPointHistoryDetailPage } from "./domains/point/pages/GroupPointHistoryDetailPage";
 import { FinalMergeResultPage } from "./domains/record/pages/FinalMergeResultPage";
 import { MergeListPage } from "./domains/record/pages/MergeListPage";
 import { MonthlyMergeResultPage } from "./domains/record/pages/MonthlyMergeResultPage";
@@ -89,8 +98,22 @@ export function App() {
         <Route path="login" element={<LoginPage />} />
         <Route path="signup" element={<SignUpPage />} />
 
+        {/*
+          경로가 백엔드에 박혀 있다. verify-result 는 EmailVerificationService 의 302 목적지,
+          reset-password 는 재설정 메일 링크, oauth 콜백은 oauth.allowed-redirect-uris 다.
+          바꾸려면 백엔드도 같이 고쳐야 한다.
+        */}
+        <Route path="verify-result" element={<VerifyResultPage />} />
+        <Route path="reset-password" element={<ResetPasswordPage />} />
+        <Route path="forgot-password" element={<ForgotPasswordPage />} />
+        <Route
+          path="oauth/:provider/callback"
+          element={<OAuthCallbackPage />}
+        />
+
         {/* 로그인해야만 열리는 화면들 */}
         <Route element={<RequireAuth />}>
+          <Route path="welcome" element={<SocialOnboardingPage />} />
           <Route path="profile/settings" element={<SettingsPage />} />
           <Route path="profile/account" element={<AccountPage />} />
           <Route path="profile/edit" element={<EditProfilePage />} />
@@ -117,6 +140,18 @@ export function App() {
             path="challenges/:challengeId/final-merge"
             element={<FinalMergeResultPage />}
           />
+          <Route
+            path="challenges/groups/:groupId/shop"
+            element={<GroupShopPage />}
+          />
+          <Route
+            path="challenges/groups/:groupId/points"
+            element={<GroupPointHistoryPage />}
+          />
+          <Route
+            path="challenges/groups/:groupId/points/:historyId"
+            element={<GroupPointHistoryDetailPage />}
+          />
 
           {/* 체크인 제출 플로우 — 카메라 중심의 집중 화면이라 하단바 없이 둔다. */}
           <Route
@@ -135,6 +170,7 @@ export function App() {
           <Route path="admin" element={<RequireAdmin />}>
             <Route index element={<AdminHomePage />} />
             <Route path="items" element={<ItemAdminPage />} />
+            <Route path="backgrounds" element={<BackgroundAdminPage />} />
           </Route>
         </Route>
       </Route>

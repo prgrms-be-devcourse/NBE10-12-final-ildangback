@@ -52,6 +52,18 @@ public enum ErrorCode {
     GROUP_OWNER_CANNOT_BE_KICKED(HttpStatus.BAD_REQUEST, "그룹 OWNER는 강퇴할 수 없습니다."),
     GROUP_MEMBER_KICK_NOT_ALLOWED(HttpStatus.CONFLICT, "ACTIVE 챌린지에서만 그룹원을 강퇴할 수 있습니다."),
     INVITE_CODE_NOT_FOUND(HttpStatus.NOT_FOUND, "유효한 초대코드를 찾을 수 없습니다."),
+    GROUP_ENDED(HttpStatus.CONFLICT, "이미 종료된 그룹입니다."),
+    BACKGROUND_NOT_FOUND(HttpStatus.NOT_FOUND, "배경을 찾을 수 없습니다."),
+    BACKGROUND_MAP_TYPE_MISMATCH(HttpStatus.BAD_REQUEST, "그룹과 배경의 맵 타입이 다릅니다."),
+    BACKGROUND_ALREADY_OWNED(HttpStatus.CONFLICT, "이미 보유한 배경입니다."),
+    BACKGROUND_NOT_OWNED(HttpStatus.CONFLICT, "보유하지 않은 배경입니다."),
+    BACKGROUND_IN_USE(HttpStatus.CONFLICT, "그룹이 보유했거나 구매 제안 이력이 있는 배경은 삭제할 수 없습니다."),
+    PURCHASE_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "구매 제안을 찾을 수 없습니다."),
+    PURCHASE_REQUEST_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 투표 중인 구매 제안이 있습니다."),
+    PURCHASE_REQUEST_CLOSED(HttpStatus.CONFLICT, "이미 종료된 구매 제안입니다."),
+    PURCHASE_REQUEST_NOT_CANCELABLE(HttpStatus.FORBIDDEN, "제안자 또는 그룹 OWNER만 취소할 수 있습니다."),
+    VOTE_ALREADY_CAST(HttpStatus.CONFLICT, "이미 투표했습니다."),
+
     // ===== item =====
     ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 아이템입니다."),
     USER_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "보유 아이템을 찾을 수 없습니다."),

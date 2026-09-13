@@ -127,16 +127,8 @@ export function ChallengeProgress({
           }
           className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-purple-50"
         >
-          {showsGroupProgress && (
-            <div
-              className="absolute inset-y-0 left-0 rounded-full bg-purple-200"
-              style={{
-                width: `${Math.max(0, Math.min(100, periodProgressRate))}%`,
-              }}
-            />
-          )}
           <div
-            className="absolute inset-y-0 left-0 z-10 rounded-full bg-purple-500"
+            className="absolute inset-y-0 left-0 rounded-full bg-purple-500"
             style={{
               width: `${Math.max(0, Math.min(100, displayedRate ?? 0))}%`,
             }}

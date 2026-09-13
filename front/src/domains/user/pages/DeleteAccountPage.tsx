@@ -13,8 +13,12 @@ import { TextField } from "../../../shared/ui/TextField";
 import { TopBar } from "../../../shared/ui/TopBar";
 import { deleteAccount } from "../api";
 
+/**
+ * 비밀번호를 필수로 두지 않는다. 소셜 전용 가입자(hasPassword=false)는 비밀번호가 없어서
+ * 막으면 영영 탈퇴하지 못하고, 그쪽은 AT 가 이미 본인 증명이다.
+ */
 const schema = z.object({
-  password: z.string().min(1, "비밀번호를 입력해주세요."),
+  password: z.string(),
 });
 
 type DeleteForm = z.infer<typeof schema>;
@@ -30,17 +34,22 @@ export function DeleteAccountPage() {
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
-  } = useForm<DeleteForm>({ resolver: zodResolver(schema) });
+  } = useForm<DeleteForm>({
+    resolver: zodResolver(schema),
+    defaultValues: { password: "" },
+  });
 
   const onSubmit = handleSubmit(async ({ password }) => {
     setFormError(null);
     try {
-      await deleteAccount(password);
+      await deleteAccount(password || undefined);
 
-      // 이 화면은 RequireAuth 안에 있어서, 로그인 상태가 비는 순간 RequireAuth 가
-      // /login 으로 튕겨낸다. 그게 탈퇴 뒤 갈 곳으로도 맞다 — 같은 이메일로 재가입이
-      // 되고 링크가 거기 있다. 문구만 flash 로 넘겨 리다이렉트와 경쟁하지 않게 한다.
+      // 탈퇴 뒤 갈 곳은 /login 이다 — 같은 이메일로 재가입이 되고 링크가 거기 있다.
+      // RequireAuth 의 리다이렉트에 맡기지 않고 직접 나간다. 맡기면 state.from 에 이
+      // 화면이 실려 그 로그인 화면에서 로그인한 사람이 탈퇴 화면으로 들어간다.
+      // 문구는 flash 로 넘겨 리다이렉트와 경쟁하지 않게 한다.
       setFlash("탈퇴가 완료됐어요.");
+      navigate("/login", { replace: true });
 
       // 서버가 모든 RT 를 폐기하고 api 쪽에서 토큰을 지웠다.
       // AuthProvider 상태만 비우면 된다 — 로그아웃 호출은 이미 죽은 RT 라 의미가 없다.
@@ -76,15 +85,18 @@ export function DeleteAccountPage() {
           noValidate
           className="mt-8 flex flex-col gap-4"
         >
-          <TextField
-            label="비밀번호"
-            type="password"
-            revealable
-            autoComplete="current-password"
-            placeholder="본인 확인을 위해 입력해주세요"
-            error={errors.password?.message}
-            {...register("password")}
-          />
+          {/* 비밀번호가 없는 계정은 물어볼 것이 없다. 서버도 확인을 건너뛴다. */}
+          {user?.hasPassword && (
+            <TextField
+              label="비밀번호"
+              type="password"
+              revealable
+              autoComplete="current-password"
+              placeholder="본인 확인을 위해 입력해주세요"
+              error={errors.password?.message}
+              {...register("password")}
+            />
+          )}
 
           <Checkbox checked={acknowledged} onChange={setAcknowledged}>
             위 내용을 확인했으며 탈퇴에 동의합니다
