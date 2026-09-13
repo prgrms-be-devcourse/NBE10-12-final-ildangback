@@ -28,14 +28,15 @@ import org.springframework.web.client.RestClient;
 @DisplayName("CloudinaryStorageService.fetchResource (RestClient 마이그레이션 특성화)")
 class CloudinaryStorageServiceLoadCharacterizationTest {
 
-    // 느린 응답 케이스에서 30초 실측 대기가 나지 않도록, 운영용 5s/30s 대신 package-private
-    // 생성자로 짧은 타임아웃을 주입한다(docs/media-restclient-migration.md 보강 4번).
     private final CloudinaryStorageService service = new CloudinaryStorageService(
-            mock(Cloudinary.class),
-            new MediaStorageProperties(null, null, null, Map.of()),
-            RestClient.builder(),
-            Duration.ofSeconds(5),
-            Duration.ofMillis(200));
+            mock(Cloudinary.class), new MediaStorageProperties(null, null, null, Map.of()));
+
+    // 느린 응답 케이스에서 30초 실측 대기가 나지 않도록, 운영용 5s/30s 대신 짧은 타임아웃의
+    // RestClient 를 fetchResource() 오버로드에 직접 넣는다(docs/media-restclient-migration.md 보강 4번).
+    // 구성 체인 자체는 CloudinaryStorageService.requestFactory() 를 그대로 재사용 — 생성자와 중복 안 되게.
+    private static final RestClient SHORT_TIMEOUT_CLIENT = RestClient.builder()
+            .requestFactory(CloudinaryStorageService.requestFactory(Duration.ofSeconds(5), Duration.ofMillis(200)))
+            .build();
 
     private HttpServer server;
 
@@ -56,7 +57,7 @@ class CloudinaryStorageServiceLoadCharacterizationTest {
             exchange.close();
         });
 
-        Resource resource = service.fetchResource(urlOf(server), "abc.jpg");
+        Resource resource = service.fetchResource(urlOf(server), "abc.jpg", SHORT_TIMEOUT_CLIENT);
 
         assertThat(resource.getContentAsByteArray()).isEqualTo(body);
         assertThat(resource.getFilename()).isEqualTo("abc.jpg");
@@ -67,7 +68,7 @@ class CloudinaryStorageServiceLoadCharacterizationTest {
     void notFound() throws IOException {
         server = startServer(exchange -> respondEmpty(exchange, 404));
 
-        assertThatThrownBy(() -> service.fetchResource(urlOf(server), "abc.jpg"))
+        assertThatThrownBy(() -> service.fetchResource(urlOf(server), "abc.jpg", SHORT_TIMEOUT_CLIENT))
                 .satisfies(
                         e -> assertThat(((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.MEDIA_NOT_FOUND));
     }
@@ -77,7 +78,7 @@ class CloudinaryStorageServiceLoadCharacterizationTest {
     void serverError() throws IOException {
         server = startServer(exchange -> respondEmpty(exchange, 500));
 
-        assertThatThrownBy(() -> service.fetchResource(urlOf(server), "abc.jpg"))
+        assertThatThrownBy(() -> service.fetchResource(urlOf(server), "abc.jpg", SHORT_TIMEOUT_CLIENT))
                 .satisfies(
                         e -> assertThat(((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.MEDIA_NOT_FOUND));
     }
@@ -94,7 +95,7 @@ class CloudinaryStorageServiceLoadCharacterizationTest {
             respondEmpty(exchange, 200);
         });
 
-        assertThatThrownBy(() -> service.fetchResource(urlOf(server), "abc.jpg"))
+        assertThatThrownBy(() -> service.fetchResource(urlOf(server), "abc.jpg", SHORT_TIMEOUT_CLIENT))
                 .satisfies(e ->
                         assertThat(((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.MEDIA_STORAGE_FAILED));
     }

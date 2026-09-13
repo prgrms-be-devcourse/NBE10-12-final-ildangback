@@ -48,23 +48,20 @@ public class CloudinaryStorageService implements StorageService {
 
     public CloudinaryStorageService(
             Cloudinary cloudinary, MediaStorageProperties properties, RestClient.Builder restClientBuilder) {
-        this(cloudinary, properties, restClientBuilder, CONNECT_TIMEOUT, REQUEST_TIMEOUT);
-    }
-
-    // 테스트 전용 — 특성화 테스트가 느린 응답 케이스를 30초 실측 대기 없이 짧은 타임아웃으로 검증할 수 있게 함.
-    CloudinaryStorageService(
-            Cloudinary cloudinary,
-            MediaStorageProperties properties,
-            RestClient.Builder restClientBuilder,
-            Duration connectTimeout,
-            Duration requestTimeout) {
         this.cloudinary = cloudinary;
         this.properties = properties;
-        ClientHttpRequestFactory requestFactory = ClientHttpRequestFactoryBuilder.detect()
+        this.restClient = restClientBuilder
+                .requestFactory(requestFactory(CONNECT_TIMEOUT, REQUEST_TIMEOUT))
+                .build();
+    }
+
+    // Boot 4.x 방식 ClientHttpRequestFactory 구성. 생성자와 특성화 테스트(짧은 타임아웃 재현)가
+    // 이 메서드를 공유해서 같은 구성 체인이 두 곳에 따로 복제되는 걸 막는다.
+    static ClientHttpRequestFactory requestFactory(Duration connectTimeout, Duration requestTimeout) {
+        return ClientHttpRequestFactoryBuilder.detect()
                 .build(HttpClientSettings.defaults()
                         .withConnectTimeout(connectTimeout)
                         .withReadTimeout(requestTimeout));
-        this.restClient = restClientBuilder.requestFactory(requestFactory).build();
     }
 
     @Override
@@ -120,13 +117,18 @@ public class CloudinaryStorageService implements StorageService {
     // res.cloudinary.com 도메인을 강제하기 때문에, 클라이언트 종류(HttpClient/RestClient)에
     // 안 가리는 와이어레벨 특성화 테스트가 임의 URL(로컬 HttpServer)을 직접 넣을 수 있도록
     // package-private 으로 뺀 것.
+    Resource fetchResource(String url, String filename) {
+        return fetchResource(url, filename, restClient);
+    }
+
+    // 테스트 전용 — 특성화 테스트가 느린 응답 케이스를 30초 실측 대기 없이 짧은 타임아웃의
+    // RestClient 를 직접 넣어 검증할 수 있게 함. 운영 경로는 항상 위 2-arg 오버로드(필드 restClient)로 들어옴.
     // 상태코드 != 200 은 전부 MEDIA_NOT_FOUND, 그 외 RestClientException(타임아웃/연결 실패 등
     // I/O 실패)은 MEDIA_STORAGE_FAILED — HttpClient 시절 시맨틱 그대로(회귀 아님, docs/media-restclient-migration.md 보강 5번).
-    Resource fetchResource(String url, String filename) {
+    Resource fetchResource(String url, String filename, RestClient client) {
         byte[] body;
         try {
-            body = restClient
-                    .get()
+            body = client.get()
                     .uri(url)
                     .retrieve()
                     .onStatus(status -> status.value() != 200, (req, res) -> {
