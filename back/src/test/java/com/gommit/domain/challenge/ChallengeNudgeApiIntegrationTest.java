@@ -171,4 +171,35 @@ class ChallengeNudgeApiIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.code").value("ALREADY_NUDGED"));
         assertThat(notifications.count()).isEqualTo(1);
     }
+
+    @Autowired
+    com.gommit.domain.notification.service.CheckInReminderService reminders;
+
+    @Test
+    void remindersExcludeCompletedInactiveAndAlreadyRemindedMembers() {
+        for (int round = 1; round <= 3; round++) {
+            checkIns.saveAndFlush(new CheckIn(
+                    challenge.getId(), senderId, round, CheckInType.PHOTO, "test.jpg", MediaType.IMAGE, null, today));
+        }
+        reminders.sendReminders();
+        assertThat(notifications.findAll()).hasSize(1);
+        var reminder = notifications.findAll().getFirst();
+        assertThat(reminder.getUserId()).isEqualTo(receiverId);
+        assertThat(reminder.getType()).isEqualTo(NotificationType.CHECK_IN_REMINDER);
+        assertThat(reminder.getRefId()).isEqualTo(challenge.getId());
+        jdbcTemplate.update(
+                "UPDATE notifications SET created_at = ?, read_at = ?", today.atTime(21, 0), today.atTime(22, 0));
+        reminders.sendReminders();
+        assertThat(notifications.count()).isEqualTo(1);
+        when(clock.today()).thenReturn(today.plusDays(1));
+        jdbcTemplate.update("UPDATE challenge_members SET status = 'LEFT' WHERE challenge_id = ?", challenge.getId());
+        reminders.sendReminders();
+        assertThat(notifications.count()).isEqualTo(1);
+        jdbcTemplate.update("UPDATE challenge_members SET status = 'ACTIVE' WHERE challenge_id = ?", challenge.getId());
+        for (String status : new String[] {"READY", "ENDED"}) {
+            jdbcTemplate.update("UPDATE challenges SET status = ? WHERE id = ?", status, challenge.getId());
+            reminders.sendReminders();
+            assertThat(notifications.count()).isEqualTo(1);
+        }
+    }
 }
