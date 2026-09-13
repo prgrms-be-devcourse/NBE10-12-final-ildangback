@@ -1,13 +1,12 @@
-import { CaretRightIcon, TShirtIcon } from "@phosphor-icons/react";
+import { CaretRightIcon, ImageIcon, TShirtIcon } from "@phosphor-icons/react";
 import { Link } from "react-router";
 import { TopBar } from "../../../shared/ui/TopBar";
 
 /**
  * 관리자 허브. `/admin` 으로 직접 들어온다 — 앱 어디에도 링크를 두지 않는다.
  *
- * 관리 영역이 늘면 아래 AREAS 에 한 줄을 더한다. 신고와 이의제기는 백엔드가 아직 없고
- * (`docs/신고이의제기명세.md` 는 명세만), 그룹 배경 관리는 feat/39 브랜치에 있어 main 에
- * 없다. 엔드포인트가 머지된 뒤에 추가한다 — 지금 껍데기 화면을 미리 만들지 않는다.
+ * 관리 영역이 늘면 아래 AREAS 에 한 줄을 더한다. 신고와 이의제기는 백엔드가 아직 없다
+ * (`docs/신고이의제기명세.md` 는 명세만) — 지금 껍데기 화면을 미리 만들지 않는다.
  */
 const AREAS = [
   {
@@ -15,6 +14,12 @@ const AREAS = [
     icon: TShirtIcon,
     title: "아이템",
     description: "캐릭터 아이템 등록과 삭제",
+  },
+  {
+    to: "/admin/backgrounds",
+    icon: ImageIcon,
+    title: "그룹 배경",
+    description: "그룹 상점 판매 배경 등록과 삭제",
   },
 ];
 

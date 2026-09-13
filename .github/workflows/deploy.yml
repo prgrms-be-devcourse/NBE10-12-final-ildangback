@@ -1,7 +1,7 @@
 name: Deploy Backend
 
 # main 에 백엔드/인프라 변경이 머지되면 이미지 빌드 → GHCR → EC2 배포.
-# 프론트는 Cloudflare Pages Git 연동이 자체 처리하므로 여기 없음.
+# 프론트는 별도 워크플로(deploy-front.yml)가 처리 — Cloudflare 쪽 Git 연동이 끊겨 대체
 on:
   push:
     branches: [main]

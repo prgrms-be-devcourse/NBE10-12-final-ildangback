@@ -58,6 +58,18 @@ public enum ErrorCode {
     KICK_VOTE_OWNER_CANNOT_INITIATE(HttpStatus.FORBIDDEN, "방장은 방장 강퇴 투표를 개시할 수 없습니다."),
     KICK_VOTE_EXPIRED(HttpStatus.CONFLICT, "투표 기간이 만료되었습니다."),
     KICK_VOTE_NOT_ENOUGH_MEMBERS(HttpStatus.CONFLICT, "투표를 진행할 멤버 수가 부족합니다."),
+    GROUP_ENDED(HttpStatus.CONFLICT, "이미 종료된 그룹입니다."),
+    BACKGROUND_NOT_FOUND(HttpStatus.NOT_FOUND, "배경을 찾을 수 없습니다."),
+    BACKGROUND_MAP_TYPE_MISMATCH(HttpStatus.BAD_REQUEST, "그룹과 배경의 맵 타입이 다릅니다."),
+    BACKGROUND_ALREADY_OWNED(HttpStatus.CONFLICT, "이미 보유한 배경입니다."),
+    BACKGROUND_NOT_OWNED(HttpStatus.CONFLICT, "보유하지 않은 배경입니다."),
+    BACKGROUND_IN_USE(HttpStatus.CONFLICT, "그룹이 보유했거나 구매 제안 이력이 있는 배경은 삭제할 수 없습니다."),
+    PURCHASE_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "구매 제안을 찾을 수 없습니다."),
+    PURCHASE_REQUEST_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 투표 중인 구매 제안이 있습니다."),
+    PURCHASE_REQUEST_CLOSED(HttpStatus.CONFLICT, "이미 종료된 구매 제안입니다."),
+    PURCHASE_REQUEST_NOT_CANCELABLE(HttpStatus.FORBIDDEN, "제안자 또는 그룹 OWNER만 취소할 수 있습니다."),
+    VOTE_ALREADY_CAST(HttpStatus.CONFLICT, "이미 투표했습니다."),
+
     // ===== item =====
     ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 아이템입니다."),
     USER_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "보유 아이템을 찾을 수 없습니다."),
@@ -66,6 +78,12 @@ public enum ErrorCode {
     NOT_EQUIPPED(HttpStatus.BAD_REQUEST, "착용 중이 아닌 아이템입니다."),
     NOT_ITEM_OWNER(HttpStatus.FORBIDDEN, "본인이 보유한 아이템만 착용할 수 있습니다."),
     ITEM_IN_USE(HttpStatus.CONFLICT, "이미 보유중인 사용자가 있어 삭제할 수 없습니다."),
+
+    // ===== notification =====
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다."),
+    ALREADY_NUDGED(HttpStatus.CONFLICT, "오늘 이미 콕 찌르기를 받은 멤버입니다."),
+    CANNOT_NUDGE_SELF(HttpStatus.BAD_REQUEST, "자기 자신을 콕 찌를 수 없습니다."),
+    ALREADY_CHECKED_IN(HttpStatus.CONFLICT, "오늘 인증을 이미 완료한 멤버입니다."),
 
     // ===== media =====
     EMPTY_FILE(HttpStatus.BAD_REQUEST, "파일이 비어 있습니다."),

@@ -264,33 +264,50 @@ public class RecordQueryService {
                         .stream()
                         .collect(Collectors.toMap(FinalMerge::getId, Function.identity()));
 
+        // 파이널은 챌린지 전체 기간 재집계본이라 총계(allRows)는 파이널로 대체.
+        // 월별 추이/잔디(trendRows)는 파이널 하나로 하면 시작 달에만 몰리니 월간 머지 기준으로.
+        Set<Long> challengeIdsWithFinalMerge = finalMergesById.values().stream()
+                .map(FinalMerge::getChallengeId)
+                .collect(Collectors.toSet());
+        Set<Long> challengeIdsWithMonthlyMerge = monthlyMergesById.values().stream()
+                .map(MonthlyMerge::getChallengeId)
+                .collect(Collectors.toSet());
+
         List<StatRow> allRows = new ArrayList<>();
+        List<StatRow> trendRows = new ArrayList<>();
         for (MonthlyMergeResult result : monthlyResults) {
             MonthlyMerge merge = monthlyMergesById.get(result.getMonthlyMergeId());
-            if (merge != null) {
-                allRows.add(StatRow.of(merge.getChallengeId(), merge, result));
+            if (merge == null) {
+                continue;
+            }
+            StatRow row = StatRow.of(merge.getChallengeId(), merge, result);
+            trendRows.add(row);
+            if (!challengeIdsWithFinalMerge.contains(merge.getChallengeId())) {
+                allRows.add(row);
             }
         }
         for (FinalMergeResult result : finalResults) {
             FinalMerge merge = finalMergesById.get(result.getFinalMergeId());
-            if (merge != null) {
-                allRows.add(StatRow.of(merge.getChallengeId(), merge, result));
+            if (merge == null) {
+                continue;
+            }
+            StatRow row = StatRow.of(merge.getChallengeId(), merge, result);
+            allRows.add(row);
+            if (!challengeIdsWithMonthlyMerge.contains(merge.getChallengeId())) {
+                trendRows.add(row);
             }
         }
 
         Map<Long, ChallengeInfo> infoByChallengeId = challengeInfoByChallengeId(
                 allRows.stream().map(StatRow::challengeId).distinct().toList());
-        // 그룹/챌린지가 삭제되는 등 정합성이 깨져 정보를 못 찾은 회차는 통계에서 제외한다.
-        List<StatRow> rows = allRows.stream()
-                .filter(row -> infoByChallengeId.containsKey(row.challengeId()))
-                .filter(row -> overlaps(row, from, to))
-                .toList();
+        List<StatRow> rows = filterValidRows(allRows, infoByChallengeId, from, to);
+        List<StatRow> trendStatRows = filterValidRows(trendRows, infoByChallengeId, from, to);
 
         return new PersonalStatsResponse(
                 buildSummary(rows),
-                buildMonthlyTrend(rows),
+                buildMonthlyTrend(trendStatRows),
                 buildCategoryBreakdown(rows, infoByChallengeId),
-                buildHeatmap(rows));
+                buildHeatmap(trendStatRows));
     }
 
     private SummaryStatResponse buildSummary(List<StatRow> rows) {
@@ -356,6 +373,15 @@ public class RecordQueryService {
                         entry.getKey(),
                         Math.min(HEATMAP_LEVELS, averageCompletionRate(entry.getValue()) * HEATMAP_LEVELS / 100)))
                 .sorted(Comparator.comparing(HeatmapCellResponse::month))
+                .toList();
+    }
+
+    // 정보를 못 찾은(그룹/챌린지 삭제 등) 회차 제외 + 조회 기간과 안 겹치는 회차 제외.
+    private List<StatRow> filterValidRows(
+            List<StatRow> rows, Map<Long, ChallengeInfo> infoByChallengeId, LocalDate from, LocalDate to) {
+        return rows.stream()
+                .filter(row -> infoByChallengeId.containsKey(row.challengeId()))
+                .filter(row -> overlaps(row, from, to))
                 .toList();
     }
 

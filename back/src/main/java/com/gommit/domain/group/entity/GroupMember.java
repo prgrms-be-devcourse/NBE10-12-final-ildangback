@@ -34,6 +34,8 @@ public class GroupMember extends BaseEntity {
 
     private LocalDateTime leftAt;
 
+    private Long lastReadMessageId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private KickVoteChoice kickVoteChoice = KickVoteChoice.NONE;
@@ -62,5 +64,11 @@ public class GroupMember extends BaseEntity {
 
     public boolean hasVoted() {
         return this.kickVoteChoice != KickVoteChoice.NONE;
+    }
+
+    public void markRead(Long messageId) {
+        if (this.lastReadMessageId == null || messageId > this.lastReadMessageId) {
+            this.lastReadMessageId = messageId;
+        }
     }
 }
