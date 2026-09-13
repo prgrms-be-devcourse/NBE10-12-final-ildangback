@@ -21,6 +21,25 @@ public interface CheckInRepository extends JpaRepository<CheckIn, Long> {
         Long getCount();
     }
 
+    public interface UserBusinessDate {
+        Long getUserId();
+
+        LocalDate getBusinessDate();
+    }
+
+    // 머지 생성 배치용 - 참여자 여러 명의 기간 내 인증 날짜를 한 번에 뽑는다(N+1 방지).
+    // 참여자별로 distinct 처리는 호출부(RecordBatchService)에서 한다(하루 여러 번 인증 가능).
+    @Query("""
+            select c.userId as userId, c.businessDate as businessDate from CheckIn c
+            where c.challengeId = :challengeId and c.userId in :userIds
+              and c.businessDate between :from and :to
+            """)
+    List<UserBusinessDate> findBusinessDatesByChallengeIdAndUserIdInAndBusinessDateBetween(
+            @Param("challengeId") Long challengeId,
+            @Param("userIds") Collection<Long> userIds,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
     @Query("""
             select c.userId from CheckIn c
             where c.challengeId = :challengeId and c.businessDate = :businessDate

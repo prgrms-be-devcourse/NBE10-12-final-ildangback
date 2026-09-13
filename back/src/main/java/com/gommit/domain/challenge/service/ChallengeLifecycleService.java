@@ -8,6 +8,7 @@ import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.group.entity.ChallengeGroup;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
+import com.gommit.domain.record.service.RecordBatchService;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import com.gommit.global.time.BusinessClock;
@@ -25,6 +26,7 @@ public class ChallengeLifecycleService {
     private final ChallengeRepository challengeRepository;
     private final ChallengeMemberRepository challengeMemberRepository;
     private final ChallengeGroupRepository challengeGroupRepository;
+    private final RecordBatchService recordBatchService;
     private final BusinessClock businessClock;
 
     @Transactional
@@ -66,6 +68,7 @@ public class ChallengeLifecycleService {
         Set<Long> groupIdsToEnd = new HashSet<>();
         for (Challenge challenge : challengesDueToday) {
             challenge.end();
+            recordBatchService.generateFinalMerge(challenge.getId());
             Optional<Challenge> nextChallenge =
                     challengeRepository.findByGroupIdAndSeqNo(challenge.getGroupId(), challenge.getSeqNo() + 1);
             if (nextChallenge.isPresent()) {

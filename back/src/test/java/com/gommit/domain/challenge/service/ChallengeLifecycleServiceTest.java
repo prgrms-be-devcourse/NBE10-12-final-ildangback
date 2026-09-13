@@ -2,6 +2,7 @@ package com.gommit.domain.challenge.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -20,6 +21,7 @@ import com.gommit.domain.group.entity.GroupStatus;
 import com.gommit.domain.group.entity.MapType;
 import com.gommit.domain.group.entity.Visibility;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
+import com.gommit.domain.record.service.RecordBatchService;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import com.gommit.global.time.BusinessClock;
@@ -52,6 +54,9 @@ class ChallengeLifecycleServiceTest {
 
     @Mock
     private ChallengeGroupRepository challengeGroupRepository;
+
+    @Mock
+    private RecordBatchService recordBatchService;
 
     @Mock
     private BusinessClock businessClock;
@@ -244,6 +249,7 @@ class ChallengeLifecycleServiceTest {
             assertThat(challenge.getStatus()).isEqualTo(ChallengeStatus.ENDED);
             assertThat(group.getStatus()).isEqualTo(GroupStatus.ENDED);
             verify(challengeGroupRepository).findAllById(Set.of(12L));
+            verify(recordBatchService).generateFinalMerge(50L);
         }
 
         @Test
@@ -260,6 +266,7 @@ class ChallengeLifecycleServiceTest {
             // then
             assertThat(challenge.getStatus()).isEqualTo(ChallengeStatus.ACTIVE);
             verify(challengeRepository, never()).findByGroupIdAndSeqNo(12L, 2);
+            verify(recordBatchService, never()).generateFinalMerge(any());
         }
 
         @Test
@@ -278,6 +285,7 @@ class ChallengeLifecycleServiceTest {
             // then
             assertThat(challenge.getStatus()).isEqualTo(ChallengeStatus.ENDED);
             verify(challengeGroupRepository, never()).findById(12L);
+            verify(recordBatchService).generateFinalMerge(50L);
         }
 
         @Test
