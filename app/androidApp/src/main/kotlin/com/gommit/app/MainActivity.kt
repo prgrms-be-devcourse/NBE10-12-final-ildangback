@@ -135,6 +135,9 @@ class MainActivity : ComponentActivity() {
                     request.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
                     return
                 }
+                // 앞선 요청이 아직 권한 대화상자를 기다리고 있으면 그것부터 닫는다.
+                // 덮어쓰기만 하면 그 요청은 grant 도 deny 도 못 받고 페이지가 영영 기다린다
+                pendingCameraRequest?.deny()
                 pendingCameraRequest = request
                 cameraPermission.launch(Manifest.permission.CAMERA)
             }
