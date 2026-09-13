@@ -2,10 +2,12 @@ package com.gommit.domain.group.repository;
 
 import com.gommit.domain.group.entity.GroupMember;
 import com.gommit.domain.group.entity.GroupMemberStatus;
+import com.gommit.domain.group.entity.KickVoteChoice;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -33,4 +35,14 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
     """)
     List<GroupMemberCount> countByGroupIdsAndStatus(
             @Param("groupIds") List<Long> groupIds, @Param("status") GroupMemberStatus status);
+
+    long countByGroupIdAndStatusAndKickVoteChoice(
+            Long groupId, GroupMemberStatus status, KickVoteChoice kickVoteChoice);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        UPDATE GroupMember gm SET gm.kickVoteChoice = :none
+        WHERE gm.group.id = :groupId AND gm.status = 'ACTIVE'
+    """)
+    void resetAllKickVoteChoices(@Param("groupId") Long groupId, @Param("none") KickVoteChoice none);
 }

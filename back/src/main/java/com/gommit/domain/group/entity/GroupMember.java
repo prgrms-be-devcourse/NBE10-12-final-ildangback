@@ -34,6 +34,10 @@ public class GroupMember extends BaseEntity {
 
     private LocalDateTime leftAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private KickVoteChoice kickVoteChoice = KickVoteChoice.NONE;
+
     @Builder
     public GroupMember(ChallengeGroup group, Long userId) {
         this.group = group;
@@ -50,5 +54,13 @@ public class GroupMember extends BaseEntity {
     public void kick() {
         this.status = GroupMemberStatus.KICKED;
         this.leftAt = LocalDateTime.now();
+    }
+
+    public void castKickVote(KickVoteChoice choice) {
+        this.kickVoteChoice = choice;
+    }
+
+    public boolean hasVoted() {
+        return this.kickVoteChoice != KickVoteChoice.NONE;
     }
 }

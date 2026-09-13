@@ -62,6 +62,10 @@ point: # [임시값] 기획 확정 시 조정. 없으면 PointProperties 의 @De
   check-in-reward: 10          # 개인 인증 1건
   group-daily-all-complete: 5  # 그룹 ACTIVE 전원이 그날 목표 달성
 
+group: # 방장 강퇴 투표 설정
+  kick-vote:     # 24 → 24시간 후 만료. 나중에 이 값만 수정하면 됨
+    expiry-hours: 24
+
 auth-token:
   access-token:
     expiration: 15m

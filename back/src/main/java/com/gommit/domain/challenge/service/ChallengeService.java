@@ -241,12 +241,16 @@ public class ChallengeService {
         if (targetMember.getStatus() != ChallengeMemberStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER);
         }
+
+        ChallengeGroup group = challengeGroupRepository
+                .findById(challenge.getGroupId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
+        if (group.hasActiveKickVote()) {
+            throw new BusinessException(ErrorCode.KICK_VOTE_ALREADY_IN_PROGRESS);
+        }
         currentMember.changeRole(ChallengeMemberRole.MEMBER);
         targetMember.changeRole(ChallengeMemberRole.OWNER);
         if (challenge.getSeqNo() == 1 || challenge.getStatus() == ChallengeStatus.ACTIVE) {
-            ChallengeGroup group = challengeGroupRepository
-                    .findById(challenge.getGroupId())
-                    .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
             group.changeOwner(request.targetUserId());
         }
         return new OwnerDelegationResponse(challengeId, userId, request.targetUserId());

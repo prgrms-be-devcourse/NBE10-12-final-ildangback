@@ -422,6 +422,10 @@ public class GroupService {
         if (group.getOwnerId().equals(targetUserId)) {
             throw new BusinessException(ErrorCode.GROUP_OWNER_CANNOT_BE_KICKED);
         }
+        if (group.hasActiveKickVote()) {
+            throw new BusinessException(ErrorCode.KICK_VOTE_ALREADY_IN_PROGRESS);
+        }
+
         Challenge activeChallenge = challengeRepository
                 .findFirstByGroupIdAndStatus(groupId, ChallengeStatus.ACTIVE)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_MEMBER_KICK_NOT_ALLOWED));
@@ -433,6 +437,9 @@ public class GroupService {
         }
         targetMember.kick();
         kickChallengeMember(activeChallenge.getId(), targetUserId);
+        challengeRepository
+                .findFirstByGroupIdAndStatus(groupId, ChallengeStatus.READY)
+                .ifPresent(ready -> kickChallengeMember(ready.getId(), targetUserId));
     }
 
     private void kickChallengeMember(Long challengeId, Long userId) {
@@ -460,6 +467,10 @@ public class GroupService {
                 group.end();
             } else {
                 group.changeOwner(newOwnerId);
+                if (group.hasActiveKickVote()) {
+                    group.endKickVote();
+                    groupMemberRepository.resetAllKickVoteChoices(group.getId(), KickVoteChoice.NONE);
+                }
             }
         }
     }
