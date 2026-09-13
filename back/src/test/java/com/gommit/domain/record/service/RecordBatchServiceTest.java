@@ -39,7 +39,6 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -214,8 +213,7 @@ class RecordBatchServiceTest {
                             businessDate(100L, periodStart),
                             businessDate(100L, periodStart.plusDays(1)),
                             businessDate(200L, periodStart)));
-            when(userPointHistoryRepository.sumEarnedByChallengeIdAndUserIdInBetween(
-                            eq(1L), anyList(), any(), any()))
+            when(userPointHistoryRepository.sumEarnedByChallengeIdAndUserIdInBetween(eq(1L), anyList(), any(), any()))
                     .thenReturn(List.of(earnedAmount(100L, 20), earnedAmount(200L, 10)));
 
             // when

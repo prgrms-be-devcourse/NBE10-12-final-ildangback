@@ -158,7 +158,8 @@ public class RecordBatchService {
                 LocalDateTime.now());
         finalMergeRepository.save(merge);
 
-        String groupName = challengeGroupRepository.findNameById(challenge.getGroupId()).orElse("챌린지");
+        String groupName =
+                challengeGroupRepository.findNameById(challenge.getGroupId()).orElse("챌린지");
         int bonus = pointProperties.mergeBonus();
         for (MemberStat stat : stats) {
             TrendData trend = completionCalculator.monthlyTrend(stat.checkInDates, periodStart, periodEnd);
@@ -175,7 +176,8 @@ public class RecordBatchService {
                     joinLabels(trend),
                     joinCounts(trend)));
             if (bonus > 0 && stat.completionRate >= CHALLENGE_BONUS_MIN_COMPLETION_RATE) {
-                personalPointService.reward(stat.userId, challengeId, bonus, UserPointReason.CHALLENGE_BONUS, groupName);
+                personalPointService.reward(
+                        stat.userId, challengeId, bonus, UserPointReason.CHALLENGE_BONUS, groupName);
             }
         }
     }
@@ -189,14 +191,13 @@ public class RecordBatchService {
             Challenge challenge, List<ChallengeMember> members, LocalDate periodStart, LocalDate periodEnd) {
         List<Long> userIds = members.stream().map(ChallengeMember::getUserId).toList();
 
-        Map<Long, List<LocalDate>> checkInDatesByUserId =
-                checkInRepository
-                        .findBusinessDatesByChallengeIdAndUserIdInAndBusinessDateBetween(
-                                challenge.getId(), userIds, periodStart, periodEnd)
-                        .stream()
-                        .collect(Collectors.groupingBy(
-                                UserBusinessDate::getUserId,
-                                Collectors.mapping(UserBusinessDate::getBusinessDate, Collectors.toList())));
+        Map<Long, List<LocalDate>> checkInDatesByUserId = checkInRepository
+                .findBusinessDatesByChallengeIdAndUserIdInAndBusinessDateBetween(
+                        challenge.getId(), userIds, periodStart, periodEnd)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        UserBusinessDate::getUserId,
+                        Collectors.mapping(UserBusinessDate::getBusinessDate, Collectors.toList())));
 
         Map<Long, Integer> earnedPointsByUserId = userPointHistoryRepository
                 .sumEarnedByChallengeIdAndUserIdInBetween(
