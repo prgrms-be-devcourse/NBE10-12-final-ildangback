@@ -108,7 +108,7 @@ class MainActivity : ComponentActivity() {
                 request: WebResourceRequest,
             ): Boolean {
                 val url = request.url
-                if (url.host == webHost) return false
+                if (originOf(url) == webOrigin) return false
                 openOutside(url)
                 return true
             }
@@ -212,8 +212,6 @@ class MainActivity : ComponentActivity() {
         }
         webView.loadUrl(target)
     }
-
-    private val webHost: String? by lazy { BuildConfig.WEB_URL.toUri().host }
 
     private val webOrigin: String? by lazy { originOf(BuildConfig.WEB_URL.toUri()) }
 
