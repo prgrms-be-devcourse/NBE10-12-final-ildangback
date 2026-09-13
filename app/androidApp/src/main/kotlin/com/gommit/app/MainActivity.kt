@@ -7,6 +7,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.view.View
+import android.widget.FrameLayout
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -43,9 +45,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        webView = WebView(this).also { setContentView(it) }
+        // 웹뷰를 그릇에 담는다. 웹뷰 자체에 패딩을 주면 뷰 패딩은 걸리는데 웹 뷰포트가
+        // 안 줄어서 콘텐츠가 상태바 뒤로 그대로 그려진다. 그릇이 줄어야 웹뷰도 줄어든다
+        webView = WebView(this)
+        val root = FrameLayout(this).apply { addView(webView) }
+        setContentView(root)
+
         configureWebView()
-        applySystemBarInsets()
+        applySystemBarInsets(root)
 
         onBackPressedDispatcher.addCallback(this) {
             if (webView.canGoBack()) webView.goBack() else finish()
@@ -134,13 +141,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // targetSdk 35 부터 시스템 바 뒤로 그려진다. 웹뷰를 상태바와 내비게이션 바 안쪽으로 민다
-    private fun applySystemBarInsets() {
-        ViewCompat.setOnApplyWindowInsetsListener(webView) { view, insets ->
+    // targetSdk 35 부터 시스템 바 뒤로 그려진다. 웹뷰를 상태바와 내비게이션 바 안쪽으로 민다.
+    // 상단은 숨통을 조금 더 준다 - 이유는 dimens.xml
+    private fun applySystemBarInsets(root: View) {
+        val breathingRoom = resources.getDimensionPixelSize(R.dimen.web_top_breathing_room)
+
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime(),
             )
-            view.updatePadding(bars.left, bars.top, bars.right, bars.bottom)
+            view.updatePadding(bars.left, bars.top + breathingRoom, bars.right, bars.bottom)
             insets
         }
     }
