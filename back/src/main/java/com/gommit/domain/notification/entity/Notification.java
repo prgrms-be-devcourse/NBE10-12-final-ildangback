@@ -2,24 +2,17 @@ package com.gommit.domain.notification.entity;
 
 import com.gommit.global.base.BaseEntity;
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
 
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(
-    name = "notifications",
-    indexes = {
-        @Index(
-            name = "idx_notifications_user",
-            columnList = "user_id, read_at, created_at"
-        )
-    }
-)
+        name = "notifications",
+        indexes = {@Index(name = "idx_notifications_user", columnList = "user_id, read_at, created_at")})
 public class Notification extends BaseEntity {
 
     @Column(name = "user_id", nullable = false)
@@ -41,13 +34,7 @@ public class Notification extends BaseEntity {
     @Column(name = "read_at")
     private LocalDateTime readAt;
 
-    public Notification(
-            Long userId,
-            NotificationType type,
-            String title,
-            String body,
-            Long refId
-    ) {
+    public Notification(Long userId, NotificationType type, String title, String body, Long refId) {
         this.userId = userId;
         this.type = type;
         this.title = title;

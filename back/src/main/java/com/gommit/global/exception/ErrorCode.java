@@ -32,7 +32,6 @@ public enum ErrorCode {
     EXTENSION_CHOICE_NOT_AVAILABLE(HttpStatus.CONFLICT, "현재 연장 참여 의사를 선택할 수 없는 챌린지입니다."),
     EXTENSION_START_DATE_NOT_EDITABLE(HttpStatus.BAD_REQUEST, "연장 시즌의 시작일은 변경할 수 없습니다."),
 
-
     // ===== checkin =====
     CHECK_IN_NOT_FOUND(HttpStatus.NOT_FOUND, "인증을 찾을 수 없습니다."),
     CHECK_IN_TYPE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "허용되지 않은 인증 방식입니다."),
