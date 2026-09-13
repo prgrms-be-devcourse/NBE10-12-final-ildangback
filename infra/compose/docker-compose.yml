@@ -19,6 +19,9 @@ x-back-common: &back-common
   depends_on:
     mysql:
       condition: service_healthy
+  # montageExecutor(MontageAsyncConfig)의 awaitTerminationSeconds=30 이 실제로 발동하려면
+  # SIGTERM 후 SIGKILL 까지 최소 30초는 있어야 함 — docker 기본 10초보다 여유 둠.
+  stop_grace_period: 40s
   # 1600M = 인스턴스 4GB(t3a.medium) 전환분 반영. DailyLog 몽타주(feat/36, main 미병합) 완화
   # blue/green 이 배포 중 잠깐 같이 뜨는 순간에도 둘이 겹쳐 인스턴스 메모리(4G)를 넘으면 안 되어 조정
   deploy:
