@@ -5,7 +5,14 @@ import { useAuth } from "../../../shared/lib/useAuth";
 import { Button } from "../../../shared/ui/Button";
 import { LoadingScreen } from "../../../shared/ui/LoadingScreen";
 import { TopBar } from "../../../shared/ui/TopBar";
-import { isOAuthProvider, redirectUriOf, takePendingOAuth } from "../oauth";
+import {
+  appCallbackUrl,
+  isAppState,
+  isAppWebView,
+  isOAuthProvider,
+  redirectUriOf,
+  takePendingOAuth,
+} from "../oauth";
 
 const CANCELLED = "로그인을 취소했어요.";
 const BROKEN_REQUEST =
@@ -27,6 +34,19 @@ export function OAuthCallbackPage() {
   const navigate = useNavigate();
   const [failure, setFailure] = useState<string | null>(null);
 
+  // 앱에서 시작한 로그인인데 여기가 웹뷰가 아니면 Custom Tab 안이다.
+  // 대조에 쓸 pending 은 웹뷰의 sessionStorage 에 있어서 이쪽에는 없다.
+  // 손대지 말고 쿼리 그대로 앱에 넘긴다 — docs/앱설계.md 4-1.
+  //
+  // UA 조건을 빼면 웹뷰가 자기가 받은 콜백을 또 튕겨서 무한 루프가 된다.
+  const handoff =
+    !isAppWebView() &&
+    isAppState(params.get("state")) &&
+    provider !== undefined &&
+    isOAuthProvider(provider)
+      ? appCallbackUrl(provider, window.location.search)
+      : null;
+
   // 인가 코드는 1회용인데 StrictMode 는 개발 모드에서 effect 를 두 번 돌린다.
   // 두 번째 실행이 같은 코드를 다시 보내면 프로바이더가 거절한다.
   const started = useRef(false);
@@ -34,6 +54,11 @@ export function OAuthCallbackPage() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
+
+    if (handoff) {
+      window.location.replace(handoff);
+      return;
+    }
 
     const exchange = async () => {
       const pending = takePendingOAuth();
@@ -87,7 +112,33 @@ export function OAuthCallbackPage() {
           "네트워크에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.",
         );
       });
-  }, [provider, params, signInWithOAuth, navigate]);
+  }, [provider, params, signInWithOAuth, navigate, handoff]);
+
+  // 자동 이동이 막히는 브라우저가 있다. 눌러서 넘어갈 길을 같이 둔다.
+  if (handoff) {
+    return (
+      <>
+        <TopBar title="소셜 로그인" />
+
+        <div className="px-6 pt-2 pb-10">
+          <h1 className="mt-4 text-[24px] font-bold text-balance text-gray-900">
+            앱으로 돌아가는 중이에요
+          </h1>
+          <p className="mt-3 text-[14px] leading-relaxed text-gray-500">
+            화면이 그대로면 아래 버튼을 눌러주세요.
+          </p>
+
+          <Button
+            type="button"
+            className="mt-10"
+            onClick={() => window.location.replace(handoff)}
+          >
+            꼬밋 앱으로 돌아가기
+          </Button>
+        </div>
+      </>
+    );
+  }
 
   if (!failure) return <LoadingScreen />;
 
