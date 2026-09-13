@@ -20,6 +20,10 @@ REF="${2:-origin/main}"
 
 ACTIVE_CONF="$APP_DIR/nginx/conf.d/active-backend.conf"
 
+nginx_running() {
+  docker compose ps --status running --quiet nginx | grep -q .
+}
+
 # 0. 지금 active 색 판별 — repo 동기화(2번, --delete)로 conf.d 가 건드려지기 전에 먼저 읽는다.
 #    이 파일을 잘못 읽은(없음/손상) 상태로 배포하면 4번이 active 컨테이너를 재기동/정지하므로 식별 불가시 배포 중단
 #    (setup 단계에서 blue 로 1회 생성해두므로 정상 운영 중엔 항상 존재해야 함)
@@ -77,7 +81,7 @@ fi
 
 # 3.5 새 nginx 설정(api.conf 등, active-backend.conf 제외) 사전 검증 —
 #     백엔드 색 스위치 전에 실패하도록. (bind-mount 라 파일은 이미 위에서 갱신됨.)
-if docker compose ps --status running --quiet nginx | grep -q .; then
+if nginx_running; then
   docker compose exec -T nginx nginx -t
 fi
 
@@ -97,6 +101,10 @@ fi
 
 # 5. nginx upstream 을 새 색으로 스위치. bind-mount 라 파일만 바뀌면 컨테이너 재생성 없이
 #    reload 로 충분 — 끊김 없음(기존 연결은 유지, 새 연결부터 새 upstream).
+#    nginx 가 떠 있으면: mv 로 상태파일을 먼저 바꾸지 않고, nginx -t 검증을 통과한 뒤에만
+#    반영한다 — 먼저 바꿔버리면 검증 실패 시(set -e 로 스크립트가 죽어도) 상태파일은 이미
+#    NEW_COLOR 인데 nginx 는 여전히 CURRENT_COLOR 를 서빙 중인 드리프트가 생기고, 다음 배포가
+#    이 드리프트된 상태파일을 보고 실제 서빙 중인 컨테이너를 6번에서 stop 하게 된다.
 cat > "$APP_DIR/nginx/conf.d/active-backend.conf.new" <<EOF
 # deploy.sh 생성 파일 — git 비추적. 활성 backend 색 = 배포 상태 그 자체(0번이 이 파일을 읽음).
 upstream backend {
@@ -104,16 +112,30 @@ upstream backend {
   keepalive 16;
 }
 EOF
-mv "$APP_DIR/nginx/conf.d/active-backend.conf.new" "$ACTIVE_CONF"
-
-if docker compose ps --status running --quiet nginx | grep -q .; then
-  docker compose exec -T nginx nginx -t
+if nginx_running; then
+  cp "$ACTIVE_CONF" "$ACTIVE_CONF.bak"
+  mv "$APP_DIR/nginx/conf.d/active-backend.conf.new" "$ACTIVE_CONF"
+  if ! docker compose exec -T nginx nginx -t; then
+    echo "새 nginx 설정 검증 실패 — active-backend.conf 롤백(active 는 여전히 back-${CURRENT_COLOR}), back-${NEW_COLOR} 정지, 배포 중단" >&2
+    mv "$ACTIVE_CONF.bak" "$ACTIVE_CONF"
+    docker compose stop "back-${NEW_COLOR}" || true
+    exit 1
+  fi
+  rm -f "$ACTIVE_CONF.bak"
   docker compose exec -T nginx nginx -s reload
   echo "nginx reloaded → active=back-${NEW_COLOR}"
+else
+  mv "$APP_DIR/nginx/conf.d/active-backend.conf.new" "$ACTIVE_CONF"
 fi
 
 # 6. 이전 색 컨테이너 프로세스 정지 (제거 아님 — 다음 배포 때 그 색이 다시 비활성 대상으로 재사용, 이미지는 7에서 정리).
-docker compose stop "back-${CURRENT_COLOR}" || true
+#    nginx 가 안 떠 있으면 스위치가 실제로 확인된 적이 없으므로 이전 색은 그대로 두고 경고만
+#    남긴다 — 유일하게 확인된 backend 를 이유 없이 내려서 복구 여지를 줄이지 않기 위함.
+if nginx_running; then
+  docker compose stop "back-${CURRENT_COLOR}" || true
+else
+  echo "nginx 미기동 — back-${CURRENT_COLOR} 유지(정지 생략). nginx 상태 확인 후 재배포 권장." >&2
+fi
 
 # 7. 안 쓰는 이미지 정리. -a = 태그만 있고 컨테이너가 안 쓰는 것도 대상(옛 back:<sha>).
 #    until=24h = 최근 하루치는 남겨 빠른 롤백 시 pull 없이 되돌림. 실행 중 이미지는 항상 보호됨.

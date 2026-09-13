@@ -194,7 +194,7 @@ gunzip -c backups/gommit-YYYYMMDD-HHMM.sql.gz | \
   docker compose exec -T mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" gommit
 # back 은 blue-green 이라 서비스명이 back-blue/back-green 로 나뉜다 — 지금 active 인
 # 쪽만 재시작(비활성 쪽까지 건드리면 안 쓰는 컨테이너가 괜히 뜬다).
-ACTIVE=$(grep -o 'back-[a-z]*' nginx/conf.d/active-backend.conf)
+ACTIVE=$(grep -om1 'back-[a-z]*' nginx/conf.d/active-backend.conf)
 docker compose restart "$ACTIVE"
 ```
 

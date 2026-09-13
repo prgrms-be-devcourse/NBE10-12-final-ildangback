@@ -1,10 +1,9 @@
 # EC2 /opt/team1-app 에 배치. CD 가 .env 의 IMAGE_TAG 를 갱신하고 deploy.sh 를 돌린다.
 #
-# back 은 로컬 blue-green(same-EC2, 상시 2 replica 아님, infra/docs/blue-green-deploy-plan-*.md
-# 참고): back-blue/back-green 둘 다 정의만 해두고, 배포 중에만 비활성 색을 새 이미지로 잠깐
+# back 은 로컬 blue-green: back-blue/back-green 둘 다 정의만 해두고, 배포 중에만 비활성 색을 새 이미지로 잠깐
 # 같이 띄운 뒤 nginx upstream 을 그쪽으로 스위치, 이전 색은 내린다. 평상시엔 한쪽만 running.
 # 어느 쪽이 active 인지는 컨테이너 정의가 아니라 nginx/conf.d/active-backend.conf(런타임 생성,
-# git 비추적)가 갖고 있다 — deploy.sh 가 그 파일을 읽고 쓴다.
+# git 비추적)가 갖는다 — deploy.sh 가 그 파일을 읽고 쓴다.
 name: gommit
 
 x-back-common: &back-common
@@ -21,11 +20,7 @@ x-back-common: &back-common
     mysql:
       condition: service_healthy
   # 1600M = 인스턴스 4GB(t3a.medium) 전환분 반영. DailyLog 몽타주(feat/36, main 미병합) 완화
-  # 실측 최악 1,264~1,327M(6×8회차+갤러리12명 동시)에 안전율(측정환경=Docker Desktop VM, 실 EC2 Linux 오차 보정).
-  # blue/green 이 배포 중 잠깐 같이 뜨는 순간에도 둘이 겹쳐 인스턴스 메모리(4G)를 넘으면 안 됨
-  # — 평상시 1개만 뜨므로 상시 소모는 그대로, 배포 중 순간 최대 back 2×1600M + mysql 600M + nginx 64M
-  # = 3864M. 1800M×2 였을 땐 4200M 로 4096M(4GB) 를 넘어 health-check 대기 구간에서
-  # OOM-kill 위험이 있었음 — 1600M 로 낮춰 OS/도커 데몬 몫(약 230M)을 남긴다.
+  # blue/green 이 배포 중 잠깐 같이 뜨는 순간에도 둘이 겹쳐 인스턴스 메모리(4G)를 넘으면 안 되어 조정
   deploy:
     resources:
       limits:
@@ -50,13 +45,6 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./certs:/etc/nginx/certs:ro   # origin.pem / origin.key (Cloudflare Origin CA)
-    # back-blue/back-green 에 대한 depends_on 없음 — 의도적. compose depends_on 은 정적이라
-    # "지금 active 인 색"을 표현 못 한다: 평상시엔 한쪽만 떠 있어서 둘 다 service_started 로
-    # 걸면 `docker compose up -d` 인자 없이 부를 때 비활성 색까지 같이 기동돼버리고
-    # (평소 한쪽만 running 이라는 불변식이 깨짐), service_healthy 로 걸면 반대로 비활성
-    # 색이 영원히 안 떠서 nginx 기동이 block 된다. 그래서 시작 순서는 여기서 강제하지
-    # 않고 infra-runbook.md 의 절차(mysql → active 색 --wait healthy → nginx)로 명시적으로
-    # 맞춘다. deploy.sh 는 재배포 시 nginx 를 새로 띄우지 않고 reload 만 하므로 영향 없음.
     deploy:
       resources:
         limits:
