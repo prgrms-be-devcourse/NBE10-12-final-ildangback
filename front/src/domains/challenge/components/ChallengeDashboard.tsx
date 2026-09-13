@@ -1,9 +1,9 @@
 import { CharacterRenderer } from "../../user/components/CharacterRenderer";
 import { useNavigate } from "react-router";
-import { useToast } from "../../../shared/lib/useToast";
+import { getUnreadCount } from "../../chat/api";
 import { ChatIcon } from "../../../shared/ui/icons";
 import { frequencyLabel } from "../presentation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import studyMap from "../../../assets/icons/studyMap.webp";
 import sportsMap from "../../../assets/icons/sportsMap.webp";
 import people from "../../../assets/icons/people.webp";
@@ -48,10 +48,23 @@ export function ChallengeDashboard({
   onExtensionSaved: () => void;
 }) {
   const navigate = useNavigate();
-  const { showToast } = useToast();
   const [tab, setTab] = useState("현황");
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { challenge } = data;
+
+  useEffect(() => {
+    let cancelled = false;
+    getUnreadCount(challenge.groupId)
+      .then((res) => {
+        if (!cancelled) setUnreadCount(res.unreadCount);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [challenge.groupId]);
+
   const canCheckIn =
     isCurrent &&
     challenge.status === "ACTIVE" &&
@@ -82,11 +95,22 @@ export function ChallengeDashboard({
             <StatusBadge status={challenge.status} />
             <button
               type="button"
-              aria-label="채팅"
-              onClick={() => showToast("채팅 기능은 준비중입니다.")}
-              className="rounded-lg p-1 text-purple-500 hover:bg-purple-50 hover:text-purple-700"
+              aria-label={
+                unreadCount > 0
+                  ? `채팅, 안 읽은 메시지 ${unreadCount}개`
+                  : "채팅"
+              }
+              onClick={() =>
+                navigate(`/challenges/groups/${challenge.groupId}/chat`)
+              }
+              className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-purple-600 text-white hover:bg-purple-700"
             >
               <ChatIcon className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </button>
           </div>
         </div>

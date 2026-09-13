@@ -2,6 +2,7 @@ package com.gommit.domain.chat.service;
 
 import com.gommit.domain.chat.dto.request.ChatMessageSendRequest;
 import com.gommit.domain.chat.dto.response.ChatMessageResponse;
+import com.gommit.domain.chat.dto.response.ChatUnreadCountResponse;
 import com.gommit.domain.chat.entity.GroupMessage;
 import com.gommit.domain.chat.repository.GroupMessageRepository;
 import com.gommit.domain.group.service.GroupService;
@@ -54,9 +55,26 @@ public class ChatService {
                 .senderId(userId)
                 .content(request.content().trim())
                 .build());
+        groupService.markMessagesRead(groupId, userId, message.getId());
 
         return new ChatMessageResponse(
                 message, userService.findNicknames(List.of(userId)).get(userId));
+    }
+
+    // 읽음 커서 갱신
+    @Transactional
+    public void markRead(Long groupId, Long userId, Long lastReadMessageId) {
+        verifyActiveMember(groupId, userId);
+        groupService.markMessagesRead(groupId, userId, lastReadMessageId);
+    }
+
+    // 내 읽음 커서 이후 쌓인 메시지 수
+    @Transactional(readOnly = true)
+    public ChatUnreadCountResponse getUnreadCount(Long groupId, Long userId) {
+        verifyActiveMember(groupId, userId);
+        Long cursor = groupService.findReadCursor(groupId, userId);
+        long count = groupMessageRepository.countByGroupIdAndIdGreaterThan(groupId, cursor == null ? 0L : cursor);
+        return new ChatUnreadCountResponse(count);
     }
 
     // ACTIVE 멤버 확인

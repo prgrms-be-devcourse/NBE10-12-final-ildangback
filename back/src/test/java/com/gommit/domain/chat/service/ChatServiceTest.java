@@ -134,7 +134,11 @@ class ChatServiceTest {
         @DisplayName("TEXT 메시지로 저장하고 앞뒤 공백을 제거한다")
         void savesTrimmedTextMessage() {
             when(groupService.isActiveMember(GROUP_ID, USER_ID)).thenReturn(true);
-            when(groupMessageRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+            when(groupMessageRepository.save(any())).thenAnswer(invocation -> {
+                GroupMessage saved = invocation.getArgument(0);
+                ReflectionTestUtils.setField(saved, "id", 1L);
+                return saved;
+            });
             when(userService.findNicknames(anyCollection())).thenReturn(Map.of(USER_ID, "테스터"));
 
             ChatMessageResponse response =
@@ -148,6 +152,75 @@ class ChatServiceTest {
 
             assertThat(response.content()).isEqualTo("안녕하세요");
             assertThat(response.senderNickname()).isEqualTo("테스터");
+            verify(groupService).markMessagesRead(GROUP_ID, USER_ID, 1L);
+        }
+    }
+
+    @Nested
+    @DisplayName("읽음 커서 갱신")
+    class MarkRead {
+
+        @Test
+        @DisplayName("ACTIVE 멤버가 아니면 갱신할 수 없다")
+        void rejectsNonMember() {
+            when(groupService.isActiveMember(GROUP_ID, USER_ID)).thenReturn(false);
+
+            assertThatThrownBy(() -> chatService.markRead(GROUP_ID, USER_ID, 5L))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ErrorCode.NOT_GROUP_MEMBER);
+
+            verify(groupService, never()).markMessagesRead(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("ACTIVE 멤버면 커서를 갱신한다")
+        void updatesCursor() {
+            when(groupService.isActiveMember(GROUP_ID, USER_ID)).thenReturn(true);
+
+            chatService.markRead(GROUP_ID, USER_ID, 5L);
+
+            verify(groupService).markMessagesRead(GROUP_ID, USER_ID, 5L);
+        }
+    }
+
+    @Nested
+    @DisplayName("안 읽은 메시지 수 조회")
+    class GetUnreadCount {
+
+        @Test
+        @DisplayName("ACTIVE 멤버가 아니면 조회할 수 없다")
+        void rejectsNonMember() {
+            when(groupService.isActiveMember(GROUP_ID, USER_ID)).thenReturn(false);
+
+            assertThatThrownBy(() -> chatService.getUnreadCount(GROUP_ID, USER_ID))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ErrorCode.NOT_GROUP_MEMBER);
+        }
+
+        @Test
+        @DisplayName("읽음 커서 이후에 쌓인 메시지 수를 센다")
+        void countsMessagesAfterCursor() {
+            when(groupService.isActiveMember(GROUP_ID, USER_ID)).thenReturn(true);
+            when(groupService.findReadCursor(GROUP_ID, USER_ID)).thenReturn(3L);
+            when(groupMessageRepository.countByGroupIdAndIdGreaterThan(GROUP_ID, 3L))
+                    .thenReturn(2L);
+
+            assertThat(chatService.getUnreadCount(GROUP_ID, USER_ID).unreadCount())
+                    .isEqualTo(2L);
+        }
+
+        @Test
+        @DisplayName("한 번도 안 읽었으면 0부터 센다")
+        void treatsNoCursorAsZero() {
+            when(groupService.isActiveMember(GROUP_ID, USER_ID)).thenReturn(true);
+            when(groupService.findReadCursor(GROUP_ID, USER_ID)).thenReturn(null);
+            when(groupMessageRepository.countByGroupIdAndIdGreaterThan(GROUP_ID, 0L))
+                    .thenReturn(5L);
+
+            assertThat(chatService.getUnreadCount(GROUP_ID, USER_ID).unreadCount())
+                    .isEqualTo(5L);
         }
     }
 }

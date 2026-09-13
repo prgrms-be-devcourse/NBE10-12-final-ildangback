@@ -13,3 +13,7 @@ CREATE TABLE group_messages (
 );
 
 CREATE INDEX idx_group_messages_group_cursor ON group_messages (group_id, id);
+
+ALTER TABLE group_members ADD COLUMN last_read_message_id BIGINT NULL;
+ALTER TABLE group_members
+    ADD CONSTRAINT fk_group_members_last_read_message FOREIGN KEY (last_read_message_id) REFERENCES group_messages (id);

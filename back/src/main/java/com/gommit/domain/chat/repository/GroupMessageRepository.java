@@ -16,4 +16,6 @@ public interface GroupMessageRepository extends JpaRepository<GroupMessage, Long
          order by m.id desc
         """)
     List<GroupMessage> findMessages(@Param("groupId") Long groupId, @Param("cursor") Long cursor, Pageable pageable);
+
+    long countByGroupIdAndIdGreaterThan(Long groupId, Long id);
 }

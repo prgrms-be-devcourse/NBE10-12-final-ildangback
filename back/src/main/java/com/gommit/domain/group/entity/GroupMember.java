@@ -34,6 +34,8 @@ public class GroupMember extends BaseEntity {
 
     private LocalDateTime leftAt;
 
+    private Long lastReadMessageId;
+
     @Builder
     public GroupMember(ChallengeGroup group, Long userId) {
         this.group = group;
@@ -50,5 +52,11 @@ public class GroupMember extends BaseEntity {
     public void kick() {
         this.status = GroupMemberStatus.KICKED;
         this.leftAt = LocalDateTime.now();
+    }
+
+    public void markRead(Long messageId) {
+        if (this.lastReadMessageId == null || messageId > this.lastReadMessageId) {
+            this.lastReadMessageId = messageId;
+        }
     }
 }
