@@ -100,11 +100,17 @@ public class GroupPointService {
     }
 
     private void requireActiveMember(Long groupId, Long userId) {
-    boolean isActiveMember = groupMemberRepository.existsByGroupIdAndUserIdAndStatus(groupId, userId, GroupMemberStatus.ACTIVE);
-    if (!isActiveMember) { throw new BusinessException(ErrorCode.NOT_GROUP_MEMBER); }
+        boolean isActiveMember =
+                groupMemberRepository.existsByGroupIdAndUserIdAndStatus(groupId, userId, GroupMemberStatus.ACTIVE);
+        if (!isActiveMember) {
+            throw new BusinessException(ErrorCode.NOT_GROUP_MEMBER);
+        }
     }
-@Transactional
-public void lockForGroupCompletion(Long groupId) { lockOrCreatePoint(groupId); }
+
+    @Transactional
+    public void lockForGroupCompletion(Long groupId) {
+        lockOrCreatePoint(groupId);
+    }
 
     private GroupPoint lockOrCreatePoint(Long groupId) {
         if (!groupPointRepository.existsByGroupId(groupId)) {

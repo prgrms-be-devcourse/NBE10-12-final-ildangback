@@ -647,8 +647,9 @@ class RecordQueryServiceTest {
 
             when(monthlyMergeResultRepository.findAllByUserId(1L))
                     .thenReturn(List.of(
-                            monthlyMergeResult(1L, 10L, 1L), monthlyMergeResult(2L, 11L, 1L), monthlyMergeResult(
-                                    3L, 12L, 1L)));
+                            monthlyMergeResult(1L, 10L, 1L),
+                            monthlyMergeResult(2L, 11L, 1L),
+                            monthlyMergeResult(3L, 12L, 1L)));
             when(finalMergeResultRepository.findAllByUserId(1L)).thenReturn(List.of(finalMergeResult(4L, 20L, 1L)));
             when(monthlyMergeRepository.findAllById(List.of(10L, 11L, 12L))).thenReturn(List.of(march, april, may));
             when(finalMergeRepository.findAllById(List.of(20L))).thenReturn(List.of(finalMerge(20L, 1L)));
@@ -662,8 +663,9 @@ class RecordQueryServiceTest {
             assertThat(response.monthlyTrend())
                     .extracting(MonthlyTrendItemResponse::month)
                     .containsExactly("2026-03", "2026-04", "2026-05");
-            assertThat(response.heatmap()).extracting(HeatmapCellResponse::month).containsExactly(
-                    "2026-03", "2026-04", "2026-05");
+            assertThat(response.heatmap())
+                    .extracting(HeatmapCellResponse::month)
+                    .containsExactly("2026-03", "2026-04", "2026-05");
             assertThat(response.summary().totalCheckInCount()).isEqualTo(169);
         }
 

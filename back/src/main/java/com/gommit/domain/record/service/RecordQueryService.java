@@ -266,8 +266,9 @@ public class RecordQueryService {
 
         // 파이널은 챌린지 전체 기간 재집계본이라 총계(allRows)는 파이널로 대체.
         // 월별 추이/잔디(trendRows)는 파이널 하나로 하면 시작 달에만 몰리니 월간 머지 기준으로.
-        Set<Long> challengeIdsWithFinalMerge =
-                finalMergesById.values().stream().map(FinalMerge::getChallengeId).collect(Collectors.toSet());
+        Set<Long> challengeIdsWithFinalMerge = finalMergesById.values().stream()
+                .map(FinalMerge::getChallengeId)
+                .collect(Collectors.toSet());
         Set<Long> challengeIdsWithMonthlyMerge = monthlyMergesById.values().stream()
                 .map(MonthlyMerge::getChallengeId)
                 .collect(Collectors.toSet());
