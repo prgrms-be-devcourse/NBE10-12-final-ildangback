@@ -1,9 +1,11 @@
 package com.gommit.domain.chat;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -73,13 +75,38 @@ class ChatApiIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isNoContent());
     }
 
-    private void insertMessage(Long groupId, Long senderId, String content) {
+    private Long insertMessage(Long groupId, Long senderId, String content) {
         jdbcTemplate.update(
                 "insert into group_messages (group_id, sender_id, message_type, content, created_at, updated_at)"
                         + " values (?, ?, 'TEXT', ?, now(6), now(6))",
                 groupId,
                 senderId,
                 content);
+        return jdbcTemplate.queryForObject(
+                "select max(id) from group_messages where group_id = ?", Long.class, groupId);
+    }
+
+    private String readBody(Long lastReadMessageId) {
+        return """
+                {"lastReadMessageId": %d}
+                """.formatted(lastReadMessageId);
+    }
+
+    private ResultActions markRead(String accessToken, Long groupId, Long lastReadMessageId) throws Exception {
+        return mockMvc.perform(jsonRequest(
+                withToken(put("/api/groups/" + groupId + "/messages/read"), accessToken), readBody(lastReadMessageId)));
+    }
+
+    private ResultActions getUnreadCount(String accessToken, Long groupId) throws Exception {
+        return mockMvc.perform(withToken(get("/api/groups/" + groupId + "/messages/unread-count"), accessToken));
+    }
+
+    private Long readCursorOf(Long groupId, Long userId) {
+        return jdbcTemplate.queryForObject(
+                "select last_read_message_id from group_members where group_id = ? and user_id = ?",
+                Long.class,
+                groupId,
+                userId);
     }
 
     @Nested
@@ -199,6 +226,164 @@ class ChatApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content.length()").value(1))
                     .andExpect(jsonPath("$.content[0].content").value("이 그룹 메시지"));
+        }
+    }
+
+    @Nested
+    @DisplayName("읽음 커서 갱신")
+    class MarkRead {
+
+        @Test
+        @DisplayName("미인증이면 401")
+        void requiresAuthentication() throws Exception {
+            mockMvc.perform(jsonRequest(put("/api/groups/1/messages/read"), readBody(1L)))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+        }
+
+        @Test
+        @DisplayName("그룹 멤버가 아니면 403")
+        void rejectsNonMember() throws Exception {
+            var owner = loginAs(OWNER_EMAIL, OWNER_NICKNAME);
+            Long ownerId = userIdOf(OWNER_EMAIL);
+            Long groupId = createGroupAndReturnId(owner.accessToken(), ownerId);
+            Long messageId = insertMessage(groupId, ownerId, "하나");
+
+            var stranger = loginAs(STRANGER_EMAIL, STRANGER_NICKNAME);
+
+            markRead(stranger.accessToken(), groupId, messageId)
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("NOT_GROUP_MEMBER"));
+        }
+
+        @Test
+        @DisplayName("강퇴당한 멤버는 갱신할 수 없다")
+        void rejectsKickedMember() throws Exception {
+            var owner = loginAs(OWNER_EMAIL, OWNER_NICKNAME);
+            Long ownerId = userIdOf(OWNER_EMAIL);
+            Long groupId = createGroupAndReturnId(owner.accessToken(), ownerId);
+            Long messageId = insertMessage(groupId, ownerId, "하나");
+
+            var member = loginAs(MEMBER_EMAIL, MEMBER_NICKNAME);
+            joinGroup(member.accessToken(), groupId);
+            kickMember(owner.accessToken(), groupId, userIdOf(MEMBER_EMAIL));
+
+            markRead(member.accessToken(), groupId, messageId)
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("NOT_GROUP_MEMBER"));
+        }
+
+        @Test
+        @DisplayName("lastReadMessageId 가 없으면 400")
+        void rejectsMissingMessageId() throws Exception {
+            var owner = loginAs(OWNER_EMAIL, OWNER_NICKNAME);
+            Long groupId = createGroupAndReturnId(owner.accessToken(), userIdOf(OWNER_EMAIL));
+
+            mockMvc.perform(jsonRequest(
+                            withToken(put("/api/groups/" + groupId + "/messages/read"), owner.accessToken()), "{}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"));
+        }
+
+        @Test
+        @DisplayName("멤버가 읽으면 커서가 저장된다")
+        void savesCursor() throws Exception {
+            var owner = loginAs(OWNER_EMAIL, OWNER_NICKNAME);
+            Long ownerId = userIdOf(OWNER_EMAIL);
+            Long groupId = createGroupAndReturnId(owner.accessToken(), ownerId);
+            insertMessage(groupId, ownerId, "하나");
+            Long second = insertMessage(groupId, ownerId, "둘");
+
+            markRead(owner.accessToken(), groupId, second).andExpect(status().isNoContent());
+
+            assertThat(readCursorOf(groupId, ownerId)).isEqualTo(second);
+        }
+
+        @Test
+        @DisplayName("이미 읽은 지점보다 뒤로 가는 갱신은 무시한다")
+        void ignoresBackwardCursor() throws Exception {
+            var owner = loginAs(OWNER_EMAIL, OWNER_NICKNAME);
+            Long ownerId = userIdOf(OWNER_EMAIL);
+            Long groupId = createGroupAndReturnId(owner.accessToken(), ownerId);
+            Long first = insertMessage(groupId, ownerId, "하나");
+            Long second = insertMessage(groupId, ownerId, "둘");
+
+            markRead(owner.accessToken(), groupId, second).andExpect(status().isNoContent());
+            markRead(owner.accessToken(), groupId, first).andExpect(status().isNoContent());
+
+            assertThat(readCursorOf(groupId, ownerId)).isEqualTo(second);
+        }
+    }
+
+    @Nested
+    @DisplayName("안 읽은 메시지 수 조회")
+    class GetUnreadCount {
+
+        @Test
+        @DisplayName("그룹 멤버가 아니면 403")
+        void rejectsNonMember() throws Exception {
+            var owner = loginAs(OWNER_EMAIL, OWNER_NICKNAME);
+            Long groupId = createGroupAndReturnId(owner.accessToken(), userIdOf(OWNER_EMAIL));
+
+            var stranger = loginAs(STRANGER_EMAIL, STRANGER_NICKNAME);
+
+            getUnreadCount(stranger.accessToken(), groupId)
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("NOT_GROUP_MEMBER"));
+        }
+
+        @Test
+        @DisplayName("한 번도 읽지 않았으면 전체를 센다")
+        void countsAllWhenNeverRead() throws Exception {
+            var owner = loginAs(OWNER_EMAIL, OWNER_NICKNAME);
+            Long ownerId = userIdOf(OWNER_EMAIL);
+            Long groupId = createGroupAndReturnId(owner.accessToken(), ownerId);
+
+            var member = loginAs(MEMBER_EMAIL, MEMBER_NICKNAME);
+            joinGroup(member.accessToken(), groupId);
+            insertMessage(groupId, ownerId, "하나");
+            insertMessage(groupId, ownerId, "둘");
+
+            getUnreadCount(member.accessToken(), groupId)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.unreadCount").value(2));
+        }
+
+        @Test
+        @DisplayName("읽은 뒤에는 그 뒤에 온 메시지만 센다")
+        void countsOnlyAfterCursor() throws Exception {
+            var owner = loginAs(OWNER_EMAIL, OWNER_NICKNAME);
+            Long ownerId = userIdOf(OWNER_EMAIL);
+            Long groupId = createGroupAndReturnId(owner.accessToken(), ownerId);
+
+            var member = loginAs(MEMBER_EMAIL, MEMBER_NICKNAME);
+            joinGroup(member.accessToken(), groupId);
+            insertMessage(groupId, ownerId, "하나");
+            Long second = insertMessage(groupId, ownerId, "둘");
+            insertMessage(groupId, ownerId, "셋");
+
+            markRead(member.accessToken(), groupId, second).andExpect(status().isNoContent());
+
+            getUnreadCount(member.accessToken(), groupId)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.unreadCount").value(1));
+        }
+
+        @Test
+        @DisplayName("다른 그룹 메시지는 세지 않는다")
+        void isolatesGroups() throws Exception {
+            var owner = loginAs(OWNER_EMAIL, OWNER_NICKNAME);
+            Long ownerId = userIdOf(OWNER_EMAIL);
+            Long groupId = createGroupAndReturnId(owner.accessToken(), ownerId);
+            Long otherGroupId = createGroupAndReturnId(owner.accessToken(), ownerId);
+
+            insertMessage(groupId, ownerId, "이 그룹 메시지");
+            insertMessage(otherGroupId, ownerId, "다른 그룹 메시지");
+            insertMessage(otherGroupId, ownerId, "다른 그룹 메시지 둘");
+
+            getUnreadCount(owner.accessToken(), groupId)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.unreadCount").value(1));
         }
     }
 }
