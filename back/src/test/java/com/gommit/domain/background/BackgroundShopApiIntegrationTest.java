@@ -97,6 +97,10 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
         return mockMvc.perform(withToken(delete("/api/admin/backgrounds/" + backgroundId), accessToken));
     }
 
+    private ResultActions getBackgrounds(String accessToken) throws Exception {
+        return mockMvc.perform(withToken(get("/api/admin/backgrounds"), accessToken));
+    }
+
     private ResultActions createBackground(String accessToken, String mapType, String name, MockMultipartFile image)
             throws Exception {
         MockMultipartHttpServletRequestBuilder builder = multipart("/api/admin/backgrounds");
@@ -927,6 +931,32 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
             MockMultipartFile gif = new MockMultipartFile("image", "a.gif", "image/gif", new byte[] {1, 2, 3, 4});
 
             createBackground(adminToken, "GYM", "야간 헬스장", gif).andExpect(status().isUnsupportedMediaType());
+        }
+    }
+
+    @Nested
+    @DisplayName("판매 배경 목록 조회")
+    class AdminList {
+
+        @Test
+        @DisplayName("맵 타입 상관없이 등록된 배경을 전부 준다")
+        void listsAllMapTypes() throws Exception {
+            String adminToken = loginAsAdmin();
+            insertBackground("STUDY_ROOM", "아늑한 서재", 200);
+            insertBackground("GYM", "네온 짐", 200);
+
+            getBackgrounds(adminToken)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[0].name").value("아늑한 서재"))
+                    .andExpect(jsonPath("$.content[1].name").value("네온 짐"));
+        }
+
+        @Test
+        @DisplayName("일반 사용자는 목록을 조회할 수 없다")
+        void nonAdminCannotList() throws Exception {
+            String userToken = loginAs().accessToken();
+
+            getBackgrounds(userToken).andExpect(status().isForbidden());
         }
     }
 

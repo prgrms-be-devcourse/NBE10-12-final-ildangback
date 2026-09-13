@@ -10,6 +10,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface BackgroundRepository extends JpaRepository<Background, Long> {
 
+    List<Background> findByIdGreaterThanOrderByIdAsc(Long cursor, Pageable pageable);
+
     List<Background> findByMapTypeAndIdGreaterThanOrderByIdAsc(MapType mapType, Long cursor, Pageable pageable);
 
     @Query("""

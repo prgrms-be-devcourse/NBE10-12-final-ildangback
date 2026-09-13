@@ -156,6 +156,18 @@ public class BackgroundService {
         }
     }
 
+    // 판매 배경 목록 조회(관리자)
+    public SliceResponse<BackgroundResponse> getBackgrounds(Long cursor, int size) {
+        long from = cursor != null ? cursor : 0L;
+        List<Background> rows = backgroundRepository.findByIdGreaterThanOrderByIdAsc(from, PageRequest.of(0, size + 1));
+
+        List<BackgroundResponse> content = new ArrayList<>();
+        for (Background background : rows) {
+            content.add(new BackgroundResponse(background, storageService.publicUrl(background.getImageKey())));
+        }
+        return SliceResponse.ofCursor(content, size, BackgroundResponse::backgroundId);
+    }
+
     // 판매 배경 삭제
     @Transactional
     public void deleteBackground(Long backgroundId) {
