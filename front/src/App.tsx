@@ -3,7 +3,9 @@ import { PlainLayout } from "./app/PlainLayout";
 import { RequireAuth } from "./app/RequireAuth";
 import { RequireAdmin } from "./domains/admin/RequireAdmin";
 import { AdminHomePage } from "./domains/admin/pages/AdminHomePage";
+import { BackgroundAdminPage } from "./domains/admin/pages/BackgroundAdminPage";
 import { ItemAdminPage } from "./domains/admin/pages/ItemAdminPage";
+import { GroupShopPage } from "./domains/background/pages/GroupShopPage";
 import { TabLayout } from "./app/TabLayout";
 import { ForgotPasswordPage } from "./domains/auth/pages/ForgotPasswordPage";
 import { LoginPage } from "./domains/auth/pages/LoginPage";
@@ -24,6 +26,8 @@ import { EditProfilePage } from "./domains/user/pages/EditProfilePage";
 import { PointHistoryDetailPage } from "./domains/point/pages/PointHistoryDetailPage";
 import { PersonalStatsPage } from "./domains/record/pages/PersonalStatsPage";
 import { PointHistoryPage } from "./domains/point/pages/PointHistoryPage";
+import { GroupPointHistoryPage } from "./domains/point/pages/GroupPointHistoryPage";
+import { GroupPointHistoryDetailPage } from "./domains/point/pages/GroupPointHistoryDetailPage";
 import { FinalMergeResultPage } from "./domains/record/pages/FinalMergeResultPage";
 import { MergeListPage } from "./domains/record/pages/MergeListPage";
 import { MonthlyMergeResultPage } from "./domains/record/pages/MonthlyMergeResultPage";
@@ -135,6 +139,18 @@ export function App() {
             path="challenges/:challengeId/final-merge"
             element={<FinalMergeResultPage />}
           />
+          <Route
+            path="challenges/groups/:groupId/shop"
+            element={<GroupShopPage />}
+          />
+          <Route
+            path="challenges/groups/:groupId/points"
+            element={<GroupPointHistoryPage />}
+          />
+          <Route
+            path="challenges/groups/:groupId/points/:historyId"
+            element={<GroupPointHistoryDetailPage />}
+          />
 
           {/* 체크인 제출 플로우 — 카메라 중심의 집중 화면이라 하단바 없이 둔다. */}
           <Route
@@ -147,6 +163,7 @@ export function App() {
           <Route path="admin" element={<RequireAdmin />}>
             <Route index element={<AdminHomePage />} />
             <Route path="items" element={<ItemAdminPage />} />
+            <Route path="backgrounds" element={<BackgroundAdminPage />} />
           </Route>
         </Route>
       </Route>
