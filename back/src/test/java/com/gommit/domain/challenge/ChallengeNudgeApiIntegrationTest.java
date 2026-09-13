@@ -202,4 +202,49 @@ class ChallengeNudgeApiIntegrationTest extends IntegrationTestSupport {
             assertThat(notifications.count()).isEqualTo(1);
         }
     }
+
+    @Autowired
+    com.gommit.domain.notification.service.ExtensionReminderService extensionReminders;
+
+    @ParameterizedTest
+    @ValueSource(strings = {"PENDING", "EXTEND", "DECLINE"})
+    void extensionRemindersRespectChoiceAndReadDuplicates(String choice) {
+        jdbcTemplate.update("UPDATE challenges SET end_date = ? WHERE id = ?", today.plusDays(3), challenge.getId());
+        jdbcTemplate.update("UPDATE challenge_members SET extension_choice = 'EXTEND' WHERE user_id = ?", senderId);
+        jdbcTemplate.update("UPDATE challenge_members SET extension_choice = ? WHERE user_id = ?", choice, receiverId);
+        extensionReminders.sendReminders();
+        if (!choice.equals("PENDING")) {
+            assertThat(notifications.count()).isZero();
+            return;
+        }
+        assertThat(notifications.findAll()).hasSize(1);
+        var notification = notifications.findAll().getFirst();
+        assertThat(notification.getType()).isEqualTo(NotificationType.EXTENSION_REMINDER);
+        assertThat(notification.getUserId()).isEqualTo(receiverId);
+        assertThat(notification.getRefId()).isEqualTo(challenge.getId());
+        assertThat(notification.getBody()).isEqualTo("다음 시즌 참여 여부를 아직 선택하지 않았어요! 마감 전에 선택해주세요 🔔");
+        notification.read();
+        notifications.saveAndFlush(notification);
+        extensionReminders.sendReminders();
+        assertThat(notifications.count()).isEqualTo(1);
+    }
+
+    @Test
+    void extensionRemindersExcludeOtherDatesAndInactiveTargets() {
+        extensionReminders.sendReminders();
+        assertThat(notifications.count()).isZero();
+        jdbcTemplate.update("UPDATE challenges SET end_date = ? WHERE id = ?", today.plusDays(2), challenge.getId());
+        extensionReminders.sendReminders();
+        assertThat(notifications.count()).isZero();
+        jdbcTemplate.update("UPDATE challenges SET end_date = ? WHERE id = ?", today.plusDays(3), challenge.getId());
+        for (String status : new String[] {"READY", "ENDED"}) {
+            jdbcTemplate.update("UPDATE challenges SET status = ? WHERE id = ?", status, challenge.getId());
+            extensionReminders.sendReminders();
+            assertThat(notifications.count()).isZero();
+        }
+        jdbcTemplate.update("UPDATE challenges SET status = 'ACTIVE' WHERE id = ?", challenge.getId());
+        jdbcTemplate.update("UPDATE challenge_members SET status = 'LEFT' WHERE challenge_id = ?", challenge.getId());
+        extensionReminders.sendReminders();
+        assertThat(notifications.count()).isZero();
+    }
 }
