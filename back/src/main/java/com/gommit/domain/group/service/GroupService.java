@@ -15,6 +15,7 @@ import com.gommit.domain.group.entity.*;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
 import com.gommit.domain.group.repository.GroupMemberCount;
 import com.gommit.domain.group.repository.GroupMemberRepository;
+import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.domain.user.entity.User;
 import com.gommit.domain.user.repository.UserRepository;
 import com.gommit.global.dto.SliceResponse;
@@ -44,6 +45,7 @@ public class GroupService {
     private final CheckInRepository checkInRepository;
     private final ChallengeMemberService challengeMemberService;
     private final ChallengeProgressCalculator challengeProgressCalculator;
+    private final PersonalPointService personalPointService;
     private final BusinessClock businessClock;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final String INVITE_CODE_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -291,17 +293,22 @@ public class GroupService {
         groupMember.leave();
         challengeRepository
                 .findFirstByGroupIdAndStatus(groupId, ChallengeStatus.ACTIVE)
-                .ifPresent(challenge -> leaveChallengeMember(challenge.getId(), userId));
+                .ifPresent(challenge -> leaveChallengeMember(challenge.getId(), userId, group.getName()));
         challengeRepository
                 .findFirstByGroupIdAndStatus(groupId, ChallengeStatus.READY)
-                .ifPresent(challenge -> leaveChallengeMember(challenge.getId(), userId));
+                .ifPresent(challenge -> leaveChallengeMember(challenge.getId(), userId, group.getName()));
     }
 
-    private void leaveChallengeMember(Long challengeId, Long userId) {
+    private void leaveChallengeMember(Long challengeId, Long userId, String groupName) {
         challengeMemberRepository
                 .findByChallengeIdAndUserId(challengeId, userId)
                 .filter(member -> member.getStatus() == ChallengeMemberStatus.ACTIVE)
-                .ifPresent(ChallengeMember::leave);
+                .ifPresent(member -> {
+                    member.leave();
+                    // 중도 탈퇴 - 이 챌린지에서 번 포인트 회수(Should). READY 챌린지는 아직
+                    // 체크인이 없어 번 게 없으니 자연히 아무 일도 안 일어난다.
+                    personalPointService.recoverChallengePoints(userId, challengeId, groupName);
+                });
     }
 
     @Transactional(readOnly = true)
@@ -432,14 +439,18 @@ public class GroupService {
             throw new BusinessException(ErrorCode.NOT_GROUP_MEMBER);
         }
         targetMember.kick();
-        kickChallengeMember(activeChallenge.getId(), targetUserId);
+        kickChallengeMember(activeChallenge.getId(), targetUserId, group.getName());
     }
 
-    private void kickChallengeMember(Long challengeId, Long userId) {
+    private void kickChallengeMember(Long challengeId, Long userId, String groupName) {
         challengeMemberRepository
                 .findByChallengeIdAndUserId(challengeId, userId)
                 .filter(member -> member.getStatus() == ChallengeMemberStatus.ACTIVE)
-                .ifPresent(ChallengeMember::kick);
+                .ifPresent(member -> {
+                    member.kick();
+                    // 추방도 중도 탈퇴와 동일하게 그 챌린지에서 번 포인트를 회수한다(Should).
+                    personalPointService.recoverChallengePoints(userId, challengeId, groupName);
+                });
     }
 
     // 회원 탈퇴 시 그룹 정리
@@ -452,7 +463,7 @@ public class GroupService {
             ChallengeGroup group = groupMember.getGroup();
             boolean ownerLeaving = group.getOwnerId().equals(userId);
             Long newOwnerId = ownerLeaving ? pickNewOwner(group.getId(), userId) : null;
-            leaveChallengesOnAccountDeletion(group.getId(), userId, newOwnerId);
+            leaveChallengesOnAccountDeletion(group.getId(), userId, newOwnerId, group.getName());
             if (!ownerLeaving) {
                 continue;
             }
@@ -478,16 +489,18 @@ public class GroupService {
     }
 
     // 살아 있는 시즌 정리
-    private void leaveChallengesOnAccountDeletion(Long groupId, Long userId, Long preferredOwnerId) {
+    private void leaveChallengesOnAccountDeletion(Long groupId, Long userId, Long preferredOwnerId, String groupName) {
         for (ChallengeStatus status : List.of(ChallengeStatus.ACTIVE, ChallengeStatus.READY)) {
             challengeRepository
                     .findFirstByGroupIdAndStatus(groupId, status)
-                    .ifPresent(challenge -> leaveChallengeMemberAndDelegate(challenge, userId, preferredOwnerId));
+                    .ifPresent(challenge ->
+                            leaveChallengeMemberAndDelegate(challenge, userId, preferredOwnerId, groupName));
         }
     }
 
     // 시즌 이탈과 OWNER 이관
-    private void leaveChallengeMemberAndDelegate(Challenge challenge, Long userId, Long preferredOwnerId) {
+    private void leaveChallengeMemberAndDelegate(
+            Challenge challenge, Long userId, Long preferredOwnerId, String groupName) {
         ChallengeMember leavingMember = challengeMemberRepository
                 .findByChallengeIdAndUserId(challenge.getId(), userId)
                 .filter(member -> member.getStatus() == ChallengeMemberStatus.ACTIVE)
@@ -496,6 +509,8 @@ public class GroupService {
             return;
         }
         leavingMember.leave();
+        // 계정 탈퇴로 인한 이탈도 중도 탈퇴와 동일하게 그 챌린지에서 번 포인트를 회수한다(Should).
+        personalPointService.recoverChallengePoints(userId, challenge.getId(), groupName);
         if (leavingMember.getRole() != ChallengeMemberRole.OWNER) {
             return;
         }
