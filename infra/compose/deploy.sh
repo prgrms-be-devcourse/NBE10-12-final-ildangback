@@ -21,11 +21,20 @@ REF="${2:-origin/main}"
 ACTIVE_CONF="$APP_DIR/nginx/conf.d/active-backend.conf"
 
 # 0. 지금 active 색 판별 — repo 동기화(2번, --delete)로 conf.d 가 건드려지기 전에 먼저 읽는다.
-#    파일이 없으면(최초 배포 전 셋업을 안 거쳤거나 사고로 지워짐) blue 를 active 로 간주하고
-#    green 부터 새로 띄운다 — 어느 쪽이든 이번 배포로 정상 상태가 됨.
-CURRENT_COLOR="blue"
-if [ -f "$ACTIVE_CONF" ] && grep -q 'back-green' "$ACTIVE_CONF"; then
+#    이 파일을 잘못 읽은(없음/손상) 상태로 배포하면 4번이 active 컨테이너를 재기동/정지하므로 식별 불가시 배포 중단
+#    (setup 단계에서 blue 로 1회 생성해두므로 정상 운영 중엔 항상 존재해야 함)
+if [ ! -f "$ACTIVE_CONF" ]; then
+  echo "ACTIVE_CONF(${ACTIVE_CONF}) 없음 — active 색 식별 불가, 배포 중단. infra-runbook.md 초기 셋업 확인." >&2
+  exit 1
+fi
+if grep -q 'back-blue' "$ACTIVE_CONF"; then
+  CURRENT_COLOR="blue"
+elif grep -q 'back-green' "$ACTIVE_CONF"; then
   CURRENT_COLOR="green"
+else
+  echo "ACTIVE_CONF(${ACTIVE_CONF}) 내용에서 blue/green 식별 불가, 배포 중단:" >&2
+  cat "$ACTIVE_CONF" >&2 || true
+  exit 1
 fi
 if [ "$CURRENT_COLOR" = "blue" ]; then
   NEW_COLOR="green"
