@@ -247,4 +247,76 @@ class ChallengeNudgeApiIntegrationTest extends IntegrationTestSupport {
         extensionReminders.sendReminders();
         assertThat(notifications.count()).isZero();
     }
+
+    @Autowired
+    com.gommit.domain.challenge.service.ChallengeLifecycleService lifecycle;
+
+    @Test
+    void seasonStartNotifiesOnlyNewSeasonActiveMembersOnce() {
+        var next = challenges.saveAndFlush(Challenge.builder()
+                .groupId(challenge.getGroupId())
+                .seqNo(2)
+                .startDate(today)
+                .endDate(today.plusDays(7))
+                .frequencyType(FrequencyType.DAILY)
+                .dailyCheckInCount(3)
+                .requiredDayCount(8)
+                .allowPhoto(true)
+                .build());
+        members.saveAndFlush(ChallengeMember.builder()
+                .challenge(next)
+                .userId(senderId)
+                .role(ChallengeMemberRole.OWNER)
+                .build());
+        // Receiver belongs only to the previous season.
+        loginAs("third@example.com", "새멤버");
+        Long thirdId =
+                jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = ?", Long.class, "third@example.com");
+        members.saveAndFlush(ChallengeMember.builder()
+                .challenge(next)
+                .userId(thirdId)
+                .role(ChallengeMemberRole.MEMBER)
+                .build());
+        loginAs("left@example.com", "탈퇴멤버");
+        Long leftId =
+                jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = ?", Long.class, "left@example.com");
+        members.saveAndFlush(ChallengeMember.builder()
+                .challenge(next)
+                .userId(leftId)
+                .role(ChallengeMemberRole.MEMBER)
+                .build());
+        jdbcTemplate.update(
+                "UPDATE challenge_members SET status = 'LEFT' WHERE challenge_id = ? AND user_id = ?",
+                next.getId(),
+                leftId);
+        lifecycle.activateChallengesDueToday();
+        assertThat(challenges.findById(next.getId()).orElseThrow().getStatus()).isEqualTo(ChallengeStatus.ACTIVE);
+        assertThat(notifications.findAll()).hasSize(2).allSatisfy(n -> {
+            assertThat(n.getType()).isEqualTo(NotificationType.SEASON_STARTED);
+            assertThat(n.getRefId()).isEqualTo(next.getId());
+            assertThat(n.getBody()).isEqualTo("새 시즌이 시작됐어요! 오늘부터 다시 인증을 시작해보세요 🔥");
+        });
+        assertThat(notifications.findAll()).extracting(n -> n.getUserId()).containsExactlyInAnyOrder(senderId, thirdId);
+        jdbcTemplate.update("UPDATE notifications SET read_at = ?", today.atTime(5, 0));
+        lifecycle.activateChallengesDueToday();
+        assertThat(notifications.count()).isEqualTo(2);
+        // Even if activation is retried from READY, read notifications still prevent duplicates.
+        jdbcTemplate.update("UPDATE challenges SET status = 'READY' WHERE id = ?", next.getId());
+        lifecycle.activateChallengesDueToday();
+        assertThat(notifications.count()).isEqualTo(2);
+    }
+
+    @Test
+    void seasonStartSkipsExistingActiveAndFutureReadyChallenges() {
+        lifecycle.activateChallengesDueToday();
+        assertThat(notifications.count()).isZero();
+        jdbcTemplate.update(
+                "UPDATE challenges SET status = 'READY', start_date = ? WHERE id = ?",
+                today.plusDays(1),
+                challenge.getId());
+        lifecycle.activateChallengesDueToday();
+        assertThat(notifications.count()).isZero();
+        assertThat(challenges.findById(challenge.getId()).orElseThrow().getStatus())
+                .isEqualTo(ChallengeStatus.READY);
+    }
 }
