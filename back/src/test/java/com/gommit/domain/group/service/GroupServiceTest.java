@@ -1054,6 +1054,31 @@ class GroupServiceTest {
                     () -> groupService.kickMember(12L, 1L, 2L), ErrorCode.GROUP_MEMBER_KICK_NOT_ALLOWED);
             org.mockito.Mockito.verifyNoInteractions(groupMemberRepository, challengeMemberRepository);
         }
+
+        @Test
+        @DisplayName("READY 챌린지 멤버도 함께 강퇴된다")
+        void givenReadyChallengeWhenOwnerKicksThenReadyMemberAlsoKicked() {
+            ChallengeGroup group = group(12L, "그룹", GroupCategory.EXERCISE, Visibility.PUBLIC, 6);
+            Challenge activeChallenge = challenge(50L, 12L, ChallengeStatus.ACTIVE);
+            Challenge readyChallenge = challenge(51L, 12L, ChallengeStatus.READY);
+            GroupMember member = groupMember(30L, group, 2L);
+            ChallengeMember activeMember = challengeMember(70L, activeChallenge, 2L, ChallengeMemberRole.MEMBER);
+            ChallengeMember readyMember = challengeMember(71L, readyChallenge, 2L, ChallengeMemberRole.MEMBER);
+            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.ACTIVE))
+                    .thenReturn(Optional.of(activeChallenge));
+            when(challengeRepository.findFirstByGroupIdAndStatus(12L, ChallengeStatus.READY))
+                    .thenReturn(Optional.of(readyChallenge));
+            when(groupMemberRepository.findByGroupIdAndUserId(12L, 2L)).thenReturn(Optional.of(member));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(activeMember));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(51L, 2L)).thenReturn(Optional.of(readyMember));
+
+            groupService.kickMember(12L, 1L, 2L);
+
+            assertThat(member.getStatus()).isEqualTo(GroupMemberStatus.KICKED);
+            assertThat(activeMember.getStatus()).isEqualTo(ChallengeMemberStatus.KICKED);
+            assertThat(readyMember.getStatus()).isEqualTo(ChallengeMemberStatus.KICKED);
+        }
     }
 
     @Nested
