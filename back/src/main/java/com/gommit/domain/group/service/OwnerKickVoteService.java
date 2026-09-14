@@ -1,9 +1,6 @@
 package com.gommit.domain.group.service;
 
-import com.gommit.domain.challenge.entity.Challenge;
-import com.gommit.domain.challenge.entity.ChallengeMemberRole;
-import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
-import com.gommit.domain.challenge.entity.ChallengeStatus;
+import com.gommit.domain.challenge.entity.*;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.group.dto.response.KickVoteStatusResponse;
@@ -18,9 +15,10 @@ import com.gommit.global.exception.ErrorCode;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -132,9 +130,8 @@ public class OwnerKickVoteService {
     @Transactional
     public void expireOutdatedVotes() {
         LocalDateTime expiredBefore = LocalDateTime.now().minusHours(kickVoteExpiryHours);
-        challengeGroupRepository
-                .findGroupsWithExpiredKickVote(expiredBefore, PageRequest.of(0, 100))
-                .forEach(group -> resetVoteData(group, group.getId()));
+        groupMemberRepository.bulkResetExpiredKickVoteChoice(expiredBefore);
+        challengeGroupRepository.bulkExpiredKickVotes(expiredBefore);
     }
 
     // ── 내부 메서드 ───────────────────────────────────────────────────────────
@@ -185,19 +182,33 @@ public class OwnerKickVoteService {
 
         List<GroupMember> remaining =
                 groupMemberRepository.findAllByGroupIdAndStatus(groupId, GroupMemberStatus.ACTIVE);
-
         if (remaining.isEmpty()) {
             group.end();
-            if (activeChallenge != null) {
-                activeChallenge.end();
-            }
-            if (readyChallenge != null) {
-                readyChallenge.end();
-            }
+            if (activeChallenge != null) activeChallenge.end();
+            if (readyChallenge != null) readyChallenge.end();
             return;
         }
 
-        Long newOwnerId = remaining.get(SECURE_RANDOM.nextInt(remaining.size())).getUserId();
+        List<GroupMember> candidates;
+        if (readyChallenge != null) {
+            Set<Long> readyMemberIds =
+                    challengeMemberRepository
+                            .findAllByChallengeIdAndStatus(readyChallenge.getId(), ChallengeMemberStatus.ACTIVE)
+                            .stream()
+                            .map(ChallengeMember::getUserId)
+                            .collect(Collectors.toSet());
+            candidates = remaining.stream()
+                    .filter(member -> readyMemberIds.contains(member.getId()))
+                    .toList();
+            if (candidates.isEmpty()) {
+                candidates = remaining;
+            }
+        } else {
+            candidates = remaining;
+        }
+
+        Long newOwnerId =
+                candidates.get(SECURE_RANDOM.nextInt(remaining.size())).getUserId();
         group.changeOwner(newOwnerId);
 
         if (activeChallenge != null) {

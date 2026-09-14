@@ -862,7 +862,7 @@ class ChallengeServiceTest {
             when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(currentOwner));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(targetMember));
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeGroupRepository.findByIdWithLock(12L)).thenReturn(Optional.of(group));
 
             // when
             var response = challengeService.delegateOwner(50L, 1L, new OwnerDelegationRequest(2L));
@@ -978,7 +978,7 @@ class ChallengeServiceTest {
             when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(currentOwner));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(targetMember));
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeGroupRepository.findByIdWithLock(12L)).thenReturn(Optional.of(group));
 
             // when
             challengeService.delegateOwner(50L, 1L, new OwnerDelegationRequest(2L));
@@ -1001,7 +1001,7 @@ class ChallengeServiceTest {
             when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(currentOwner));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(targetMember));
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeGroupRepository.findByIdWithLock(12L)).thenReturn(Optional.of(group));
 
             // when & then
             assertBusinessException(
@@ -1019,7 +1019,7 @@ class ChallengeServiceTest {
             when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(currentOwner));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(targetMember));
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.empty());
+            when(challengeGroupRepository.findByIdWithLock(12L)).thenReturn(Optional.empty());
 
             // when & then
             assertBusinessException(

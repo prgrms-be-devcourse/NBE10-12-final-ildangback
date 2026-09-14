@@ -1,12 +1,9 @@
 package com.gommit.domain.group.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import com.gommit.domain.challenge.entity.Challenge;
 import com.gommit.domain.challenge.entity.ChallengeMember;
@@ -36,6 +33,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -599,32 +597,27 @@ class OwnerKickVoteServiceTest {
         @Test
         @DisplayName("만료된 그룹들의 투표 데이터를 초기화한다")
         void resetsExpiredGroups() {
-            ChallengeGroup expired1 = group(10L, 1L);
-            expired1.startKickVote();
-            ChallengeGroup expired2 = group(11L, 2L);
-            expired2.startKickVote();
-            when(challengeGroupRepository.findGroupsWithExpiredKickVote(
-                            any(LocalDateTime.class), any(org.springframework.data.domain.Pageable.class)))
-                    .thenReturn(List.of(expired1, expired2));
+            when(groupMemberRepository.bulkResetExpiredKickVoteChoice(any(LocalDateTime.class)))
+                    .thenReturn(2);
+            when(challengeGroupRepository.bulkExpiredKickVotes(any(LocalDateTime.class)))
+                    .thenReturn(2);
 
             ownerKickVoteService.expireOutdatedVotes();
 
-            assertThat(expired1.hasActiveKickVote()).isFalse();
-            assertThat(expired2.hasActiveKickVote()).isFalse();
-            verify(groupMemberRepository).resetAllKickVoteChoices(10L, KickVoteChoice.NONE);
-            verify(groupMemberRepository).resetAllKickVoteChoices(11L, KickVoteChoice.NONE);
+            InOrder inOrder = inOrder(groupMemberRepository, challengeGroupRepository);
+            inOrder.verify(groupMemberRepository).bulkResetExpiredKickVoteChoice(any(LocalDateTime.class));
+            inOrder.verify(challengeGroupRepository).bulkExpiredKickVotes(any(LocalDateTime.class));
         }
 
         @Test
         @DisplayName("만료된 그룹이 없으면 아무것도 하지 않는다")
         void doesNothingWhenNothingExpired() {
-            when(challengeGroupRepository.findGroupsWithExpiredKickVote(
-                            any(LocalDateTime.class), any(org.springframework.data.domain.Pageable.class)))
-                    .thenReturn(List.of());
+            when(groupMemberRepository.bulkResetExpiredKickVoteChoice(any(LocalDateTime.class)))
+                    .thenReturn(0);
+            when(challengeGroupRepository.bulkExpiredKickVotes(any(LocalDateTime.class)))
+                    .thenReturn(0);
 
-            ownerKickVoteService.expireOutdatedVotes();
-
-            verify(groupMemberRepository, never()).resetAllKickVoteChoices(any(), any());
+            assertThatCode(() -> ownerKickVoteService.expireOutdatedVotes()).doesNotThrowAnyException();
         }
     }
 }

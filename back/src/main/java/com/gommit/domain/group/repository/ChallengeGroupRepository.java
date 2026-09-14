@@ -7,9 +7,9 @@ import jakarta.persistence.LockModeType;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -33,11 +33,12 @@ public interface ChallengeGroupRepository extends JpaRepository<ChallengeGroup, 
     """)
     Optional<ChallengeGroup> findByInviteCodeWithLock(@Param("inviteCode") String inviteCode);
 
+    @Modifying(clearAutomatically = true)
     @Query("""
-        SELECT g FROM ChallengeGroup g
+        UPDATE ChallengeGroup g
+        SET g.kickVoteStartedAt = NULL
         WHERE g.kickVoteStartedAt IS NOT NULL
-        AND g.kickVoteStartedAt < :expiredBefore
+            AND g.kickVoteStartedAt < :expiredBefore
     """)
-    List<ChallengeGroup> findGroupsWithExpiredKickVote(
-            @Param("expiredBefore") LocalDateTime expiredBefore, Pageable pageable);
+    int bulkExpiredKickVotes(@Param("expiredBefore") LocalDateTime expiredBefore);
 }

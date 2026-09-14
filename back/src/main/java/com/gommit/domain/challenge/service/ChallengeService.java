@@ -243,7 +243,7 @@ public class ChallengeService {
         }
 
         ChallengeGroup group = challengeGroupRepository
-                .findById(challenge.getGroupId())
+                .findByIdWithLock(challenge.getGroupId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
         if (group.hasActiveKickVote()) {
             throw new BusinessException(ErrorCode.KICK_VOTE_ALREADY_IN_PROGRESS);

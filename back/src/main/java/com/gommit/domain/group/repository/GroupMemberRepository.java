@@ -3,6 +3,7 @@ package com.gommit.domain.group.repository;
 import com.gommit.domain.group.entity.GroupMember;
 import com.gommit.domain.group.entity.GroupMemberStatus;
 import com.gommit.domain.group.entity.KickVoteChoice;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -45,4 +46,17 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
         WHERE gm.group.id = :groupId AND gm.status = 'ACTIVE'
     """)
     void resetAllKickVoteChoices(@Param("groupId") Long groupId, @Param("none") KickVoteChoice none);
+
+    @Modifying(clearAutomatically = true)
+    @Query("""
+        UPDATE GroupMember gm
+        SET gm.kickVoteChoice = 'NONE'
+        WHERE gm.status = 'ACTIVE'
+            AND gm.group.id IN(
+                    SELECT g.id FROM ChallengeGroup g
+                    WHERE g.kickVoteStartedAt IS NOT NULL
+                        AND g.kickVoteStartedAt < :expiredBefore
+            )
+    """)
+    int bulkResetExpiredKickVoteChoice(@Param("expiredBefore") LocalDateTime expiredBefore);
 }
