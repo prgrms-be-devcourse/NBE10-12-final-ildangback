@@ -60,8 +60,9 @@ git -C "$APP_DIR/src" reset --hard FETCH_HEAD
 # 2. 배포물을 작업 디렉터리로 동기화.
 #    active-backend.conf 는 repo 에 없는 런타임 생성 파일(지울 시 blue/green 색 삭제됨),
 #    htpasswd 는 repo 에 없는 실물 시크릿 — 둘 다 --delete 대상에서 제외.
-rsync -a --delete --exclude 'conf.d/active-backend.conf' --exclude '*.htpasswd' "$APP_DIR/src/infra/nginx/" "$APP_DIR/nginx/"
-rsync -a --delete "$APP_DIR/src/infra/monitoring/" "$APP_DIR/monitoring/"
+#    --inplace: 파일 단위로 bind mount 된 nginx.conf/prometheus.yml 등은 inplace가 없으면 inode가 바뀌어 컨테이너가 새 내용을 못 봄.
+rsync -a --inplace --delete --exclude 'conf.d/active-backend.conf' --exclude '*.htpasswd' "$APP_DIR/src/infra/nginx/" "$APP_DIR/nginx/"
+rsync -a --inplace --delete "$APP_DIR/src/infra/monitoring/" "$APP_DIR/monitoring/"
 cp "$APP_DIR/src/infra/compose/docker-compose.yml" "$APP_DIR/docker-compose.yml"
 cp "$APP_DIR/src/infra/compose/backup.sh"          "$APP_DIR/backup.sh"
 
