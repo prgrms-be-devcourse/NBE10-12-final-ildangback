@@ -35,6 +35,7 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.PageRequest;
@@ -104,12 +105,14 @@ public class CheckInService {
                 challengeId, userId, roundNo, form.checkInType(), mediaKey, MediaType.IMAGE, memo, businessDate);
         try {
             checkInRepository.saveAndFlush(checkIn);
-        } catch (DataIntegrityViolationException e) {
+        } catch (DataIntegrityViolationException | CannotAcquireLockException e) {
+            // uk 위반 + 잔여 갭락 데드락 모두 "회차 선점됨"으로 동일 처리
             log.atInfo()
-                    .setMessage("uk_check_ins 위반(같은 회차 선점됨)")
+                    .setMessage("uk_check_ins 위반 또는 락 경합(같은 회차 선점됨)")
                     .addKeyValue("challengeId", challengeId)
                     .addKeyValue("userId", userId)
                     .addKeyValue("roundNo", roundNo)
+                    .setCause(e)
                     .log();
             deleteQuietly(mediaKey); // 방금 쓴 orphan을 best-effort로 정리
             throw new BusinessException(ErrorCode.DAILY_LIMIT_EXCEEDED);
