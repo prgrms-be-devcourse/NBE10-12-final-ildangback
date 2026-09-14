@@ -372,11 +372,13 @@ class OwnerKickVoteApiIntegrationTest extends IntegrationTestSupport {
     class GetVoteStatus {
 
         @Test
-        @DisplayName("진행 중인 투표가 없으면 404")
-        void rejectsWhenNoActiveVote() throws Exception {
+        @DisplayName("진행 중인 투표가 없으면 inProgress=false 로 반환한다")
+        void returnsNotInProgressWhenNoActiveVote() throws Exception {
             var g = setupFivePersonActiveGroup();
 
-            getVoteStatus(g.member1().accessToken(), g.groupId()).andExpect(status().isNotFound());
+            getVoteStatus(g.member1().accessToken(), g.groupId())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.inProgress").value(false));
         }
 
         @Test

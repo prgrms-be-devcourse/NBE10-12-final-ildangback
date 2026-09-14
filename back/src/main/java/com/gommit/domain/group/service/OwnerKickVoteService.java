@@ -114,13 +114,9 @@ public class OwnerKickVoteService {
 
         getActiveMember(groupId, requesterId);
 
-        if (!group.hasActiveKickVote()) {
-            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
-        }
-
-        if (group.isKickVoteExpired(kickVoteExpiryHours)) {
+        // 만료된 투표는 조회 시점에 조용히 정리하고 inProgress=false 로 반환한다
+        if (group.hasActiveKickVote() && group.isKickVoteExpired(kickVoteExpiryHours)) {
             resetVoteData(group, groupId);
-            throw new BusinessException(ErrorCode.KICK_VOTE_EXPIRED);
         }
 
         return buildResponse(group, groupId, group.getOwnerId(), requesterId);

@@ -541,27 +541,37 @@ class OwnerKickVoteServiceTest {
         }
 
         @Test
-        @DisplayName("진행 중인 투표가 없으면 RESOURCE_NOT_FOUND")
+        @DisplayName("진행 중인 투표가 없으면 inProgress=false 로 반환한다")
         void noActiveVote() {
             ChallengeGroup group = group(12L, 1L); // kickVoteStartedAt = null
             GroupMember requester = member(30L, group, 2L);
+            stubCounts(12L, 3, 0, 0);
             when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
             when(groupMemberRepository.findByGroupIdAndUserId(12L, 2L)).thenReturn(Optional.of(requester));
-            assertBusinessException(() -> ownerKickVoteService.getVoteStatus(12L, 2L), ErrorCode.RESOURCE_NOT_FOUND);
+
+            var response = ownerKickVoteService.getVoteStatus(12L, 2L);
+
+            assertThat(response.inProgress()).isFalse();
+            assertThat(response.agreeCount()).isEqualTo(0);
+            assertThat(response.disagreeCount()).isEqualTo(0);
+            assertThat(response.expiresAt()).isNull();
         }
 
         @Test
-        @DisplayName("투표 기간이 만료됐으면 초기화하고 KICK_VOTE_EXPIRED")
+        @DisplayName("투표 기간이 만료됐으면 초기화하고 inProgress=false 로 반환한다")
         void expiredVote() {
             ChallengeGroup group = group(12L, 1L);
             group.startKickVote();
             ReflectionTestUtils.setField(
                     group, "kickVoteStartedAt", LocalDateTime.now().minusHours(25));
             GroupMember requester = member(30L, group, 2L);
+            stubCounts(12L, 3, 0, 0);
             when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
             when(groupMemberRepository.findByGroupIdAndUserId(12L, 2L)).thenReturn(Optional.of(requester));
 
-            assertBusinessException(() -> ownerKickVoteService.getVoteStatus(12L, 2L), ErrorCode.KICK_VOTE_EXPIRED);
+            var response = ownerKickVoteService.getVoteStatus(12L, 2L);
+
+            assertThat(response.inProgress()).isFalse();
             assertThat(group.hasActiveKickVote()).isFalse();
             verify(groupMemberRepository).resetAllKickVoteChoices(12L, KickVoteChoice.NONE);
         }

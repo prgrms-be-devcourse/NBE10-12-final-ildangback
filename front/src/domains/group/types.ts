@@ -114,3 +114,17 @@ export interface SeasonSummary {
   seqNo: number;
   status: ChallengeStatus;
 }
+
+export type KickVoteChoice = "NONE" | "AGREE" | "DISAGREE";
+
+export interface KickVoteStatusResponse {
+  groupId: number;
+  targetOwnerId: number;
+  inProgress: boolean;
+  agreeCount: number;
+  disagreeCount: number;
+  eligibleVoters: number;
+  myChoice: KickVoteChoice;
+  startedAt: string | null;
+  expiresAt: string | null;
+}

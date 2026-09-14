@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>방장 강퇴 투표 UI 미리보기</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    dialog::backdrop { background: rgba(0,0,0,0.4); }
+    dialog[open] { display: flex; flex-direction: column; }
+    .tab-btn { transition: all 0.15s; }
+    .tab-btn.active { background: #8b5cf6; color: white; }
+    .tab-btn:not(.active) { background: white; color: #7c3aed; border: 1px solid #ddd6fe; }
+    .progress-bar { transition: width 0.4s ease; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-100 font-sans">
+
+  <!-- ── 상단 탭 네비게이션 ───────────────────────────────────── -->
+  <div class="mx-auto max-w-[430px] px-4 pt-8 pb-4">
+    <h1 class="mb-2 text-lg font-bold text-gray-700">방장 강퇴 투표 UI 미리보기</h1>
+    <p class="mb-4 text-xs text-gray-400">화면 상태를 탭으로 전환해보세요</p>
+    <div class="grid grid-cols-4 gap-1 rounded-xl bg-gray-200 p-1">
+      <button class="tab-btn active rounded-lg py-2 text-xs font-semibold" onclick="showState('no_vote', this)">투표 없음</button>
+      <button class="tab-btn rounded-lg py-2 text-xs font-semibold" onclick="showState('in_vote', this)">투표 진행</button>
+      <button class="tab-btn rounded-lg py-2 text-xs font-semibold" onclick="showState('voted', this)">투표 완료</button>
+      <button class="tab-btn rounded-lg py-2 text-xs font-semibold" onclick="showState('done', this)">투표 종료</button>
+    </div>
+  </div>
+
+  <!-- ── 페이지 배경 (GroupPreviewPage 느낌) ────────────────────── -->
+  <div class="mx-auto max-w-[430px] space-y-4 px-4 pb-10">
+
+    <!-- 그룹 정보 카드 (배경용) -->
+    <div class="rounded-2xl bg-white p-4 shadow-sm">
+      <div class="flex items-start justify-between">
+        <div>
+          <div class="mb-2 flex gap-2">
+            <span class="rounded-md border border-purple-300 px-2 py-1 text-xs text-purple-500">공개 그룹</span>
+            <span class="rounded-md bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">진행 중</span>
+          </div>
+          <h2 class="text-xl font-bold">매일 운동 인증 챌린지</h2>
+          <p class="mt-1 text-sm text-gray-500">운동 · 4 / 6명</p>
+        </div>
+        <div class="h-16 w-16 rounded-full bg-purple-100 flex items-center justify-center text-2xl">🏋️</div>
+      </div>
+    </div>
+
+    <!-- 멤버 그리드 카드 -->
+    <div class="rounded-2xl border border-purple-200 bg-white p-4 shadow-sm">
+      <div class="mb-3 flex items-center justify-between">
+        <h3 class="font-bold">그룹 멤버 4 / 6</h3>
+        <div class="flex gap-2">
+          <!-- 방장 위임 버튼 (방장만 볼 수 있음, 여기선 참고용 표시) -->
+          <!-- <button class="min-h-8 rounded-full border border-purple-300 bg-white px-3 text-xs font-semibold text-purple-700">그룹장 위임</button> -->
+          <!-- ★ 방장 강퇴 투표 버튼 ★ -->
+          <button
+            onclick="openDialog()"
+            class="min-h-8 rounded-full border border-red-200 bg-white px-3 text-xs font-semibold text-red-600 hover:bg-red-50"
+          >
+            방장 강퇴 투표
+          </button>
+        </div>
+      </div>
+      <ul class="grid grid-cols-3 gap-2">
+        <li class="flex flex-col items-center gap-1 rounded-xl bg-purple-50 px-1 py-3 text-center text-sm">
+          <div class="h-14 w-14 rounded-full bg-purple-200 flex items-center justify-center text-xl">😎</div>
+          <span>김철수</span>
+          <span class="text-xs text-purple-500">그룹장</span>
+        </li>
+        <li class="flex flex-col items-center gap-1 rounded-xl bg-purple-50 px-1 py-3 text-center text-sm">
+          <div class="h-14 w-14 rounded-full bg-blue-200 flex items-center justify-center text-xl">🙂</div>
+          <span>나(이영희)</span>
+          <span class="text-xs text-gray-400 text-[10px]">멤버</span>
+        </li>
+        <li class="flex flex-col items-center gap-1 rounded-xl bg-purple-50 px-1 py-3 text-center text-sm">
+          <div class="h-14 w-14 rounded-full bg-green-200 flex items-center justify-center text-xl">😄</div>
+          <span>박민준</span>
+        </li>
+        <li class="flex flex-col items-center gap-1 rounded-xl bg-purple-50 px-1 py-3 text-center text-sm">
+          <div class="h-14 w-14 rounded-full bg-yellow-200 flex items-center justify-center text-xl">😊</div>
+          <span>최지은</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       다이얼로그 — 상태별 4개
+  ══════════════════════════════════════════════════════════════ -->
+
+  <!-- State 1: 진행 중인 투표 없음 -->
+  <dialog id="dialog-no_vote" class="m-auto w-[calc(100%-2rem)] max-w-[390px] rounded-2xl bg-white p-5 shadow-xl">
+    <h2 class="mb-4 text-lg font-bold">방장 강퇴 투표</h2>
+    <div class="space-y-4">
+      <p class="text-sm leading-relaxed text-gray-600">
+        현재 진행 중인 방장 강퇴 투표가 없어요.<br/>
+        투표를 시작하면 자동으로 찬성 처리되며, 과반수 찬성 시 방장이 즉시 교체돼요.
+      </p>
+      <div class="rounded-xl bg-yellow-50 p-3 text-xs text-yellow-700">
+        ⚠ 투표는 24시간 동안 유효하며, ACTIVE 챌린지가 있는 그룹에서만 가능해요.
+      </div>
+      <div class="flex gap-2">
+        <button onclick="closeDialog('no_vote')" class="h-13 w-full rounded-xl border border-purple-200 bg-white py-3 text-[15px] font-semibold text-purple-700 hover:bg-purple-50">
+          취소
+        </button>
+        <button onclick="closeDialog('no_vote'); showState('in_vote', null)" class="h-13 w-full rounded-xl bg-red-500 py-3 text-[15px] font-semibold text-white hover:bg-red-600">
+          투표 개시
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- State 2: 투표 진행 중 (아직 투표 안 함) -->
+  <dialog id="dialog-in_vote" class="m-auto w-[calc(100%-2rem)] max-w-[390px] rounded-2xl bg-white p-5 shadow-xl">
+    <h2 class="mb-4 text-lg font-bold">방장 강퇴 투표</h2>
+    <div class="space-y-4">
+      <!-- 진행 바 -->
+      <div class="space-y-3 rounded-xl bg-purple-50 p-4">
+        <div class="flex justify-between text-xs text-gray-500">
+          <span>투표 가능 인원: 3명</span>
+          <span>가결 기준: 2명 이상</span>
+        </div>
+        <div>
+          <div class="mb-1 flex justify-between text-sm font-semibold">
+            <span class="text-purple-600">찬성 1명</span>
+            <span class="text-gray-400">반대 0명</span>
+          </div>
+          <div class="flex h-3 overflow-hidden rounded-full bg-gray-200">
+            <div class="progress-bar bg-purple-500 h-full rounded-full" style="width: 33%"></div>
+            <div class="progress-bar bg-red-400 h-full" style="width: 0%"></div>
+          </div>
+        </div>
+        <p class="text-center text-xs text-gray-400">2026. 9. 15. 오전 10:00에 만료</p>
+      </div>
+      <!-- 투표 버튼 -->
+      <p class="text-center text-sm text-gray-600">방장 강퇴에 동의하시나요?</p>
+      <div class="flex gap-2">
+        <button onclick="closeDialog('in_vote'); showState('voted_disagree', null)" class="h-13 w-full rounded-xl border border-purple-200 bg-white py-3 text-[15px] font-semibold text-purple-700 hover:bg-purple-50">
+          반대
+        </button>
+        <button onclick="closeDialog('in_vote'); showState('voted_agree', null)" class="h-13 w-full rounded-xl bg-red-500 py-3 text-[15px] font-semibold text-white hover:bg-red-600">
+          찬성
+        </button>
+      </div>
+      <button onclick="closeDialog('in_vote')" class="h-13 w-full rounded-xl py-3 text-[15px] font-semibold text-gray-500 hover:bg-gray-100">
+        닫기
+      </button>
+    </div>
+  </dialog>
+
+  <!-- State 3a: 투표 완료 — 찬성 선택 후 -->
+  <dialog id="dialog-voted" class="m-auto w-[calc(100%-2rem)] max-w-[390px] rounded-2xl bg-white p-5 shadow-xl">
+    <h2 class="mb-4 text-lg font-bold">방장 강퇴 투표</h2>
+    <div class="space-y-4">
+      <!-- 진행 바 -->
+      <div class="space-y-3 rounded-xl bg-purple-50 p-4">
+        <div class="flex justify-between text-xs text-gray-500">
+          <span>투표 가능 인원: 3명</span>
+          <span>가결 기준: 2명 이상</span>
+        </div>
+        <div>
+          <div class="mb-1 flex justify-between text-sm font-semibold">
+            <span class="text-purple-600">찬성 2명</span>
+            <span class="text-gray-400">반대 0명</span>
+          </div>
+          <div class="flex h-3 overflow-hidden rounded-full bg-gray-200">
+            <div class="progress-bar bg-purple-500 h-full rounded-l-full" style="width: 67%"></div>
+            <div class="progress-bar bg-red-400 h-full" style="width: 0%"></div>
+          </div>
+        </div>
+        <p class="text-center text-xs text-gray-400">2026. 9. 15. 오전 10:00에 만료</p>
+      </div>
+      <!-- 내 투표 결과 -->
+      <div class="rounded-xl bg-gray-50 p-3 text-center text-sm text-gray-500">
+        ✅ 찬성으로 투표했어요.
+      </div>
+      <button onclick="closeDialog('voted')" class="h-13 w-full rounded-xl py-3 text-[15px] font-semibold text-gray-500 hover:bg-gray-100">
+        닫기
+      </button>
+    </div>
+  </dialog>
+
+  <!-- State 3b: 투표 완료 — 반대 선택 후 (탭에서 접근) -->
+  <dialog id="dialog-voted_agree" class="m-auto w-[calc(100%-2rem)] max-w-[390px] rounded-2xl bg-white p-5 shadow-xl">
+    <h2 class="mb-4 text-lg font-bold">방장 강퇴 투표</h2>
+    <div class="space-y-4">
+      <div class="space-y-3 rounded-xl bg-purple-50 p-4">
+        <div class="flex justify-between text-xs text-gray-500">
+          <span>투표 가능 인원: 3명</span><span>가결 기준: 2명 이상</span>
+        </div>
+        <div>
+          <div class="mb-1 flex justify-between text-sm font-semibold">
+            <span class="text-purple-600">찬성 2명</span>
+            <span class="text-gray-400">반대 0명</span>
+          </div>
+          <div class="flex h-3 overflow-hidden rounded-full bg-gray-200">
+            <div class="progress-bar bg-purple-500 h-full rounded-l-full" style="width: 67%"></div>
+          </div>
+        </div>
+        <p class="text-center text-xs text-gray-400">2026. 9. 15. 오전 10:00에 만료</p>
+      </div>
+      <div class="rounded-xl bg-gray-50 p-3 text-center text-sm text-gray-500">✅ 찬성으로 투표했어요.</div>
+      <button onclick="closeAll()" class="h-13 w-full rounded-xl py-3 text-[15px] font-semibold text-gray-500 hover:bg-gray-100">닫기</button>
+    </div>
+  </dialog>
+
+  <dialog id="dialog-voted_disagree" class="m-auto w-[calc(100%-2rem)] max-w-[390px] rounded-2xl bg-white p-5 shadow-xl">
+    <h2 class="mb-4 text-lg font-bold">방장 강퇴 투표</h2>
+    <div class="space-y-4">
+      <div class="space-y-3 rounded-xl bg-purple-50 p-4">
+        <div class="flex justify-between text-xs text-gray-500">
+          <span>투표 가능 인원: 3명</span><span>가결 기준: 2명 이상</span>
+        </div>
+        <div>
+          <div class="mb-1 flex justify-between text-sm font-semibold">
+            <span class="text-purple-600">찬성 1명</span>
+            <span class="text-gray-400">반대 1명</span>
+          </div>
+          <div class="flex h-3 overflow-hidden rounded-full bg-gray-200">
+            <div class="progress-bar bg-purple-500 h-full rounded-l-full" style="width: 33%"></div>
+            <div class="progress-bar bg-red-400 h-full rounded-r-full" style="width: 33%"></div>
+          </div>
+        </div>
+        <p class="text-center text-xs text-gray-400">2026. 9. 15. 오전 10:00에 만료</p>
+      </div>
+      <div class="rounded-xl bg-gray-50 p-3 text-center text-sm text-gray-500">❌ 반대로 투표했어요.</div>
+      <button onclick="closeAll()" class="h-13 w-full rounded-xl py-3 text-[15px] font-semibold text-gray-500 hover:bg-gray-100">닫기</button>
+    </div>
+  </dialog>
+
+  <!-- State 4: 투표 종료 (가결) -->
+  <dialog id="dialog-done" class="m-auto w-[calc(100%-2rem)] max-w-[390px] rounded-2xl bg-white p-5 shadow-xl">
+    <h2 class="mb-4 text-lg font-bold">방장 강퇴 투표</h2>
+    <div class="space-y-4">
+      <!-- 최종 결과 진행 바 -->
+      <div class="space-y-3 rounded-xl bg-purple-50 p-4">
+        <div class="flex justify-between text-xs text-gray-500">
+          <span>투표 가능 인원: 3명</span>
+          <span>가결 기준: 2명 이상</span>
+        </div>
+        <div>
+          <div class="mb-1 flex justify-between text-sm font-semibold">
+            <span class="text-purple-600">찬성 2명</span>
+            <span class="text-gray-400">반대 1명</span>
+          </div>
+          <div class="flex h-3 overflow-hidden rounded-full bg-gray-200">
+            <div class="progress-bar bg-purple-500 h-full rounded-l-full" style="width: 67%"></div>
+            <div class="progress-bar bg-red-400 h-full rounded-r-full" style="width: 33%"></div>
+          </div>
+        </div>
+      </div>
+      <div class="rounded-xl bg-purple-50 p-3 text-center text-sm font-semibold text-purple-700">
+        투표가 종료되었어요.
+      </div>
+      <button onclick="closeDialog('done')" class="h-13 w-full rounded-xl bg-purple-500 py-3 text-[15px] font-semibold text-white hover:bg-purple-600">
+        확인
+      </button>
+    </div>
+  </dialog>
+
+  <!-- ── 스크립트 ─────────────────────────────────────────────────── -->
+  <script>
+    const stateMap = {
+      no_vote:  'dialog-no_vote',
+      in_vote:  'dialog-in_vote',
+      voted:    'dialog-voted',
+      done:     'dialog-done',
+    };
+
+    function openDialog() {
+      const active = document.querySelector('.tab-btn.active');
+      const state = active?.dataset.state ?? 'no_vote';
+      document.getElementById(stateMap[state] ?? 'dialog-no_vote')?.showModal();
+    }
+
+    function closeDialog(state) {
+      document.getElementById(stateMap[state] ?? `dialog-${state}`)?.close();
+    }
+
+    function closeAll() {
+      document.querySelectorAll('dialog[open]').forEach(d => d.close());
+    }
+
+    function showState(state, btn) {
+      closeAll();
+
+      // 탭 활성화
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      if (btn) {
+        btn.classList.add('active');
+        btn.dataset.state = state;
+      } else {
+        // state로 탭 찾기
+        const tabs = document.querySelectorAll('.tab-btn');
+        const labels = { no_vote: '투표 없음', in_vote: '투표 진행', voted: '투표 완료', done: '투표 종료' };
+        tabs.forEach(b => {
+          if (b.textContent.trim() === labels[state]) {
+            b.classList.add('active');
+            b.dataset.state = state;
+          }
+        });
+      }
+      if (btn) btn.dataset.state = state;
+
+      // 해당 state 다이얼로그 자동 열기
+      const dialogId = stateMap[state];
+      if (dialogId) setTimeout(() => document.getElementById(dialogId)?.showModal(), 50);
+    }
+
+    // 탭에 data-state 초기화
+    document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+      const states = ['no_vote', 'in_vote', 'voted', 'done'];
+      btn.dataset.state = states[i];
+    });
+
+    // 다이얼로그 바깥 클릭 시 닫기
+    document.querySelectorAll('dialog').forEach(dialog => {
+      dialog.addEventListener('click', e => {
+        if (e.target === dialog) dialog.close();
+      });
+    });
+
+    // 초기 상태: 투표 없음 다이얼로그 열기
+    setTimeout(() => document.getElementById('dialog-no_vote')?.showModal(), 100);
+  </script>
+</body>
+</html>
