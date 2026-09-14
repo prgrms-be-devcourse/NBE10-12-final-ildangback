@@ -36,6 +36,7 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.PageRequest;
@@ -118,7 +119,7 @@ public class CheckInService {
                 businessDate);
         try {
             checkInRepository.saveAndFlush(checkIn);
-        } catch (DataIntegrityViolationException e) {
+        } catch (DataIntegrityViolationException | CannotAcquireLockException e) {
             log.atInfo()
                     .setMessage("uk_check_ins 위반(같은 회차 선점됨)")
                     .addKeyValue("challengeId", challengeId)
