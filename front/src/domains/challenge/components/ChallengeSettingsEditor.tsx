@@ -9,7 +9,7 @@ import { FormAlert } from "../../../shared/ui/FormAlert";
 import { TextField } from "../../../shared/ui/TextField";
 import { groupCreateSchema, WEEKDAYS } from "../../group/validation";
 import { updateChallenge } from "../api";
-import { isSupportedCheckInType, toggleAllowedType } from "../types";
+import { toggleAllowedType, toSupportedTypesOrDefault } from "../types";
 import type { ChallengeDetail } from "../types";
 
 const schema = groupCreateSchema.shape.challenge.superRefine((value, ctx) => {
@@ -33,18 +33,6 @@ const schema = groupCreateSchema.shape.challenge.superRefine((value, ctx) => {
     });
 });
 type SettingsForm = z.infer<typeof schema>;
-
-/**
- * 챌린지 도메인의 `CheckInType` 은 LIVE 도 포함(별도 서브시스템, 아직 없음) — 이 폼은
- * PHOTO/VIDEO 만 다룬다(사진/영상 동시 허용 가능). 기존 값에 LIVE 만 있는 이상 상태는
- * 없으니 필터 결과가 비면 PHOTO 로 되돌린다.
- */
-function toSupportedAllowedTypesOrDefault(
-  allowedTypes: ChallengeDetail["allowedTypes"],
-): SettingsForm["allowedTypes"] {
-  const supported = allowedTypes.filter(isSupportedCheckInType);
-  return supported.length ? supported : ["PHOTO"];
-}
 
 const FIELDS = [
   "startDate",
@@ -73,7 +61,7 @@ export function ChallengeSettingsEditor({
       ...challenge,
       daysOfWeek: challenge.daysOfWeek ?? [],
       frequencyValue: challenge.frequencyValue ?? 2,
-      allowedTypes: toSupportedAllowedTypesOrDefault(challenge.allowedTypes),
+      allowedTypes: toSupportedTypesOrDefault(challenge.allowedTypes),
     },
   });
   const frequencyType = useWatch({

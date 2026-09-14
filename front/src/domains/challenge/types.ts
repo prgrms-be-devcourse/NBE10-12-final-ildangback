@@ -20,6 +20,16 @@ export function toggleAllowedType(
     ? current.filter((t) => t !== value)
     : [...current, value];
 }
+/**
+ * LIVE 를 걸러낸 뒤 PHOTO/VIDEO 를 그대로 돌려준다(동시 허용 가능). 걸러낸 결과가 비면
+ * (기존 값에 LIVE 만 있던 이상 상태) PHOTO 로 되돌린다.
+ */
+export function toSupportedTypesOrDefault(
+  allowedTypes: CheckInType[],
+): SupportedCheckInType[] {
+  const supported = allowedTypes.filter(isSupportedCheckInType);
+  return supported.length ? supported : ["PHOTO"];
+}
 export type ChallengeMemberRole = "OWNER" | "MEMBER";
 export type ExtensionChoice = "PENDING" | "EXTEND" | "DECLINE";
 export interface ChallengeSettings {
