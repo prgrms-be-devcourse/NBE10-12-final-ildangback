@@ -4,5 +4,6 @@ package com.gommit.domain.media.entity;
 public enum MediaRole {
     CHECKIN,
     DAILYLOG,
-    ITEM
+    ITEM,
+    BACKGROUND
 }

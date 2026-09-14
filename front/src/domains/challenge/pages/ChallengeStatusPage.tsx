@@ -16,6 +16,7 @@ import { Button } from "../../../shared/ui/Button";
 import { FormAlert } from "../../../shared/ui/FormAlert";
 import { ShopIcon } from "../../../shared/ui/icons";
 import { TopBar } from "../../../shared/ui/TopBar";
+import { getActiveBackground } from "../../background/api";
 import { getGroup, getGroupChallenges, leaveGroup } from "../../group/api";
 import { ConfirmActionDialog } from "../../group/components/ConfirmActionDialog";
 import { useResource } from "../../group/hooks/useResource";
@@ -112,9 +113,9 @@ function SeasonBrowser({
   const options = seasons.data?.length
     ? seasons.data
     : [group.data?.currentChallenge ?? initialData.challenge];
-  // 시즌이 하나뿐이면 고를 것이 없어 제목 아래를 비워 둔다.
+  // 시즌이 하나뿐이면 고를 것이 없어 뒤로 가기 버튼 옆을 비워 둔다.
   const seasonPicker = options.length > 1 && (
-    <div className="relative mt-0.5">
+    <div className="relative">
       <label className="sr-only" htmlFor="challenge-season">
         시즌 선택
       </label>
@@ -123,7 +124,7 @@ function SeasonBrowser({
         value={selectedChallengeId}
         disabled={selectingInitialSeason}
         onChange={(event) => setSelectedChallengeId(Number(event.target.value))}
-        className="appearance-none rounded-full bg-purple-50 py-0.5 pr-6 pl-2.5 text-[11px] font-semibold text-purple-700 disabled:opacity-60"
+        className="appearance-none rounded-full bg-purple-50 py-1 pr-8 pl-3.5 text-[13px] font-semibold text-purple-700 disabled:opacity-60"
       >
         {!options.some((season) => season.id === selectedChallengeId) && (
           <option value={selectedChallengeId}>선택한 시즌</option>
@@ -135,10 +136,10 @@ function SeasonBrowser({
         ))}
       </select>
       <CaretDownIcon
-        size={10}
+        size={12}
         weight="bold"
         aria-hidden
-        className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-purple-700"
+        className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-purple-700"
       />
     </div>
   );
@@ -213,6 +214,11 @@ function ChallengeContent({
     [challenge.id],
   );
   const characters = useResource(charactersLoader);
+  const backgroundLoader = useCallback(
+    () => getActiveBackground(challenge.groupId),
+    [challenge.groupId],
+  );
+  const background = useResource(backgroundLoader);
   // After a future check-in succeeds, call characters.retry() independently of members.retry().
   const joinedGroup = !!group.data?.members.some(
     (member) => member.userId === user?.id,
@@ -221,28 +227,27 @@ function ChallengeContent({
   return (
     <>
       <header className="relative flex min-h-12 items-center justify-between gap-1">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          aria-label="뒤로 가기"
-          className="shrink-0 p-2"
-        >
-          <CaretLeftIcon size={24} weight="bold" />
-        </button>
-        <div className="flex min-w-0 flex-1 flex-col items-center">
-          <p className="w-full truncate text-center text-[15px] leading-tight font-bold">
-            {group.data?.group.name ?? `시즌 ${challenge.seqNo}`}
-          </p>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => navigate("/challenges")}
+            aria-label="뒤로 가기"
+            className="p-2"
+          >
+            <CaretLeftIcon size={24} weight="bold" />
+          </button>
           {seasonPicker}
         </div>
-        <button
-          type="button"
+        <p className="min-w-0 flex-1 truncate text-center text-[15px] leading-tight font-bold">
+          {group.data?.group.name ?? `시즌 ${challenge.seqNo}`}
+        </p>
+        <Link
+          to={`/challenges/groups/${challenge.groupId}/shop`}
           aria-label="그룹 상점"
-          onClick={() => showToast("그룹 상점은 준비중입니다.")}
           className="shrink-0 rounded-lg p-2 text-purple-600 hover:bg-purple-50"
         >
           <ShopIcon className="h-6 w-6" />
-        </button>
+        </Link>
         <button
           type="button"
           aria-label="추가 메뉴"
@@ -300,6 +305,7 @@ function ChallengeContent({
         currentKnown={currentKnown}
         description={group.data?.group.description}
         mapType={group.data?.group.mapType}
+        backgroundImageUrl={background.data?.imageUrl}
         members={members.data ?? null}
         characters={characters.data ?? null}
         currentUserId={user?.id}

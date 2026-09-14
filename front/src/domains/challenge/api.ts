@@ -17,6 +17,12 @@ export function getChallenge(id: number) {
 export function getChallengeMembers(id: number) {
   return apiFetch<MemberTodayStatusResponse[]>(`/api/challenges/${id}/members`);
 }
+export function nudgeMember(challengeId: number, userId: number) {
+  return apiFetch<void>(
+    `/api/challenges/${challengeId}/members/${userId}/nudge`,
+    { method: "POST" },
+  );
+}
 export function updateChallenge(id: number, body: ChallengeUpdateRequest) {
   return apiFetch<ChallengeUpdateResponse>(`/api/challenges/${id}`, {
     method: "PATCH",

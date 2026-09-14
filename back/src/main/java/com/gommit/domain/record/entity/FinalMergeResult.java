@@ -55,6 +55,19 @@ public class FinalMergeResult extends BaseEntity {
     @Column(length = 200)
     private String checkInTrendCounts;
 
+    // 발행 시점 캐릭터 스냅샷 - MonthlyMergeResult와 동일한 이유(옷 갈아입어도 안 바뀜).
+    @Column(length = 255)
+    private String headImageUrl;
+
+    @Column(length = 255)
+    private String topImageUrl;
+
+    @Column(length = 255)
+    private String bottomImageUrl;
+
+    @Column(length = 255)
+    private String shoesImageUrl;
+
     private FinalMergeResult(
             Long finalMergeId,
             Long userId,
@@ -66,7 +79,11 @@ public class FinalMergeResult extends BaseEntity {
             int earnedPoints,
             int contributionRate,
             String checkInTrendLabels,
-            String checkInTrendCounts) {
+            String checkInTrendCounts,
+            String headImageUrl,
+            String topImageUrl,
+            String bottomImageUrl,
+            String shoesImageUrl) {
         this.finalMergeId = finalMergeId;
         this.userId = userId;
         this.ranking = ranking;
@@ -78,6 +95,10 @@ public class FinalMergeResult extends BaseEntity {
         this.contributionRate = contributionRate;
         this.checkInTrendLabels = checkInTrendLabels;
         this.checkInTrendCounts = checkInTrendCounts;
+        this.headImageUrl = headImageUrl;
+        this.topImageUrl = topImageUrl;
+        this.bottomImageUrl = bottomImageUrl;
+        this.shoesImageUrl = shoesImageUrl;
     }
 
     public static FinalMergeResult of(
@@ -101,6 +122,10 @@ public class FinalMergeResult extends BaseEntity {
                 earnedPoints,
                 contributionRate,
                 null,
+                null,
+                null,
+                null,
+                null,
                 null);
     }
 
@@ -115,7 +140,11 @@ public class FinalMergeResult extends BaseEntity {
             int earnedPoints,
             int contributionRate,
             String checkInTrendLabels,
-            String checkInTrendCounts) {
+            String checkInTrendCounts,
+            String headImageUrl,
+            String topImageUrl,
+            String bottomImageUrl,
+            String shoesImageUrl) {
         return new FinalMergeResult(
                 finalMergeId,
                 userId,
@@ -127,6 +156,10 @@ public class FinalMergeResult extends BaseEntity {
                 earnedPoints,
                 contributionRate,
                 checkInTrendLabels,
-                checkInTrendCounts);
+                checkInTrendCounts,
+                headImageUrl,
+                topImageUrl,
+                bottomImageUrl,
+                shoesImageUrl);
     }
 }

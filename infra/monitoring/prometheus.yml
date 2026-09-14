@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 30s       # 2 vCPU 공유 박스라 여유
+  evaluation_interval: 30s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: gommit-back
+    metrics_path: /actuator/prometheus
+    # back 은 blue-green(back-blue/back-green) 이라 고정된 "back" 호스트가 없음. 둘 다
+    # 타겟으로 올려두고 매 순간 비활성 쪽은 up=0 으로 잡히는 걸 정상으로 본다 —
+    # color 라벨로 Grafana 쪽에서 활성 쪽만 골라보면 됨.
+    static_configs:
+      - targets: ["back-blue:8080"]
+        labels:
+          app: gommit-back
+          color: blue
+      - targets: ["back-green:8080"]
+        labels:
+          app: gommit-back
+          color: green

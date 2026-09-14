@@ -119,7 +119,12 @@ public class CheckInService {
         try {
             checkInRepository.saveAndFlush(checkIn);
         } catch (DataIntegrityViolationException e) {
-            log.info("uk_check_ins 위반(같은 회차 선점됨): challengeId={}, userId={}, roundNo={}", challengeId, userId, roundNo);
+            log.atInfo()
+                    .setMessage("uk_check_ins 위반(같은 회차 선점됨)")
+                    .addKeyValue("challengeId", challengeId)
+                    .addKeyValue("userId", userId)
+                    .addKeyValue("roundNo", roundNo)
+                    .log();
             deleteQuietly(mediaKey, uploaded.posterKey()); // 방금 쓴 orphan을 best-effort로 정리
             throw new BusinessException(ErrorCode.DAILY_LIMIT_EXCEEDED);
         }
@@ -164,13 +169,14 @@ public class CheckInService {
                     groupCompletedCount,
                     groupTotalCount);
         } catch (RuntimeException e) {
-            log.error(
-                    "인증 후처리 실패로 롤백: challengeId={}, userId={}, roundNo={}, earnedUserPoints={}",
-                    challengeId,
-                    userId,
-                    roundNo,
-                    earnedUserPoints,
-                    e);
+            log.atError()
+                    .setMessage("인증 후처리 실패로 롤백")
+                    .addKeyValue("challengeId", challengeId)
+                    .addKeyValue("userId", userId)
+                    .addKeyValue("roundNo", roundNo)
+                    .addKeyValue("earnedUserPoints", earnedUserPoints)
+                    .setCause(e)
+                    .log();
             deleteQuietly(mediaKey, uploaded.posterKey()); // 롤백은 CheckIn 행만 지운다. 올라간 파일은 best-effort 로 정리
             throw e;
         }
@@ -275,11 +281,12 @@ public class CheckInService {
         try {
             return mediaStore.load(checkIn.getMediaKey());
         } catch (BusinessException e) {
-            log.warn(
-                    "미디어 로드 실패: checkInId={}, mediaKey={}, code={}",
-                    checkInId,
-                    checkIn.getMediaKey(),
-                    e.getErrorCode());
+            log.atWarn()
+                    .setMessage("미디어 로드 실패")
+                    .addKeyValue("checkInId", checkInId)
+                    .addKeyValue("mediaKey", checkIn.getMediaKey())
+                    .addKeyValue("code", e.getErrorCode())
+                    .log();
             throw e;
         }
     }
@@ -343,14 +350,19 @@ public class CheckInService {
         try {
             mediaStore.delete(mediaKey, posterKey);
         } catch (RuntimeException ex) {
-            log.warn("orphan 미디어 정리 실패: {}", mediaKey, ex);
+            log.atWarn()
+                    .setMessage("orphan 미디어 정리 실패")
+                    .addKeyValue("mediaKey", mediaKey)
+                    .addKeyValue("posterKey", posterKey)
+                    .setCause(ex)
+                    .log();
         }
     }
 
     private String nicknameOf(Long userId, Long checkInId) {
         String nickname = userService.findNicknames(List.of(userId)).get(userId);
         if (nickname == null) {
-            log.warn("닉네임 조회 실패(유저 없음 추정): userId={}, checkInId={}", userId, checkInId);
+            logNicknameMissing(userId, checkInId);
         }
         return nickname;
     }
@@ -360,7 +372,15 @@ public class CheckInService {
         Map<Long, String> nicknames = userService.findNicknames(userIds);
         rows.stream()
                 .filter(r -> !nicknames.containsKey(r.getUserId()))
-                .forEach(r -> log.warn("닉네임 조회 실패(유저 없음 추정): userId={}, checkInId={}", r.getUserId(), r.getId()));
+                .forEach(r -> logNicknameMissing(r.getUserId(), r.getId()));
         return nicknames;
+    }
+
+    private void logNicknameMissing(Long userId, Long checkInId) {
+        log.atWarn()
+                .setMessage("닉네임 조회 실패(유저 없음 추정)")
+                .addKeyValue("userId", userId)
+                .addKeyValue("checkInId", checkInId)
+                .log();
     }
 }

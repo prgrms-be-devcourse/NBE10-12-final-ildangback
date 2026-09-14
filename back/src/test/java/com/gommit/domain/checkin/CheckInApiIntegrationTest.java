@@ -16,7 +16,7 @@ import com.gommit.domain.media.service.StorageService;
 import com.gommit.domain.media.support.MediaContentType;
 import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.global.exception.BusinessException;
-import com.gommit.global.time.BusinessDayCutoff;
+import com.gommit.global.time.BusinessClock;
 import com.gommit.support.ChallengeFixtures;
 import com.gommit.support.IntegrationTestSupport;
 import com.jayway.jsonpath.JsonPath;
@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -62,6 +61,9 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
 
     @Autowired
     private StorageService storageService;
+
+    @Autowired
+    private BusinessClock businessClock;
 
     // 통합 테스트가 실제 파일을 쓰므로, orphan 여부를 검증할 수 있도록 매 테스트 전에 미디어 디렉토리를 비운다.
     @BeforeEach
@@ -880,9 +882,9 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
             var owner = loginAs(EMAIL, NICKNAME);
             long challengeId = setUpChallenge(EMAIL, 2);
             submit(challengeId, owner.accessToken());
-            // businessDate 는 자정이 아니라 04:00 컷오프 기준(BusinessDayCutoff) — 00:00~03:59 사이엔
-            // 달력상 오늘(LocalDate.now())과 다르다. submit() 이 실제로 쓴 것과 같은 방식으로 구해야 한다.
-            LocalDate today = BusinessDayCutoff.of(LocalDateTime.now());
+            // businessDate 는 자정이 아니라 04:00 컷오프 기준 — 00:00~03:59 사이엔 달력상 오늘(LocalDate.now())과
+            // 다르다. submit() 이 실제로 쓴 것과 같은 businessClock 으로 구해야 한다.
+            LocalDate today = businessClock.today();
 
             mockMvc.perform(withToken(
                             get("/api/challenges/{challengeId}/daily-logs/{date}", challengeId, today),

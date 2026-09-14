@@ -1,9 +1,13 @@
 import { CharacterRenderer } from "../../user/components/CharacterRenderer";
 import { useNavigate } from "react-router";
-import { useToast } from "../../../shared/lib/useToast";
+import { getUnreadCount } from "../../chat/api";
 import { ChatIcon } from "../../../shared/ui/icons";
 import { frequencyLabel } from "../presentation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useToast } from "../../../shared/lib/useToast";
+import { ApiError } from "../../../shared/api/client";
+import { ConfirmActionDialog } from "../../group/components/ConfirmActionDialog";
+import { nudgeMember } from "../api";
 import studyMap from "../../../assets/icons/studyMap.webp";
 import sportsMap from "../../../assets/icons/sportsMap.webp";
 import people from "../../../assets/icons/people.webp";
@@ -25,6 +29,13 @@ import { toCheckInTypeQuery } from "../../checkin/lib/checkInTypeParam";
 // 지도 위 이름표의 인증 횟수 색. 채우면 초록, 아니면 보라.
 const COUNT_DONE = "#16A300";
 const COUNT_ONGOING = "#774AD3";
+const NUDGE_ERRORS: Record<string, string> = {
+  CANNOT_NUDGE_SELF: "자기 자신은 콕 찌를 수 없어요.",
+  ALREADY_CHECKED_IN: "오늘 인증을 이미 완료한 멤버예요.",
+  ALREADY_NUDGED: "오늘 이미 콕 찌르기를 받은 멤버예요.",
+  CHALLENGE_NOT_MEMBER: "현재 챌린지에 참여 중인 멤버가 아니에요.",
+  CHALLENGE_NOT_ACTIVE: "진행 중인 챌린지에서만 사용할 수 있어요.",
+};
 import { RecentCheckInLog } from "../../checkin/components/RecentCheckInLog";
 import { MergeArchiveSection } from "../../record/components/MergeArchiveSection";
 
@@ -32,6 +43,7 @@ export function ChallengeDashboard({
   data,
   description,
   mapType,
+  backgroundImageUrl,
   members,
   characters,
   isCurrent,
@@ -42,6 +54,8 @@ export function ChallengeDashboard({
   data: ChallengeStatusResponse;
   description?: string | null;
   mapType?: MapType;
+  /** 그룹이 상점에서 산 배경을 적용했으면 그 그림, 아니면 기본 지도 그림을 쓴다. */
+  backgroundImageUrl?: string | null;
   members: MemberTodayStatusResponse[] | null;
   characters: ChallengeCharacterResponse[] | null;
   isCurrent: boolean;
@@ -53,7 +67,46 @@ export function ChallengeDashboard({
   const { showToast } = useToast();
   const [tab, setTab] = useState("현황");
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { challenge } = data;
+
+  useEffect(() => {
+    let cancelled = false;
+    getUnreadCount(challenge.groupId)
+      .then((res) => {
+        if (!cancelled) setUnreadCount(res.unreadCount);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [challenge.groupId]);
+
+  // The parent keys this dashboard's content by the viewed season ID.
+  const [selectedMember, setSelectedMember] =
+    useState<ChallengeCharacterResponse | null>(null);
+  const canSelectMember = (userId: number) =>
+    challenge.status === "ACTIVE" &&
+    currentUserId !== undefined &&
+    userId !== currentUserId;
+  const canNudge = !!selectedMember && canSelectMember(selectedMember.userId);
+  const sendNudge = async () => {
+    if (!selectedMember || !canNudge) return;
+    try {
+      await nudgeMember(challenge.id, selectedMember.userId);
+      showToast(`${selectedMember.nickname}님을 콕 찔렀어요!`);
+    } catch (error) {
+      // Reuse the dialog's inline error handling, with nudge-specific wording.
+      if (error instanceof ApiError && NUDGE_ERRORS[error.code]) {
+        throw new ApiError(error.status, {
+          code: error.code,
+          message: NUDGE_ERRORS[error.code],
+          errors: error.errors,
+        });
+      }
+      throw error;
+    }
+  };
   const canCheckIn =
     isCurrent &&
     challenge.status === "ACTIVE" &&
@@ -84,11 +137,22 @@ export function ChallengeDashboard({
             <StatusBadge status={challenge.status} />
             <button
               type="button"
-              aria-label="채팅"
-              onClick={() => showToast("채팅 기능은 준비중입니다.")}
-              className="rounded-lg p-1 text-purple-500 hover:bg-purple-50 hover:text-purple-700"
+              aria-label={
+                unreadCount > 0
+                  ? `채팅, 안 읽은 메시지 ${unreadCount}개`
+                  : "채팅"
+              }
+              onClick={() =>
+                navigate(`/challenges/groups/${challenge.groupId}/chat`)
+              }
+              className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-purple-600 text-white hover:bg-purple-700"
             >
               <ChatIcon className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -161,8 +225,14 @@ export function ChallengeDashboard({
               {mapType ? (
                 <div className="relative isolate">
                   <img
-                    src={gym ? sportsMap : studyMap}
-                    alt={gym ? "운동 챌린지 공간" : "공부 챌린지 공간"}
+                    src={backgroundImageUrl ?? (gym ? sportsMap : studyMap)}
+                    alt={
+                      backgroundImageUrl
+                        ? "그룹이 적용한 배경"
+                        : gym
+                          ? "운동 챌린지 공간"
+                          : "공부 챌린지 공간"
+                    }
                     className="aspect-[4/3] w-full object-cover"
                   />
                   <div className="absolute bottom-5 left-1/2 flex w-[min(16rem,calc(100%-2rem))] -translate-x-1/2 flex-wrap items-end justify-center gap-x-2 gap-y-2 min-[400px]:gap-x-3">
@@ -179,17 +249,34 @@ export function ChallengeDashboard({
                         !!member &&
                         member.todayCheckInCount >= challenge.dailyCheckInCount;
 
+                      const selected =
+                        canNudge && selectedMember?.userId === character.userId;
+
                       return (
                         <div
                           key={character.userId}
-                          className="flex w-[calc((100%-1.5rem)/3)] min-w-0 flex-col items-center gap-1"
+                          className={`relative flex w-[calc((100%-1.5rem)/3)] min-w-0 flex-col items-center gap-1 ${selected ? "z-10" : ""}`}
                         >
-                          <CharacterRenderer
-                            pose={character.pose}
-                            slots={character.slots}
-                            label={`${character.nickname} 캐릭터`}
-                            className="h-12 w-12 min-[360px]:h-13 min-[360px]:w-13 min-[400px]:h-14 min-[400px]:w-14 sm:h-16 sm:w-16"
-                          />
+                          <button
+                            type="button"
+                            aria-label={`${character.nickname} 콕 찌르기 대상 선택`}
+                            aria-pressed={
+                              canNudge &&
+                              selectedMember?.userId === character.userId
+                            }
+                            disabled={!canSelectMember(character.userId)}
+                            onClick={() => {
+                              setSelectedMember(selected ? null : character);
+                            }}
+                            className={`flex rounded-xl focus-visible:outline-2 focus-visible:outline-purple-500 enabled:cursor-pointer ${canNudge && selectedMember?.userId === character.userId ? "bg-white/50 ring-2 ring-purple-500 ring-offset-2" : ""}`}
+                          >
+                            <CharacterRenderer
+                              pose={character.pose}
+                              slots={character.slots}
+                              label={`${character.nickname} 캐릭터`}
+                              className="h-12 w-12 min-[360px]:h-13 min-[360px]:w-13 min-[400px]:h-14 min-[400px]:w-14 sm:h-16 sm:w-16"
+                            />
+                          </button>
                           <span className="flex max-w-full items-center rounded bg-white/90 text-[10px]">
                             <span className="min-w-0 truncate px-1.5 py-0.5 text-gray-900">
                               {character.nickname}
@@ -246,6 +333,15 @@ export function ChallengeDashboard({
           <CheckInGalleryTab challengeId={challenge.id} members={members} />
         )}
       </section>
+      {canNudge && selectedMember && (
+        <ConfirmActionDialog
+          title="콕 찌르겠습니까?"
+          description={`${selectedMember.nickname}님에게 오늘 인증을 기다리고 있다는 알림을 보내요.`}
+          confirmLabel="찌르기"
+          onConfirm={sendNudge}
+          onClose={() => setSelectedMember(null)}
+        />
+      )}
       <CheckInMethodSheet
         isOpen={sheetOpen}
         onClose={() => setSheetOpen(false)}

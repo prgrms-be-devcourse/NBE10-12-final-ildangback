@@ -6,7 +6,6 @@ import type {
   ItemSlot,
   MonthlyMergeDetailResponse,
 } from "../../../shared/api/types";
-import { getCharacters } from "../../item/api";
 import { toCharacterArt } from "../../item/lib/shop";
 import {
   getChallengeMergeOverview,
@@ -76,15 +75,13 @@ export function MergeArchiveSection({ challengeId }: { challengeId: number }) {
           if (cancelled) return;
           setLatest(detail);
 
-          const art = await getCharacters(
-            detail.participants.map((p) => p.userId),
-          );
-          if (cancelled) return;
+          // 참여자 캐릭터는 발행 시점 스냅샷(characterSlots)을 그대로 쓴다 -
+          // 지금 착용 중인 옷을 실시간 조회하면 안 된다.
           setCharacters(
             Object.fromEntries(
-              Object.entries(art).map(([id, slots]) => [
-                Number(id),
-                toCharacterArt(slots),
+              detail.participants.map((p) => [
+                p.userId,
+                toCharacterArt(p.characterSlots),
               ]),
             ),
           );

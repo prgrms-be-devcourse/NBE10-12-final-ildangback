@@ -38,6 +38,30 @@ public class PersonalPointService {
         point.add(amount);
         userPointHistoryRepository.save(
                 UserPointHistory.of(userId, challengeId, sourceName, amount, reason, point.getBalance()));
+
+        // 예전에 다른 챌린지를 중도 탈퇴해서 못 갚은 회수분(pendingDeduction)이 있으면,
+        // 방금 들어온 적립으로 잔액이 늘어난 한도 안에서 이어서 갚는다.
+        int settled = point.settlePendingDeduction();
+        if (settled > 0) {
+            userPointHistoryRepository.save(UserPointHistory.ofWithoutChallenge(
+                    userId, "챌린지 중도 탈퇴 회수", -settled, UserPointReason.WITHDRAWAL_PENALTY, point.getBalance()));
+        }
+    }
+
+    // 챌린지 중도 탈퇴/추방 시 그 챌린지에서 번 포인트를 회수한다. 잔액이 모자라면 0까지만
+    // 깎고 나머지는 pendingDeduction에 쌓아 다음 reward() 때 이어서 갚는다(음수 잔액 없음).
+    @Transactional
+    public void recoverChallengePoints(Long userId, Long challengeId, String sourceName) {
+        int earned = userPointHistoryRepository.sumEarnedByUserIdAndChallengeId(userId, challengeId);
+        if (earned <= 0) {
+            return;
+        }
+        UserPoint point = lockOrCreatePoint(userId);
+        int actual = point.deductUpToBalance(earned);
+        if (actual > 0) {
+            userPointHistoryRepository.save(UserPointHistory.ofWithoutChallenge(
+                    userId, sourceName, -actual, UserPointReason.WITHDRAWAL_PENALTY, point.getBalance()));
+        }
     }
 
     @Transactional

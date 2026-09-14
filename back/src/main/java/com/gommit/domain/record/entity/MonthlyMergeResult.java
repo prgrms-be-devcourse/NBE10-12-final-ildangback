@@ -54,6 +54,20 @@ public class MonthlyMergeResult extends BaseEntity {
     @Column(length = 100)
     private String checkInTrendCounts;
 
+    // 발행 시점 캐릭터 스냅샷 - 그 뒤로 유저가 옷을 갈아입어도 이 머지 카드는 안 바뀐다.
+    // 슬롯이 4개로 고정이라(ItemSlot) 컬럼으로 둔다. 미착용 슬롯은 null.
+    @Column(length = 255)
+    private String headImageUrl;
+
+    @Column(length = 255)
+    private String topImageUrl;
+
+    @Column(length = 255)
+    private String bottomImageUrl;
+
+    @Column(length = 255)
+    private String shoesImageUrl;
+
     private MonthlyMergeResult(
             Long monthlyMergeId,
             Long userId,
@@ -65,7 +79,11 @@ public class MonthlyMergeResult extends BaseEntity {
             int earnedPoints,
             int contributionRate,
             String checkInTrendLabels,
-            String checkInTrendCounts) {
+            String checkInTrendCounts,
+            String headImageUrl,
+            String topImageUrl,
+            String bottomImageUrl,
+            String shoesImageUrl) {
         this.monthlyMergeId = monthlyMergeId;
         this.userId = userId;
         this.ranking = ranking;
@@ -77,6 +95,10 @@ public class MonthlyMergeResult extends BaseEntity {
         this.contributionRate = contributionRate;
         this.checkInTrendLabels = checkInTrendLabels;
         this.checkInTrendCounts = checkInTrendCounts;
+        this.headImageUrl = headImageUrl;
+        this.topImageUrl = topImageUrl;
+        this.bottomImageUrl = bottomImageUrl;
+        this.shoesImageUrl = shoesImageUrl;
     }
 
     public static MonthlyMergeResult of(
@@ -100,6 +122,10 @@ public class MonthlyMergeResult extends BaseEntity {
                 earnedPoints,
                 contributionRate,
                 null,
+                null,
+                null,
+                null,
+                null,
                 null);
     }
 
@@ -114,7 +140,11 @@ public class MonthlyMergeResult extends BaseEntity {
             int earnedPoints,
             int contributionRate,
             String checkInTrendLabels,
-            String checkInTrendCounts) {
+            String checkInTrendCounts,
+            String headImageUrl,
+            String topImageUrl,
+            String bottomImageUrl,
+            String shoesImageUrl) {
         return new MonthlyMergeResult(
                 monthlyMergeId,
                 userId,
@@ -126,6 +156,10 @@ public class MonthlyMergeResult extends BaseEntity {
                 earnedPoints,
                 contributionRate,
                 checkInTrendLabels,
-                checkInTrendCounts);
+                checkInTrendCounts,
+                headImageUrl,
+                topImageUrl,
+                bottomImageUrl,
+                shoesImageUrl);
     }
 }
