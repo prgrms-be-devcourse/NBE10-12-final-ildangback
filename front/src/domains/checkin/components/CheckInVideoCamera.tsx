@@ -30,14 +30,14 @@ export function CheckInVideoCamera({ onCaptured }: Props) {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const drawTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // 녹화 도중 언마운트(뒤로가기 등)되면 onstop 이 나중에 불려도 부모에 결과를 넘기지 않는다.
+  // 언마운트 후 onstop 결과 무시용. effect 본문에도 true 세팅 — StrictMode dev 재mount 시 false 고정 방지.
   const mountedRef = useRef(true);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
       mountedRef.current = false;
-    },
-    [],
-  );
+    };
+  }, []);
 
   const canRecord =
     typeof MediaRecorder !== "undefined" &&
@@ -83,7 +83,12 @@ export function CheckInVideoCamera({ onCaptured }: Props) {
   useEffect(
     () => () => {
       clearTimers();
-      recorderRef.current?.stop();
+      // 이미 멈춘 recorder 면 stop() 이 던짐 — 언마운트 정리라 무시.
+      try {
+        recorderRef.current?.stop();
+      } catch {
+        // noop
+      }
       recorderRef.current = null;
     },
     [clearTimers],
@@ -141,10 +146,11 @@ export function CheckInVideoCamera({ onCaptured }: Props) {
     const recorder = new MediaRecorder(canvasStream, { mimeType });
     recorderRef.current = recorder;
 
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunks.push(e.data);
-    };
-    recorder.onstop = () => {
+    // onstop/onerror 공통 종료 처리. finishedRef 로 중복 실행 방지.
+    const finishedRef = { current: false };
+    const finish = () => {
+      if (finishedRef.current) return;
+      finishedRef.current = true;
       clearTimers();
       canvasStream.getTracks().forEach((track) => track.stop());
       canvas.width = 0;
@@ -160,6 +166,12 @@ export function CheckInVideoCamera({ onCaptured }: Props) {
       onCaptured(new Blob(chunks, { type: mimeType }));
     };
 
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
+    recorder.onstop = finish;
+    recorder.onerror = finish;
+
     recorder.start();
     setRecording(true);
     setElapsedMs(0);
@@ -170,7 +182,16 @@ export function CheckInVideoCamera({ onCaptured }: Props) {
     );
     stopTimerRef.current = setTimeout(() => {
       clearInterval(tickTimer);
-      recorder.stop();
+      if (recorder.state === "inactive") {
+        // 이미 inactive 면 stop() 이 던짐 — 직접 마무리.
+        finish();
+        return;
+      }
+      try {
+        recorder.stop();
+      } catch {
+        finish();
+      }
     }, CHECKIN_VIDEO_DURATION_MS);
   }
 
