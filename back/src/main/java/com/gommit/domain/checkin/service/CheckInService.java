@@ -15,6 +15,7 @@ import com.gommit.domain.checkin.dto.response.TodayCheckInStatusResponse;
 import com.gommit.domain.checkin.entity.CheckIn;
 import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.domain.checkin.entity.MediaType;
+import com.gommit.domain.checkin.event.OrphanMediaCleanupEvent;
 import com.gommit.domain.checkin.media.CheckInMediaStore;
 import com.gommit.domain.checkin.media.UploadedMedia;
 import com.gommit.domain.checkin.repository.CheckInRepository;
@@ -37,6 +38,7 @@ import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.io.Resource;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -66,6 +68,7 @@ public class CheckInService {
     private final PointProperties pointProperties;
     private final BusinessClock businessClock;
     private final DailyLogService dailyLogService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public TodayCheckInStatusResponse getTodayStatus(Long userId, Long challengeId) {
         Challenge challenge = preconditions.getActiveChallengeForActiveMember(challengeId, userId);
@@ -130,7 +133,8 @@ public class CheckInService {
                     .addKeyValue("userId", userId)
                     .addKeyValue("roundNo", roundNo)
                     .log();
-            deleteQuietly(mediaKey, uploaded.posterKey()); // 방금 쓴 orphan을 best-effort로 정리
+            // 방금 쓴 orphan 정리는 롤백 이후(after-rollback) 비동기로 — 커넥션 붙잡지 않게.
+            eventPublisher.publishEvent(new OrphanMediaCleanupEvent(mediaKey, uploaded.posterKey()));
             throw new BusinessException(ErrorCode.DAILY_LIMIT_EXCEEDED);
         }
 
@@ -182,7 +186,8 @@ public class CheckInService {
                     .addKeyValue("earnedUserPoints", earnedUserPoints)
                     .setCause(e)
                     .log();
-            deleteQuietly(mediaKey, uploaded.posterKey()); // 롤백은 CheckIn 행만 지운다. 올라간 파일은 best-effort 로 정리
+            // 롤백은 CheckIn 행만 지운다. 올라간 파일은 롤백 이후(after-rollback) 비동기로 정리.
+            eventPublisher.publishEvent(new OrphanMediaCleanupEvent(mediaKey, uploaded.posterKey()));
             throw e;
         }
     }
