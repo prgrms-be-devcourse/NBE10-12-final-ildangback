@@ -6,11 +6,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-// CheckInVideoTranscoderTest 와 DailyLogMontageBuilderFfmpegTest 가 공유하는 ffmpeg 유무 판정 +
-// 결과 mp4 길이 측정. 둘 다 실제 로컬 ffmpeg 로 돌아가고, ffmpeg 이 PATH 에 없으면(CI 등) 스킵한다.
-abstract class AbstractFfmpegTest {
+// ffmpeg 로 돌아가는 테스트들이 공유하는 유무 판정 + 합성 영상 생성 + 결과 mp4 길이 측정.
+// CheckInVideoTranscoderTest/DailyLogMontageBuilderFfmpegTest 는 같은 패키지라 상속으로 쓰고,
+// CheckInApiIntegrationTest/CheckInApiCloudinaryIntegrationTest 는 이미 IntegrationTestSupport 를
+// 상속하고 있어(다중상속 불가) 이 클래스를 정적 호출로만 쓴다 — 그래서 public.
+// 전부 ffmpeg 이 PATH 에 없으면(CI 등) 스킵되는 걸 전제로 한다.
+public abstract class AbstractFfmpegTest {
 
-    static boolean ffmpegAvailable() {
+    public static boolean ffmpegAvailable() {
         try {
             return new ProcessBuilder("ffmpeg", "-version")
                             .redirectErrorStream(true)
@@ -22,8 +25,29 @@ abstract class AbstractFfmpegTest {
         }
     }
 
+    // lavfi testsrc 로 합성 영상을 만든다 — 실 카메라 파일 없이도 지정한 길이의 mp4 를 얻는다.
+    public static byte[] syntheticVideoBytes(double durationSeconds) throws Exception {
+        Path tmp = Files.createTempFile("ffmpeg-test-synth-", ".mp4");
+        try {
+            new ProcessBuilder(
+                            "ffmpeg",
+                            "-y",
+                            "-f",
+                            "lavfi",
+                            "-i",
+                            "testsrc=size=320x240:rate=30:duration=%s".formatted(durationSeconds),
+                            tmp.toString())
+                    .redirectErrorStream(true)
+                    .start()
+                    .waitFor();
+            return Files.readAllBytes(tmp);
+        } finally {
+            Files.deleteIfExists(tmp);
+        }
+    }
+
     // 인코딩된 mp4 바이트를 임시 파일로 떨궈 ffprobe 로 재생시간(초)을 읽는다.
-    static double probeDuration(byte[] mp4) throws Exception {
+    public static double probeDuration(byte[] mp4) throws Exception {
         Path tmp = Files.createTempFile("ffmpeg-test-probe-", ".mp4");
         try {
             Files.write(tmp, mp4);

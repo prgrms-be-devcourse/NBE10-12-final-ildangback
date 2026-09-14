@@ -10,12 +10,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.gommit.domain.checkin.dto.request.SubmitCheckInRequest;
 import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.domain.checkin.service.CheckInService;
+import com.gommit.domain.checkin.support.AbstractFfmpegTest;
 import com.gommit.domain.media.entity.MediaRole;
 import com.gommit.domain.media.service.StorageService;
 import com.gommit.domain.media.support.MediaContentType;
 import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.time.BusinessDayCutoff;
+import com.gommit.support.ChallengeFixtures;
 import com.gommit.support.IntegrationTestSupport;
 import com.jayway.jsonpath.JsonPath;
 import java.io.IOException;
@@ -78,54 +80,26 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
         }
     }
 
-    // ===== 시딩 (challenge 도메인에 생성 로직이 없어 직접 넣는다) =====
+    // ===== 시딩 (ChallengeFixtures 에 위임 — CheckInApiCloudinaryIntegrationTest 도 같이 쓴다) =====
 
     private long userIdOf(String email) {
-        return jdbcTemplate.queryForObject("select id from users where email = ?", Long.class, email);
+        return ChallengeFixtures.userIdOf(jdbcTemplate, email);
     }
 
     private long seedGroup(long ownerId) {
-        jdbcTemplate.update(
-                "insert into challenge_groups"
-                        + " (name, description, category, map_type, visibility, max_members, owner_id, status, created_at, updated_at)"
-                        + " values ('테스트그룹', null, 'DEV', 'STUDY_ROOM', 'PUBLIC', 10, ?, 'ACTIVE', now(6), now(6))",
-                ownerId);
-        return jdbcTemplate.queryForObject("select id from challenge_groups order by id desc limit 1", Long.class);
+        return ChallengeFixtures.seedGroup(jdbcTemplate, ownerId);
     }
 
     private long seedChallenge(long groupId, int dailyCheckInCount, String challengeStatus) {
-        jdbcTemplate.update(
-                "insert into challenges"
-                        + " (group_id, seq_no, start_date, end_date, status, frequency_type, frequency_value,"
-                        + " days_of_week, daily_check_in_count, required_day_count, group_current_streak,"
-                        + " group_best_streak, allow_photo, created_at, updated_at)"
-                        + " values (?, 1, ?, ?, ?, 'DAILY', null, null, ?, 30, 0, 0, true, now(6), now(6))",
-                groupId,
-                LocalDate.now().minusDays(10),
-                LocalDate.now().plusDays(30),
-                challengeStatus,
-                dailyCheckInCount);
-        return jdbcTemplate.queryForObject("select id from challenges order by id desc limit 1", Long.class);
+        return ChallengeFixtures.seedChallenge(jdbcTemplate, groupId, dailyCheckInCount, challengeStatus);
     }
 
     private void seedMember(long challengeId, long userId, String memberStatus, LocalDate leftOn) {
-        jdbcTemplate.update(
-                "insert into challenge_members"
-                        + " (challenge_id, user_id, role, status, current_streak, best_streak, left_at,"
-                        + " extension_choice, created_at, updated_at)"
-                        + " values (?, ?, 'MEMBER', ?, 0, 0, ?, 'PENDING', now(6), now(6))",
-                challengeId,
-                userId,
-                memberStatus,
-                leftOn == null ? null : leftOn.atStartOfDay());
+        ChallengeFixtures.seedMember(jdbcTemplate, challengeId, userId, memberStatus, leftOn);
     }
 
     private long setUpChallenge(String memberEmail, int dailyCheckInCount) {
-        long userId = userIdOf(memberEmail);
-        long groupId = seedGroup(userId);
-        long challengeId = seedChallenge(groupId, dailyCheckInCount, "ACTIVE");
-        seedMember(challengeId, userId, "ACTIVE", null);
-        return challengeId;
+        return ChallengeFixtures.setUpChallenge(jdbcTemplate, memberEmail, dailyCheckInCount);
     }
 
     // ===== 요청 헬퍼 =====
@@ -759,7 +733,7 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
     // AbstractFfmpegTest 를 같이 상속할 수 없어 판정 메서드만 별도로 둔다.)
     @Nested
     @DisplayName("영상 인증 제출/서빙")
-    @org.junit.jupiter.api.condition.EnabledIf("com.gommit.domain.checkin.CheckInApiIntegrationTest#ffmpegAvailable")
+    @org.junit.jupiter.api.condition.EnabledIf("com.gommit.domain.checkin.support.AbstractFfmpegTest#ffmpegAvailable")
     class VideoSubmission {
 
         @Test
@@ -770,7 +744,8 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
             jdbcTemplate.update("update challenges set allow_video = true where id = ?", challengeId);
 
             // 회차 길이(2초)보다 짧은 원본 — 패딩 경로까지 실제 ffmpeg 로 검증.
-            var media = new MockMultipartFile("media", "clip.mp4", "video/mp4", syntheticVideoBytes(0.5));
+            var media = new MockMultipartFile(
+                    "media", "clip.mp4", "video/mp4", AbstractFfmpegTest.syntheticVideoBytes(0.5));
             var builder = multipart("/api/challenges/{challengeId}/check-ins", challengeId)
                     .file(media)
                     .param("checkInType", "VIDEO")
@@ -793,38 +768,6 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
             mockMvc.perform(withToken(get(posterUrl), tokens.accessToken()))
                     .andExpect(status().isOk())
                     .andExpect(content().contentTypeCompatibleWith("image/jpeg"));
-        }
-
-        private byte[] syntheticVideoBytes(double durationSeconds) throws Exception {
-            Path tmp = Files.createTempFile("checkin-api-video-", ".mp4");
-            try {
-                new ProcessBuilder(
-                                "ffmpeg",
-                                "-y",
-                                "-f",
-                                "lavfi",
-                                "-i",
-                                "testsrc=size=320x240:rate=30:duration=%s".formatted(durationSeconds),
-                                tmp.toString())
-                        .redirectErrorStream(true)
-                        .start()
-                        .waitFor();
-                return Files.readAllBytes(tmp);
-            } finally {
-                Files.deleteIfExists(tmp);
-            }
-        }
-    }
-
-    static boolean ffmpegAvailable() {
-        try {
-            return new ProcessBuilder("ffmpeg", "-version")
-                            .redirectErrorStream(true)
-                            .start()
-                            .waitFor()
-                    == 0;
-        } catch (Exception e) {
-            return false;
         }
     }
 
