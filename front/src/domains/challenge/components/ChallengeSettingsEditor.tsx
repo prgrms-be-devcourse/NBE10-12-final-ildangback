@@ -36,14 +36,14 @@ type SettingsForm = z.infer<typeof schema>;
 
 /**
  * 챌린지 도메인의 `CheckInType` 은 LIVE 도 포함(별도 서브시스템, 아직 없음) — 이 폼은
- * PHOTO/VIDEO 중 하나만 다룬다. 기존 값에 LIVE 만 있는 이상 상태는 없으니 필터 결과가
- * 비면 PHOTO 로 되돌린다.
+ * PHOTO/VIDEO 만 다룬다(사진/영상 동시 허용 가능). 기존 값에 LIVE 만 있는 이상 상태는
+ * 없으니 필터 결과가 비면 PHOTO 로 되돌린다.
  */
-function toSupportedAllowedTypeOrDefault(
+function toSupportedAllowedTypesOrDefault(
   allowedTypes: ChallengeDetail["allowedTypes"],
 ): SettingsForm["allowedTypes"] {
   const supported = allowedTypes.filter(isSupportedCheckInType);
-  return supported.length ? [supported[0]] : ["PHOTO"];
+  return supported.length ? supported : ["PHOTO"];
 }
 
 const FIELDS = [
@@ -73,7 +73,7 @@ export function ChallengeSettingsEditor({
       ...challenge,
       daysOfWeek: challenge.daysOfWeek ?? [],
       frequencyValue: challenge.frequencyValue ?? 2,
-      allowedTypes: toSupportedAllowedTypeOrDefault(challenge.allowedTypes),
+      allowedTypes: toSupportedAllowedTypesOrDefault(challenge.allowedTypes),
     },
   });
   const frequencyType = useWatch({
@@ -211,9 +211,14 @@ export function ChallengeSettingsEditor({
                 type="button"
                 aria-pressed={allowedTypes.includes(type)}
                 onClick={() =>
-                  form.setValue("allowedTypes", [type], {
-                    shouldValidate: true,
-                  })
+                  // 사진/영상은 동시에 허용할 수 있다 — 카드 토글이지 라디오가 아니다.
+                  form.setValue(
+                    "allowedTypes",
+                    allowedTypes.includes(type)
+                      ? allowedTypes.filter((t) => t !== type)
+                      : [...allowedTypes, type],
+                    { shouldValidate: true },
+                  )
                 }
                 className={`min-h-11 rounded-xl border text-sm font-medium ${
                   allowedTypes.includes(type)

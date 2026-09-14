@@ -351,9 +351,14 @@ export function GroupCreateSteps({ step }: { step: number }) {
                     showToast("준비중입니다.");
                     return;
                   }
-                  setValue("challenge.allowedTypes", [value], {
-                    shouldValidate: true,
-                  });
+                  // 사진/영상은 동시에 허용할 수 있다 — 카드 토글이지 라디오가 아니다.
+                  setValue(
+                    "challenge.allowedTypes",
+                    selected
+                      ? settings.allowedTypes.filter((t) => t !== value)
+                      : [...settings.allowedTypes, value],
+                    { shouldValidate: true },
+                  );
                 }}
                 className={`flex min-h-24 w-full items-center gap-4 rounded-2xl border p-4 text-left ${selected ? SELECTED : NORMAL}`}
               >

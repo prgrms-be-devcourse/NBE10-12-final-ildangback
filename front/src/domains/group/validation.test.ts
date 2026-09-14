@@ -35,10 +35,10 @@ describe("groupCreateSchema.challenge.allowedTypes", () => {
     expect(groupCreateSchema.safeParse(baseForm([])).success).toBe(false);
   });
 
-  it("rejects picking both at once (single-select field)", () => {
+  it("accepts picking both at once — 같은 회차라도 사진/영상 둘 다 허용할 수 있다", () => {
     expect(
       groupCreateSchema.safeParse(baseForm(["PHOTO", "VIDEO"])).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("rejects LIVE — no subsystem for it yet", () => {
