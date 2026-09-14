@@ -20,6 +20,7 @@ import { ExtensionChoicePanel } from "./ExtensionChoicePanel";
 import { CheckInGalleryTab } from "../../checkin/components/CheckInGalleryTab";
 import { DailyLogTimeline } from "../../checkin/components/DailyLogTimeline";
 import { CheckInMethodSheet } from "../../checkin/components/CheckInMethodSheet";
+import { toCheckInTypeQuery } from "../../checkin/lib/checkInTypeParam";
 
 // 지도 위 이름표의 인증 횟수 색. 채우면 초록, 아니면 보라.
 const COUNT_DONE = "#16A300";
@@ -254,9 +255,15 @@ export function ChallengeDashboard({
           targetCount: challenge.dailyCheckInCount,
           allowedTypes: challenge.allowedTypes.filter(isSupportedCheckInType),
         }}
-        onSelectPhoto={() => navigate(`/challenges/${challenge.id}/check-in`)}
+        onSelectPhoto={() =>
+          navigate(
+            `/challenges/${challenge.id}/check-in${toCheckInTypeQuery("PHOTO")}`,
+          )
+        }
         onSelectVideo={() =>
-          navigate(`/challenges/${challenge.id}/check-in?type=video`)
+          navigate(
+            `/challenges/${challenge.id}/check-in${toCheckInTypeQuery("VIDEO")}`,
+          )
         }
       />
     </>

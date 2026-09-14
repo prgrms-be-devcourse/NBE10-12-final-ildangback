@@ -11,13 +11,13 @@ import { CheckInDone } from "../components/CheckInDone";
 import { CheckInIntro } from "../components/CheckInIntro";
 import { CheckInVideoCamera } from "../components/CheckInVideoCamera";
 import { checkInFlowReducer, initialCheckInFlow } from "../lib/checkInFlow";
-import type { CheckInType } from "../types";
+import { parseCheckInTypeParam } from "../lib/checkInTypeParam";
 
 /**
  * 사진/영상 인증 제출 플로우 (와이어프레임 2·3·4 + 카메라).
  * 미디어 blob 이 메모리에만 있어서 라우트를 쪼개지 않고 스텝 상태로 돌린다.
  *
- * 인증 방법(사진/영상)은 `?type=video` 쿼리로 들어온다(CheckInMethodSheet 가 붙여서 이동).
+ * 인증 방법(사진/영상)은 `?type=video` 쿼리로 들어온다(ChallengeDashboard 가 붙여서 이동).
  * 없으면 사진으로 취급 — 기존 딥링크·북마크와 호환.
  */
 export function CheckInPage() {
@@ -27,8 +27,7 @@ export function CheckInPage() {
   const [searchParams] = useSearchParams();
   const challengeId = Number(challengeIdParam);
   const detailPath = `/challenges/${challengeIdParam}`;
-  const checkInType: CheckInType =
-    searchParams.get("type") === "video" ? "VIDEO" : "PHOTO";
+  const checkInType = parseCheckInTypeParam(searchParams);
 
   const [flow, dispatch] = useReducer(
     checkInFlowReducer,
