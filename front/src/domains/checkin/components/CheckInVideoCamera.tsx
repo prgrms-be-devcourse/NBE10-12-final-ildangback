@@ -30,6 +30,7 @@ export function CheckInVideoCamera({ onCaptured }: Props) {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const drawTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tickTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // 언마운트 후 onstop 결과 무시용. effect 본문에도 true 세팅 — StrictMode dev 재mount 시 false 고정 방지.
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -75,6 +76,10 @@ export function CheckInVideoCamera({ onCaptured }: Props) {
     if (stopTimerRef.current != null) {
       clearTimeout(stopTimerRef.current);
       stopTimerRef.current = null;
+    }
+    if (tickTimerRef.current != null) {
+      clearInterval(tickTimerRef.current);
+      tickTimerRef.current = null;
     }
   }, []);
 
@@ -176,12 +181,15 @@ export function CheckInVideoCamera({ onCaptured }: Props) {
     setRecording(true);
     setElapsedMs(0);
     const startedAt = Date.now();
-    const tickTimer = setInterval(
+    tickTimerRef.current = setInterval(
       () => setElapsedMs(Date.now() - startedAt),
       100,
     );
     stopTimerRef.current = setTimeout(() => {
-      clearInterval(tickTimer);
+      if (tickTimerRef.current != null) {
+        clearInterval(tickTimerRef.current);
+        tickTimerRef.current = null;
+      }
       if (recorder.state === "inactive") {
         // 이미 inactive 면 stop() 이 던짐 — 직접 마무리.
         finish();
