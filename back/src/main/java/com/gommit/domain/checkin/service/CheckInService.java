@@ -79,7 +79,7 @@ public class CheckInService {
 
     @Transactional
     public CheckInResultResponse submit(Long userId, Long challengeId, SubmitCheckInRequest form, MultipartFile media) {
-        Challenge challenge = preconditions.getActiveChallengeForActiveMember(challengeId, userId);
+        Challenge challenge = preconditions.getActiveChallengeForActiveMemberForUpdate(challengeId, userId);
 
         String memo = (form.memo() == null || form.memo().isBlank()) ? null : form.memo();
 

@@ -34,6 +34,20 @@ public class CheckInPreconditions {
     public Challenge getActiveChallengeForActiveMember(Long challengeId, Long userId) {
         Challenge challenge = getChallenge(challengeId);
         ChallengeMember member = findMember(challengeId, userId);
+        return validateActive(challenge, member);
+    }
+
+    // submit 전용. 같은 (challengeId, userId) 로 들어온 동시 요청을 멤버 행 락으로 줄 세운다 —
+    // round_no 계산부터 insert까지가 이 락 안에서 순차 진행되므로 uk_check_ins 경합(데드락 포함)이 사라진다.
+    public Challenge getActiveChallengeForActiveMemberForUpdate(Long challengeId, Long userId) {
+        Challenge challenge = getChallenge(challengeId);
+        ChallengeMember member = challengeMemberRepository
+                .findByChallengeIdAndUserIdForUpdate(challengeId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER));
+        return validateActive(challenge, member);
+    }
+
+    private Challenge validateActive(Challenge challenge, ChallengeMember member) {
         if (member.getStatus() != ChallengeMemberStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER);
         }
