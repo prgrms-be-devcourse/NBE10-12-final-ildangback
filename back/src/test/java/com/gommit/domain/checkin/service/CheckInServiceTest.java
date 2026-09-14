@@ -33,6 +33,7 @@ import com.gommit.domain.checkin.dto.response.TodayCheckInStatusResponse;
 import com.gommit.domain.checkin.entity.CheckIn;
 import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.domain.checkin.entity.MediaType;
+import com.gommit.domain.checkin.event.OrphanMediaCleanupEvent;
 import com.gommit.domain.checkin.media.CheckInMediaStore;
 import com.gommit.domain.checkin.media.UploadedMedia;
 import com.gommit.domain.checkin.repository.CheckInRepository;
@@ -62,6 +63,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -107,6 +109,9 @@ class CheckInServiceTest {
     @Mock
     private DailyLogService dailyLogService;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private final PointProperties pointProperties = new PointProperties(10, 5, 0, 0);
 
     private CheckInService service;
@@ -126,7 +131,8 @@ class CheckInServiceTest {
                 challengeGroupRepository,
                 pointProperties,
                 new BusinessClock(clock),
-                dailyLogService);
+                dailyLogService,
+                eventPublisher);
         lenient().when(userService.findNicknames(anyList())).thenReturn(Map.of(USER_ID, "인증러"));
         lenient().when(challengeGroupRepository.findNameById(1L)).thenReturn(Optional.of("오운완 모임"));
     }
@@ -324,8 +330,9 @@ class CheckInServiceTest {
                     () -> service.submit(USER_ID, CHALLENGE_ID, request(null), media()),
                     ErrorCode.DAILY_LIMIT_EXCEEDED);
 
-            // insert 가 실패하면 방금 쓴 파일을 정리한다 — orphan 방지. (이미지라 posterKey 는 null)
-            verify(mediaStore).delete(anyString(), isNull());
+            // insert 가 실패하면 방금 쓴 파일을 정리한다 — orphan 방지 (롤백 이후 비동기 이벤트로).
+            // (이미지라 posterKey 는 null)
+            verify(eventPublisher).publishEvent(new OrphanMediaCleanupEvent("check-ins/2026/09/uuid.png", null));
             verify(personalPointService, never()).reward(anyLong(), anyLong(), anyInt(), any(), any());
         }
 
@@ -346,7 +353,7 @@ class CheckInServiceTest {
             assertThatThrownBy(() -> service.submit(USER_ID, CHALLENGE_ID, request(null), media()))
                     .isInstanceOf(IllegalStateException.class);
 
-            verify(mediaStore).delete("check-ins/2026/09/uuid.png", null);
+            verify(eventPublisher).publishEvent(new OrphanMediaCleanupEvent("check-ins/2026/09/uuid.png", null));
         }
     }
 
