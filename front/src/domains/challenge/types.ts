@@ -4,6 +4,13 @@ export type ChallengeStatus = "READY" | "ACTIVE" | "ENDED";
 export type FrequencyType = "DAILY" | "EVERY_N_DAYS" | "DAYS_OF_WEEK";
 export type DaysOfWeek = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
 export type CheckInType = "PHOTO" | "VIDEO" | "LIVE";
+// LIVE 는 별도 서브시스템(아직 없음) — 제출/선택 UI 는 이 둘만 다룬다.
+export type SupportedCheckInType = "PHOTO" | "VIDEO";
+export function isSupportedCheckInType(
+  type: CheckInType,
+): type is SupportedCheckInType {
+  return type === "PHOTO" || type === "VIDEO";
+}
 export type ChallengeMemberRole = "OWNER" | "MEMBER";
 export type ExtensionChoice = "PENDING" | "EXTEND" | "DECLINE";
 export interface ChallengeSettings {

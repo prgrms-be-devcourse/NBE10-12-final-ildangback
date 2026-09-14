@@ -9,6 +9,7 @@ import { FormAlert } from "../../../shared/ui/FormAlert";
 import { TextField } from "../../../shared/ui/TextField";
 import { groupCreateSchema, WEEKDAYS } from "../../group/validation";
 import { updateChallenge } from "../api";
+import { isSupportedCheckInType } from "../types";
 import type { ChallengeDetail } from "../types";
 
 const schema = groupCreateSchema.shape.challenge.superRefine((value, ctx) => {
@@ -41,9 +42,7 @@ type SettingsForm = z.infer<typeof schema>;
 function toSupportedAllowedTypeOrDefault(
   allowedTypes: ChallengeDetail["allowedTypes"],
 ): SettingsForm["allowedTypes"] {
-  const supported = allowedTypes.filter(
-    (t): t is "PHOTO" | "VIDEO" => t === "PHOTO" || t === "VIDEO",
-  );
+  const supported = allowedTypes.filter(isSupportedCheckInType);
   return supported.length ? [supported[0]] : ["PHOTO"];
 }
 

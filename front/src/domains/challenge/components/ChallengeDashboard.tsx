@@ -9,6 +9,7 @@ import sportsMap from "../../../assets/icons/sportsMap.webp";
 import people from "../../../assets/icons/people.webp";
 import camera from "../../../assets/icons/iconoir_camera.webp";
 import type { MapType } from "../../group/types";
+import { isSupportedCheckInType } from "../types";
 import type {
   ChallengeStatusResponse,
   ChallengeCharacterResponse,
@@ -251,10 +252,7 @@ export function ChallengeDashboard({
         status={{
           currentCount: data.myCurrentCount,
           targetCount: challenge.dailyCheckInCount,
-          // 챌린지 도메인의 CheckInType 은 LIVE 도 포함(아직 별도 서브시스템, 이번 스코프 아님).
-          allowedTypes: challenge.allowedTypes.filter(
-            (t): t is "PHOTO" | "VIDEO" => t === "PHOTO" || t === "VIDEO",
-          ),
+          allowedTypes: challenge.allowedTypes.filter(isSupportedCheckInType),
         }}
         onSelectPhoto={() => navigate(`/challenges/${challenge.id}/check-in`)}
         onSelectVideo={() =>
