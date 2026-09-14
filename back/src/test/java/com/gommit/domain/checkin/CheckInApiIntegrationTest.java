@@ -153,6 +153,8 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(jsonPath("$.checkIn.roundNo").value(1))
                     .andExpect(jsonPath("$.checkIn.nickname").value(NICKNAME))
                     .andExpect(jsonPath("$.checkIn.mediaType").value("IMAGE"))
+                    // 사진 체크인은 포스터가 없다 — posterUrl 필드가 null 로 남아야 한다.
+                    .andExpect(jsonPath("$.checkIn.posterUrl").doesNotExist())
                     .andExpect(jsonPath("$.currentCount").value(1))
                     .andExpect(jsonPath("$.targetCount").value(3))
                     .andExpect(jsonPath("$.dailyCompleted").value(false))
