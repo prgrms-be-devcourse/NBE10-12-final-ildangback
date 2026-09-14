@@ -3,7 +3,7 @@ package com.gommit.domain.checkin.support;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.gommit.domain.checkin.support.DailyLogMontageBuilder.Frame;
-import com.gommit.domain.checkin.support.DailyLogMontageBuilder.Kind;
+import com.gommit.domain.checkin.support.DailyLogMontageBuilder.Motion;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -60,7 +60,7 @@ class DailyLogMontageBuilderFfmpegTest {
     @CsvSource({"1, 1280, 1280", "2, 1280, 640", "3, 1278, 426", "4, 1280, 1280", "5, 1278, 852", "6, 1278, 852"})
     @DisplayName("N칸 × 2회차 그리드가 지정 해상도 mp4 로 인코딩된다(방향 섞인 입력 + 빈 칸)")
     void gridEncodesAtExpectedResolution(int cellCount, int expectedWidth, int expectedHeight) throws Exception {
-        DailyLogMontageBuilder builder = new DailyLogMontageBuilder("ffmpeg");
+        DailyLogMontageBuilder builder = new DailyLogMontageBuilder("ffmpeg", new FfmpegProcessRunner());
 
         String[] colors = {"red", "green", "blue", "yellow", "cyan", "magenta"};
         int[][] sizes = {{1080, 1920}, {1920, 1080}, {1000, 1000}, {800, 1200}, {1200, 800}, {900, 1600}};
@@ -70,7 +70,7 @@ class DailyLogMontageBuilderFfmpegTest {
             List<Frame> slots = new ArrayList<>();
             for (int k = 0; k < cellCount; k++) {
                 boolean blank = k == 0 && r == 1; // 2회차 첫 칸은 비움(검정) 검증
-                slots.add(blank ? null : new Frame(png(sizes[k][0], sizes[k][1], colors[k]), "png", Kind.IMAGE));
+                slots.add(blank ? null : new Frame(png(sizes[k][0], sizes[k][1], colors[k]), "png", Motion.STILL));
             }
             rounds.add(slots);
         }

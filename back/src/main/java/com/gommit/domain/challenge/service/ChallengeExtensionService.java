@@ -147,6 +147,7 @@ public class ChallengeExtensionService {
                 .dailyCheckInCount(currentChallenge.getDailyCheckInCount())
                 .requiredDayCount(requiredDayCount)
                 .allowPhoto(currentChallenge.isAllowPhoto())
+                .allowVideo(currentChallenge.isAllowVideo())
                 // 새 시즌이므로 streak 초기화
                 .groupCurrentStreak(0)
                 .groupBestStreak(0)

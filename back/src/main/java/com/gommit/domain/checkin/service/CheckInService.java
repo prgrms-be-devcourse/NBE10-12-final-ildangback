@@ -14,8 +14,8 @@ import com.gommit.domain.checkin.dto.response.RecentCheckInResponse.RecentCheckI
 import com.gommit.domain.checkin.dto.response.TodayCheckInStatusResponse;
 import com.gommit.domain.checkin.entity.CheckIn;
 import com.gommit.domain.checkin.entity.CheckInType;
-import com.gommit.domain.checkin.entity.MediaType;
 import com.gommit.domain.checkin.media.CheckInMediaStore;
+import com.gommit.domain.checkin.media.UploadedMedia;
 import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.checkin.support.CheckInPreconditions;
 import com.gommit.domain.checkin.support.CheckInPreconditions.ReadDateAccess;
@@ -97,16 +97,25 @@ public class CheckInService {
             throw new BusinessException(ErrorCode.DAILY_LIMIT_EXCEEDED);
         }
 
-        String mediaKey = mediaStore.store(media);
+        UploadedMedia uploaded = mediaStore.store(media);
+        String mediaKey = uploaded.storageKey(); // 여기서 CheckIn.mediaKey 로 번역
         int roundNo = already + 1;
 
         CheckIn checkIn = new CheckIn(
-                challengeId, userId, roundNo, form.checkInType(), mediaKey, MediaType.IMAGE, memo, businessDate);
+                challengeId,
+                userId,
+                roundNo,
+                form.checkInType(),
+                mediaKey,
+                uploaded.mediaType(),
+                uploaded.posterKey(),
+                memo,
+                businessDate);
         try {
             checkInRepository.saveAndFlush(checkIn);
         } catch (DataIntegrityViolationException e) {
             log.info("uk_check_ins 위반(같은 회차 선점됨): challengeId={}, userId={}, roundNo={}", challengeId, userId, roundNo);
-            deleteQuietly(mediaKey); // 방금 쓴 orphan을 best-effort로 정리
+            deleteQuietly(mediaKey, uploaded.posterKey()); // 방금 쓴 orphan을 best-effort로 정리
             throw new BusinessException(ErrorCode.DAILY_LIMIT_EXCEEDED);
         }
 
@@ -157,7 +166,7 @@ public class CheckInService {
                     roundNo,
                     earnedUserPoints,
                     e);
-            deleteQuietly(mediaKey); // 롤백은 CheckIn 행만 지운다. 올라간 파일은 best-effort 로 정리
+            deleteQuietly(mediaKey, uploaded.posterKey()); // 롤백은 CheckIn 행만 지운다. 올라간 파일은 best-effort 로 정리
             throw e;
         }
     }
@@ -257,13 +266,7 @@ public class CheckInService {
     // 붙잡는다. 여기 두 조회는 서로 독립이고 쓰기도 없으니 트랜잭션 없이 돌려 커넥션을 바로 반납한다.
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Resource loadCheckInMedia(Long userId, Long checkInId) {
-        CheckIn checkIn = checkInRepository
-                .findById(checkInId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CHECK_IN_NOT_FOUND));
-        ReadDateAccess access = preconditions.resolveReadDateAccess(checkIn.getChallengeId(), userId);
-        if (!access.allows(checkIn.getBusinessDate())) {
-            throw new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER);
-        }
+        CheckIn checkIn = readableMediaCheckIn(userId, checkInId);
         try {
             return mediaStore.load(checkIn.getMediaKey());
         } catch (BusinessException e) {
@@ -274,6 +277,36 @@ public class CheckInService {
                     e.getErrorCode());
             throw e;
         }
+    }
+
+    // 영상 체크인의 그리드 표시용 썸네일. 이미지 체크인은 posterKey 가 없어 404.
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public Resource loadCheckInPoster(Long userId, Long checkInId) {
+        CheckIn checkIn = readableMediaCheckIn(userId, checkInId);
+        if (checkIn.getPosterKey() == null) {
+            throw new BusinessException(ErrorCode.MEDIA_NOT_FOUND);
+        }
+        try {
+            return mediaStore.load(checkIn.getPosterKey());
+        } catch (BusinessException e) {
+            log.warn(
+                    "포스터 로드 실패: checkInId={}, posterKey={}, code={}",
+                    checkInId,
+                    checkIn.getPosterKey(),
+                    e.getErrorCode());
+            throw e;
+        }
+    }
+
+    private CheckIn readableMediaCheckIn(Long userId, Long checkInId) {
+        CheckIn checkIn = checkInRepository
+                .findById(checkInId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHECK_IN_NOT_FOUND));
+        ReadDateAccess access = preconditions.resolveReadDateAccess(checkIn.getChallengeId(), userId);
+        if (!access.allows(checkIn.getBusinessDate())) {
+            throw new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER);
+        }
+        return checkIn;
     }
 
     private CheckIn readableCheckIn(Long userId, Long challengeId, Long checkInId) {
@@ -290,11 +323,11 @@ public class CheckInService {
         return checkIn;
     }
 
-    private void deleteQuietly(String storageKey) {
+    private void deleteQuietly(String mediaKey, String posterKey) {
         try {
-            mediaStore.delete(storageKey);
+            mediaStore.delete(mediaKey, posterKey);
         } catch (RuntimeException ex) {
-            log.warn("orphan 미디어 정리 실패: {}", storageKey, ex);
+            log.warn("orphan 미디어 정리 실패: {}", mediaKey, ex);
         }
     }
 

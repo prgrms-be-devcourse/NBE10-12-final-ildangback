@@ -11,6 +11,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
@@ -33,6 +34,7 @@ import com.gommit.domain.checkin.entity.CheckIn;
 import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.domain.checkin.entity.MediaType;
 import com.gommit.domain.checkin.media.CheckInMediaStore;
+import com.gommit.domain.checkin.media.UploadedMedia;
 import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.checkin.support.CheckInPreconditions;
 import com.gommit.domain.checkin.support.CheckInPreconditions.ReadDateAccess;
@@ -144,7 +146,8 @@ class CheckInServiceTest {
     }
 
     private CheckIn checkInRow(Long id) {
-        CheckIn checkIn = new CheckIn(CHALLENGE_ID, USER_ID, 1, CheckInType.PHOTO, "key", MediaType.IMAGE, null, TODAY);
+        CheckIn checkIn =
+                new CheckIn(CHALLENGE_ID, USER_ID, 1, CheckInType.PHOTO, "key", MediaType.IMAGE, null, null, TODAY);
         ReflectionTestUtils.setField(checkIn, "id", id);
         return checkIn;
     }
@@ -160,7 +163,8 @@ class CheckInServiceTest {
             givenActiveMemberAndValidDay(challenge);
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(1);
-            when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
+            when(mediaStore.store(any()))
+                    .thenReturn(new UploadedMedia("check-ins/2026/09/uuid.png", MediaType.IMAGE, null));
             when(checkInRepository.saveAndFlush(any(CheckIn.class))).thenAnswer(inv -> {
                 CheckIn c = inv.getArgument(0);
                 ReflectionTestUtils.setField(c, "id", 100L);
@@ -190,7 +194,8 @@ class CheckInServiceTest {
             givenActiveMemberAndValidDay(challenge);
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(0);
-            when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
+            when(mediaStore.store(any()))
+                    .thenReturn(new UploadedMedia("check-ins/2026/09/uuid.png", MediaType.IMAGE, null));
             when(checkInRepository.saveAndFlush(any(CheckIn.class))).thenAnswer(inv -> inv.getArgument(0));
             when(challengeStreakService.onMemberDailyComplete(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(new MemberCheckInResult(3, 2, 4, false));
@@ -210,7 +215,8 @@ class CheckInServiceTest {
             givenActiveMemberAndValidDay(challenge);
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(1);
-            when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
+            when(mediaStore.store(any()))
+                    .thenReturn(new UploadedMedia("check-ins/2026/09/uuid.png", MediaType.IMAGE, null));
             when(checkInRepository.saveAndFlush(any(CheckIn.class))).thenAnswer(inv -> inv.getArgument(0));
             when(challengeGroupRepository.findNameById(1L)).thenReturn(Optional.empty());
 
@@ -289,7 +295,8 @@ class CheckInServiceTest {
             givenActiveMemberAndValidDay(challenge);
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(0);
-            when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
+            when(mediaStore.store(any()))
+                    .thenReturn(new UploadedMedia("check-ins/2026/09/uuid.png", MediaType.IMAGE, null));
             when(checkInRepository.saveAndFlush(any(CheckIn.class)))
                     .thenThrow(new DataIntegrityViolationException("uk_check_ins"));
 
@@ -297,8 +304,8 @@ class CheckInServiceTest {
                     () -> service.submit(USER_ID, CHALLENGE_ID, request(null), media()),
                     ErrorCode.DAILY_LIMIT_EXCEEDED);
 
-            // insert 가 실패하면 방금 쓴 파일을 정리한다 — orphan 방지.
-            verify(mediaStore).delete(anyString());
+            // insert 가 실패하면 방금 쓴 파일을 정리한다 — orphan 방지. (이미지라 posterKey 는 null)
+            verify(mediaStore).delete(anyString(), isNull());
             verify(personalPointService, never()).reward(anyLong(), anyLong(), anyInt(), any(), any());
         }
 
@@ -309,7 +316,8 @@ class CheckInServiceTest {
             givenActiveMemberAndValidDay(challenge);
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(1);
-            when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
+            when(mediaStore.store(any()))
+                    .thenReturn(new UploadedMedia("check-ins/2026/09/uuid.png", MediaType.IMAGE, null));
             when(checkInRepository.saveAndFlush(any(CheckIn.class))).thenAnswer(inv -> inv.getArgument(0));
             doThrow(new IllegalStateException("적립 실패"))
                     .when(personalPointService)
@@ -318,7 +326,7 @@ class CheckInServiceTest {
             assertThatThrownBy(() -> service.submit(USER_ID, CHALLENGE_ID, request(null), media()))
                     .isInstanceOf(IllegalStateException.class);
 
-            verify(mediaStore).delete("check-ins/2026/09/uuid.png");
+            verify(mediaStore).delete("check-ins/2026/09/uuid.png", null);
         }
     }
 
@@ -566,7 +574,15 @@ class CheckInServiceTest {
 
     private static CheckIn checkIn(long id, long challengeId, LocalDate businessDate) {
         CheckIn checkIn = new CheckIn(
-                challengeId, USER_ID, 1, CheckInType.PHOTO, "check-ins/k.png", MediaType.IMAGE, null, businessDate);
+                challengeId,
+                USER_ID,
+                1,
+                CheckInType.PHOTO,
+                "check-ins/k.png",
+                MediaType.IMAGE,
+                null,
+                null,
+                businessDate);
         ReflectionTestUtils.setField(checkIn, "id", id);
         return checkIn;
     }

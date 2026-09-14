@@ -27,6 +27,17 @@ public class CheckInMediaController {
     @GetMapping("/api/check-ins/{checkInId}/media")
     public ResponseEntity<Resource> get(@CurrentUser SecurityUser actor, @PathVariable Long checkInId) {
         Resource resource = checkInService.loadCheckInMedia(actor.getId(), checkInId);
+        return withContentType(resource);
+    }
+
+    @Operation(summary = "영상 체크인 썸네일 조회")
+    @GetMapping("/api/check-ins/{checkInId}/media/poster")
+    public ResponseEntity<Resource> getPoster(@CurrentUser SecurityUser actor, @PathVariable Long checkInId) {
+        Resource resource = checkInService.loadCheckInPoster(actor.getId(), checkInId);
+        return withContentType(resource);
+    }
+
+    private ResponseEntity<Resource> withContentType(Resource resource) {
         MediaType contentType =
                 MediaTypeFactory.getMediaType(resource.getFilename()).orElse(MediaType.APPLICATION_OCTET_STREAM);
         return ResponseEntity.ok().contentType(contentType).body(resource);

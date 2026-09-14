@@ -1,5 +1,6 @@
 package com.gommit.domain.checkin.support;
 
+import com.gommit.domain.checkin.entity.MediaType;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
@@ -8,10 +9,8 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 import javax.imageio.ImageIO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,18 +38,29 @@ public class DailyLogMontageBuilder {
     private static final long CONCAT_TIMEOUT_SECONDS = 15;
 
     private final String ffmpegPath;
+    private final FfmpegProcessRunner processRunner;
 
-    public DailyLogMontageBuilder(@Value("${app.dailylog.ffmpeg-path:ffmpeg}") String ffmpegPath) {
+    public DailyLogMontageBuilder(
+            @Value("${app.dailylog.ffmpeg-path:ffmpeg}") String ffmpegPath, FfmpegProcessRunner processRunner) {
         this.ffmpegPath = ffmpegPath;
+        this.processRunner = processRunner;
     }
 
-    public enum Kind {
-        IMAGE,
-        VIDEO
+    // 그리드 한 칸이 정지 이미지인지 영상인지
+    public enum Motion {
+        STILL,
+        VIDEO;
+
+        public static Motion from(MediaType mediaType) {
+            return switch (mediaType) {
+                case IMAGE -> STILL;
+                case VIDEO -> Motion.VIDEO;
+            };
+        }
     }
 
     // 그리드 한 칸에 들어갈 미디어. extension 은 ffmpeg 이 디코더를 고르는 데 쓰인다(원본 확장자 그대로 넘긴다).
-    public record Frame(Resource resource, String extension, Kind kind) {}
+    public record Frame(Resource resource, String extension, Motion motion) {}
 
     // 캔버스 가로 = CANVAS_WIDTH(1280) 고정. 칸은 정사각(cellSize = CANVAS_WIDTH / cols), 세로 = rows * cellSize.
     // N=5 는 6칸 레이아웃을 쓰고 마지막 1칸은 항상 검정(gridCells > cellCount).
@@ -85,26 +95,24 @@ public class DailyLogMontageBuilder {
         Layout layout = Layout.forCells(cellCount);
         List<Frame> flat = flatten(cellCount, layout, rounds); // (회차 × gridCells) 순서, null = 검정 칸
 
-        Path workDir = null;
         try {
-            workDir = Files.createTempDirectory("dailylog-montage-");
-            List<String> inputNames = writeFrames(workDir, flat, layout.cellSize());
-            Path output = workDir.resolve("out.mp4");
+            return processRunner.withTempWorkDir("dailylog-montage-", workDir -> {
+                List<String> inputNames = writeFrames(workDir, flat, layout.cellSize());
+                Path output = workDir.resolve("out.mp4");
 
-            int exitCode = runFfmpeg(workDir, layout, rounds.size(), flat, inputNames, output);
-            if (exitCode != 0 || !Files.exists(output)) {
-                log.warn("ffmpeg 몽타주 생성 실패 (exitCode={})", exitCode);
-                return Optional.empty();
-            }
-            return Optional.of(Files.readAllBytes(output));
+                int exitCode = runFfmpeg(workDir, layout, rounds.size(), flat, inputNames, output);
+                if (exitCode != 0 || !Files.exists(output)) {
+                    log.warn("ffmpeg 몽타주 생성 실패 (exitCode={})", exitCode);
+                    return Optional.<byte[]>empty();
+                }
+                return Optional.of(Files.readAllBytes(output));
+            });
         } catch (IOException e) {
             log.warn("ffmpeg 실행 불가 — 몽타주 생성 건너뜀 (배포 이미지에 ffmpeg 없을 수 있음)", e);
             return Optional.empty();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return Optional.empty();
-        } finally {
-            deleteRecursively(workDir);
         }
     }
 
@@ -122,6 +130,10 @@ public class DailyLogMontageBuilder {
     // ffmpeg 가 그 해상도 그대로 디코드해 xstack framesync 가 큰 프레임을 버퍼링 — 회차당
     // RSS 가 수백MB~1GB 로 뛰는 원인이었다(2026-09-11 실측). 여기서 미리 줄여두면 ffmpeg 는
     // 이미 셀 크기인 작은 이미지만 디코드한다.
+    // 영상 칸은 같은 방식(ImageIO 디코드)으로 사전 다운스케일할 수 없어(별도 ffmpeg 패스가 필요) 원본
+    // 그대로 넘긴다 — 그래도 CheckInVideoTranscoder 가 업로드 시점에 이미 1080x1080 로 강제 재인코딩해
+    // 두므로, 사진처럼 "최대 수천px" 원본이 들어올 일이 없다. 최종 셀 크기 정규화는 buildRoundFilter 의
+    // scale+crop 이 모든 칸에 동일하게 적용한다.
     private List<String> writeFrames(Path workDir, List<Frame> flat, int cellSize) throws IOException {
         List<String> names = new ArrayList<>();
         int idx = 0;
@@ -131,12 +143,11 @@ public class DailyLogMontageBuilder {
                 idx++;
                 continue;
             }
-            if (frame.kind() == Kind.IMAGE) {
+            if (frame.motion() == Motion.STILL) {
                 String name = "frame_%04d.jpg".formatted(idx++);
                 writeDownscaledImage(frame.resource(), workDir.resolve(name), cellSize);
                 names.add(name);
             } else {
-                // 동영상 칸: 현재 미사용 경로(NOTE 참고) — 다운스케일 없이 원본 그대로.
                 String name = "frame_%04d.%s".formatted(idx++, frame.extension());
                 try (InputStream in = frame.resource().getInputStream()) {
                     Files.copy(in, workDir.resolve(name));
@@ -219,8 +230,7 @@ public class DailyLogMontageBuilder {
                 command.add(String.valueOf(ROUND_SECONDS));
                 command.add("-i");
                 command.add("color=c=black:s=%dx%d:r=%d".formatted(layout.cellSize(), layout.cellSize(), FPS));
-            } else if (frame.kind() == Kind.VIDEO) {
-                // NOTE: 현재 MediaType 에 VIDEO 가 없어 이 경로는 미사용 — 동영상 인증 도입 시 실제 클립으로 검증 필요.
+            } else if (frame.motion() == Motion.VIDEO) {
                 command.add("-t");
                 command.add(String.valueOf(ROUND_SECONDS));
                 command.add("-i");
@@ -245,7 +255,7 @@ public class DailyLogMontageBuilder {
         command.add("-preset");
         command.add(PRESET);
         command.add(output.getFileName().toString());
-        return run(workDir, command, ROUND_TIMEOUT_SECONDS);
+        return processRunner.run(workDir, command, ROUND_TIMEOUT_SECONDS);
     }
 
     // 스트림 복사(-c copy)만 하므로 재인코딩 없음 — 메모리·시간 거의 안 든다.
@@ -270,24 +280,7 @@ public class DailyLogMontageBuilder {
                 "-movflags",
                 "+faststart",
                 output.getFileName().toString());
-        return run(workDir, command, CONCAT_TIMEOUT_SECONDS);
-    }
-
-    // 출력을 버린다(DISCARD) — 부모가 stdout/stderr 를 읽어가지 않으면 OS 파이프 버퍼가 차면서
-    // ffmpeg 가 write 블로킹될 수 있다. 로그 소비처가 없어 병합(redirectErrorStream) 대신 폐기한다.
-    private int run(Path workDir, List<String> command, long timeoutSeconds) throws IOException, InterruptedException {
-        Process process = new ProcessBuilder(command)
-                .directory(workDir.toFile())
-                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-                .redirectError(ProcessBuilder.Redirect.DISCARD)
-                .start();
-        boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
-        if (!finished) {
-            process.destroyForcibly();
-            log.warn("ffmpeg 타임아웃 ({}초)", timeoutSeconds);
-            return -1;
-        }
-        return process.exitValue();
+        return processRunner.run(workDir, command, CONCAT_TIMEOUT_SECONDS);
     }
 
     // 칸별 cover 정규화(짧은 변을 셀에 맞춰 스케일 후 중앙 crop, 동영상은 tpad 로 길이 보정) → xstack 그리드 한 장.
@@ -313,12 +306,8 @@ public class DailyLogMontageBuilder {
                     .append(",setsar=1,fps=")
                     .append(FPS);
             Frame frame = roundFrames.get(i);
-            if (frame != null && frame.kind() == Kind.VIDEO) {
-                sb.append(",tpad=stop_mode=clone:stop_duration=")
-                        .append(ROUND_SECONDS)
-                        .append(",trim=duration=")
-                        .append(ROUND_SECONDS)
-                        .append(",setpts=PTS-STARTPTS");
+            if (frame != null && frame.motion() == Motion.VIDEO) {
+                sb.append(',').append(FfmpegProcessRunner.padAndTrimFilter(ROUND_SECONDS));
             }
             sb.append("[c").append(i).append("];");
         }
@@ -351,22 +340,5 @@ public class DailyLogMontageBuilder {
             sb.append(x).append('_').append(y);
         }
         return sb.toString();
-    }
-
-    private void deleteRecursively(Path dir) {
-        if (dir == null) {
-            return;
-        }
-        try (var paths = Files.walk(dir)) {
-            paths.sorted(Comparator.reverseOrder()).forEach(p -> {
-                try {
-                    Files.deleteIfExists(p);
-                } catch (IOException ignored) {
-                    // best-effort 정리
-                }
-            });
-        } catch (IOException ignored) {
-            // best-effort 정리
-        }
     }
 }

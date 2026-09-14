@@ -16,6 +16,7 @@ public record CheckInResponse(
         CheckInType checkInType,
         String mediaUrl,
         MediaType mediaType,
+        String posterUrl,
         String memo,
         LocalDateTime createdAt) {
 
@@ -29,6 +30,7 @@ public record CheckInResponse(
                 checkIn.getCheckInType(),
                 CheckInMediaUrl.of(checkIn.getId()),
                 checkIn.getMediaType(),
+                CheckInMediaUrl.posterOfOrNull(checkIn.getId(), checkIn.hasPoster()),
                 checkIn.getMemo(),
                 checkIn.getCreatedAt());
     }

@@ -4,6 +4,7 @@ import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.global.base.BaseEntity;
 import jakarta.persistence.*;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -60,6 +61,9 @@ public class Challenge extends BaseEntity {
     @Column(nullable = false)
     private boolean allowPhoto;
 
+    @Column(nullable = false)
+    private boolean allowVideo;
+
     @Builder
     public Challenge(
             Long groupId,
@@ -73,7 +77,8 @@ public class Challenge extends BaseEntity {
             int requiredDayCount,
             int groupCurrentStreak,
             int groupBestStreak,
-            boolean allowPhoto) {
+            boolean allowPhoto,
+            boolean allowVideo) {
         this.groupId = groupId;
         this.seqNo = seqNo;
         this.startDate = startDate;
@@ -87,6 +92,7 @@ public class Challenge extends BaseEntity {
         this.groupCurrentStreak = groupCurrentStreak;
         this.groupBestStreak = groupBestStreak;
         this.allowPhoto = allowPhoto;
+        this.allowVideo = allowVideo;
     }
 
     public void updateSettings(
@@ -97,7 +103,8 @@ public class Challenge extends BaseEntity {
             String daysOfWeek,
             int dailyCheckInCount,
             int requiredDayCount,
-            boolean allowPhoto) {
+            boolean allowPhoto,
+            boolean allowVideo) {
         this.startDate = startDate;
         this.endDate = endDate;
         this.frequencyType = frequencyType;
@@ -106,11 +113,18 @@ public class Challenge extends BaseEntity {
         this.dailyCheckInCount = dailyCheckInCount;
         this.requiredDayCount = requiredDayCount;
         this.allowPhoto = allowPhoto;
+        this.allowVideo = allowVideo;
     }
 
-    // 이 챌린지가 허용하는 인증 방식 목록. 현재는 사진 허용 여부만 저장한다.
     public List<CheckInType> allowedCheckInTypes() {
-        return allowPhoto ? List.of(CheckInType.PHOTO) : List.of();
+        List<CheckInType> types = new ArrayList<>();
+        if (allowPhoto) {
+            types.add(CheckInType.PHOTO);
+        }
+        if (allowVideo) {
+            types.add(CheckInType.VIDEO);
+        }
+        return types;
     }
 
     public void activate() {

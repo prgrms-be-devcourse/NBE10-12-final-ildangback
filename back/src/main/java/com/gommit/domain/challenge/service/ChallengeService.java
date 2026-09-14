@@ -53,6 +53,7 @@ public class ChallengeService {
         // DB (String) 저장을 위해 List를 문자열로 변환
         String daysOfWeek = convertDaysOfWeek(setting.daysOfWeek());
         boolean allowPhoto = setting.allowedTypes().contains(CheckInType.PHOTO);
+        boolean allowVideo = setting.allowedTypes().contains(CheckInType.VIDEO);
         Challenge challenge = Challenge.builder()
                 .groupId(groupId)
                 .seqNo(1)
@@ -66,6 +67,7 @@ public class ChallengeService {
                 .groupCurrentStreak(0)
                 .groupBestStreak(0)
                 .allowPhoto(allowPhoto)
+                .allowVideo(allowVideo)
                 .build();
         Challenge savedChallenge = challengeRepository.save(challenge);
         challengeMemberService.createChallengeMember(savedChallenge, userId, ChallengeMemberRole.OWNER);
@@ -193,13 +195,13 @@ public class ChallengeService {
         if (dailyCheckInCount < 1 || dailyCheckInCount > 10) {
             throw new BusinessException(ErrorCode.INVALID_DAILY_COUNT);
         }
-        List<CheckInType> allowedTypes = request.allowedTypes() != null
-                ? request.allowedTypes()
-                : challenge.isAllowPhoto() ? List.of(CheckInType.PHOTO) : List.of();
+        List<CheckInType> allowedTypes =
+                request.allowedTypes() != null ? request.allowedTypes() : challenge.allowedCheckInTypes();
         if (allowedTypes.isEmpty()) {
             throw new BusinessException(ErrorCode.NO_CHECK_IN_METHOD);
         }
         boolean allowPhoto = allowedTypes.contains(CheckInType.PHOTO);
+        boolean allowVideo = allowedTypes.contains(CheckInType.VIDEO);
         int requiredDayCount = challengeProgressCalculator.calculateRequiredDayCount(
                 startDate, endDate, frequencyType, frequencyValue, daysOfWeek);
         String dayOfWeekValue = convertDaysOfWeek(daysOfWeek);
@@ -211,7 +213,8 @@ public class ChallengeService {
                 dayOfWeekValue,
                 dailyCheckInCount,
                 requiredDayCount,
-                allowPhoto);
+                allowPhoto,
+                allowVideo);
         return new ChallengeUpdateResponse(
                 challenge.getId(),
                 startDate,

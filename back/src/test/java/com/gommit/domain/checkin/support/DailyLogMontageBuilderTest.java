@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.gommit.domain.checkin.support.DailyLogMontageBuilder.Frame;
-import com.gommit.domain.checkin.support.DailyLogMontageBuilder.Kind;
 import com.gommit.domain.checkin.support.DailyLogMontageBuilder.Layout;
+import com.gommit.domain.checkin.support.DailyLogMontageBuilder.Motion;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -21,7 +21,7 @@ import org.springframework.core.io.ByteArrayResource;
 class DailyLogMontageBuilderTest {
 
     private static Frame image() {
-        return new Frame(new ByteArrayResource(new byte[] {1, 2, 3}), "png", Kind.IMAGE);
+        return new Frame(new ByteArrayResource(new byte[] {1, 2, 3}), "png", Motion.STILL);
     }
 
     private static List<Frame> slots(Frame... frames) {
@@ -35,7 +35,7 @@ class DailyLogMontageBuilderTest {
         @Test
         @DisplayName("회차가 없으면 서브프로세스를 띄우지 않고 즉시 빈 값을 반환한다")
         void emptyRoundsReturnsEmpty() {
-            DailyLogMontageBuilder builder = new DailyLogMontageBuilder("ffmpeg");
+            DailyLogMontageBuilder builder = new DailyLogMontageBuilder("ffmpeg", new FfmpegProcessRunner());
 
             assertThat(builder.build(2, List.of())).isEmpty();
         }
@@ -44,7 +44,7 @@ class DailyLogMontageBuilderTest {
         @ValueSource(ints = {0, 7})
         @DisplayName("칸 수가 1~6 밖이면 빈 값을 반환한다")
         void cellCountOutOfRangeReturnsEmpty(int cellCount) {
-            DailyLogMontageBuilder builder = new DailyLogMontageBuilder("ffmpeg");
+            DailyLogMontageBuilder builder = new DailyLogMontageBuilder("ffmpeg", new FfmpegProcessRunner());
 
             assertThat(builder.build(cellCount, List.of(slots(image())))).isEmpty();
         }
@@ -52,7 +52,8 @@ class DailyLogMontageBuilderTest {
         @Test
         @DisplayName("ffmpeg 실행 파일이 없으면 예외 없이 빈 값으로 graceful degrade 한다")
         void missingFfmpegGracefullyDegrades() {
-            DailyLogMontageBuilder builder = new DailyLogMontageBuilder("/no/such/ffmpeg-binary-xyz");
+            DailyLogMontageBuilder builder =
+                    new DailyLogMontageBuilder("/no/such/ffmpeg-binary-xyz", new FfmpegProcessRunner());
 
             Optional<byte[]> result = builder.build(2, List.of(slots(image(), null)));
 

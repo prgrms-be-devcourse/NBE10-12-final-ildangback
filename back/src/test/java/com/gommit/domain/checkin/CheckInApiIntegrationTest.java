@@ -15,12 +15,14 @@ import com.gommit.domain.media.service.StorageService;
 import com.gommit.domain.media.support.MediaContentType;
 import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.global.exception.BusinessException;
+import com.gommit.global.time.BusinessDayCutoff;
 import com.gommit.support.IntegrationTestSupport;
 import com.jayway.jsonpath.JsonPath;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -842,7 +844,9 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
             var owner = loginAs(EMAIL, NICKNAME);
             long challengeId = setUpChallenge(EMAIL, 2);
             submit(challengeId, owner.accessToken());
-            LocalDate today = LocalDate.now();
+            // businessDate 는 자정이 아니라 04:00 컷오프 기준(BusinessDayCutoff) — 00:00~03:59 사이엔
+            // 달력상 오늘(LocalDate.now())과 다르다. submit() 이 실제로 쓴 것과 같은 방식으로 구해야 한다.
+            LocalDate today = BusinessDayCutoff.of(LocalDateTime.now());
 
             mockMvc.perform(withToken(
                             get("/api/challenges/{challengeId}/daily-logs/{date}", challengeId, today),

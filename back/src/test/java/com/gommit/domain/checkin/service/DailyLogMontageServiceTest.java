@@ -100,7 +100,13 @@ class DailyLogMontageServiceTest {
     }
 
     private CheckIn checkIn(long userId, int roundNo, String mediaKey) {
-        return new CheckIn(CHALLENGE_ID, userId, roundNo, CheckInType.PHOTO, mediaKey, MediaType.IMAGE, null, DATE);
+        return new CheckIn(
+                CHALLENGE_ID, userId, roundNo, CheckInType.PHOTO, mediaKey, MediaType.IMAGE, null, null, DATE);
+    }
+
+    private CheckIn videoCheckIn(long userId, int roundNo, String mediaKey) {
+        return new CheckIn(
+                CHALLENGE_ID, userId, roundNo, CheckInType.VIDEO, mediaKey, MediaType.VIDEO, null, null, DATE);
     }
 
     @SuppressWarnings("unchecked")
@@ -124,6 +130,22 @@ class DailyLogMontageServiceTest {
         assertThat(rounds).hasSize(2);
         assertThat(rounds).allSatisfy(slots -> assertThat(slots).hasSize(2).doesNotContainNull());
         assertThat(dailyLog.getVideoKey()).isEqualTo("video-key");
+    }
+
+    @Test
+    @DisplayName("영상 체크인은 Motion.VIDEO 로, 이미지 체크인은 Motion.STILL 로 매핑된다")
+    void mapsVideoAndImageCheckInsToMotion() {
+        snapshot(activeMember(10L, challenge, 100L), activeMember(20L, challenge, 200L));
+        checkIns(checkIn(100L, 1), videoCheckIn(200L, 1, "check-ins/clip.mp4"));
+        when(montageBuilder.build(anyInt(), any())).thenReturn(Optional.empty());
+
+        service.generateMontage(CHALLENGE_ID, DATE);
+
+        List<List<Frame>> rounds = captureRounds(2);
+        List<Frame> round = rounds.get(0);
+        assertThat(round.get(0).motion()).isEqualTo(DailyLogMontageBuilder.Motion.STILL);
+        assertThat(round.get(1).motion()).isEqualTo(DailyLogMontageBuilder.Motion.VIDEO);
+        assertThat(round.get(1).extension()).isEqualTo("mp4");
     }
 
     @Test

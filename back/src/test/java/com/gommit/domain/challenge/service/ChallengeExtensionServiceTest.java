@@ -310,6 +310,7 @@ class ChallengeExtensionServiceTest {
         void createsNextChallengeWithCurrentOwner() {
             // given
             Challenge challenge = challenge(50L, ChallengeStatus.ACTIVE);
+            ReflectionTestUtils.setField(challenge, "allowVideo", true); // 이전 시즌 VIDEO 허용 설정
             ChallengeMember owner = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
             ChallengeMember member = challengeMember(71L, challenge, 2L, ChallengeMemberRole.MEMBER);
             owner.changeExtensionChoice(ExtensionChoice.EXTEND);
@@ -338,6 +339,8 @@ class ChallengeExtensionServiceTest {
             assertThat(captor.getValue().getSeqNo()).isEqualTo(2);
             assertThat(captor.getValue().getStartDate())
                     .isEqualTo(challenge.getEndDate().plusDays(1));
+            // 이전 시즌의 VIDEO 허용 설정도 다음 시즌으로 그대로 넘어가야 한다(allowPhoto 만 복사하던 누락 방지).
+            assertThat(captor.getValue().isAllowVideo()).isTrue();
             verify(challengeMemberService).createChallengeMember(savedNextChallenge, 1L, ChallengeMemberRole.OWNER);
             verify(challengeMemberService).createChallengeMember(savedNextChallenge, 2L, ChallengeMemberRole.MEMBER);
         }

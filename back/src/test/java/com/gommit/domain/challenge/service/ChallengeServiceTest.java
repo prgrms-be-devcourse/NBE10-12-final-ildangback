@@ -324,6 +324,8 @@ class ChallengeServiceTest {
             assertThat(captor.getValue().getRequiredDayCount()).isEqualTo(3);
             assertThat(captor.getValue().getDaysOfWeek()).isEqualTo("MON,WED,FRI");
             assertThat(captor.getValue().isAllowPhoto()).isFalse();
+            // PHOTO 가 아닌 인증 방식(VIDEO)도 버려지지 않고 저장돼야 한다.
+            assertThat(captor.getValue().allowedCheckInTypes()).containsExactly(CheckInType.VIDEO);
         }
 
         @Test
@@ -799,6 +801,25 @@ class ChallengeServiceTest {
             // when & then
             assertBusinessException(
                     () -> challengeService.updateChallenge(50L, 1L, request), ErrorCode.NO_CHECK_IN_METHOD);
+        }
+
+        @Test
+        @DisplayName("요청에 인증 방식이 없으면 PHOTO 뿐 아니라 기존에 허용해 둔 VIDEO 도 그대로 유지한다")
+        void keepsExistingVideoPermissionWhenAllowedTypesOmitted() {
+            // given
+            Challenge challenge = challenge(50L, ChallengeStatus.READY);
+            ReflectionTestUtils.setField(challenge, "allowVideo", true);
+            ChallengeMember owner = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
+            LocalDate endDate = challenge.getStartDate().plusDays(9);
+            ChallengeUpdateRequest request = new ChallengeUpdateRequest(null, endDate, null, null, null, null, null);
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(owner));
+
+            // when
+            challengeService.updateChallenge(50L, 1L, request);
+
+            // then
+            assertThat(challenge.allowedCheckInTypes()).containsExactly(CheckInType.PHOTO, CheckInType.VIDEO);
         }
 
         @Test

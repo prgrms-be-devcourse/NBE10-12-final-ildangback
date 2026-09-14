@@ -4,14 +4,12 @@ import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.checkin.entity.CheckIn;
 import com.gommit.domain.checkin.entity.DailyLog;
-import com.gommit.domain.checkin.entity.MediaType;
 import com.gommit.domain.checkin.media.CheckInMediaStore;
 import com.gommit.domain.checkin.media.DailyLogMediaStore;
 import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.checkin.repository.DailyLogRepository;
 import com.gommit.domain.checkin.support.DailyLogMontageBuilder;
 import com.gommit.domain.checkin.support.DailyLogMontageBuilder.Frame;
-import com.gommit.domain.checkin.support.DailyLogMontageBuilder.Kind;
 import com.gommit.global.time.BusinessDayCutoff;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -134,7 +132,7 @@ public class DailyLogMontageService {
                         new Frame(
                                 checkInMediaStore.load(checkIn.getMediaKey()),
                                 extensionOf(checkIn.getMediaKey()),
-                                kindOf(checkIn.getMediaType())));
+                                DailyLogMontageBuilder.Motion.from(checkIn.getMediaType())));
                 anyMapped = true;
             }
             if (anyMapped) {
@@ -142,12 +140,6 @@ public class DailyLogMontageService {
             }
         }
         return rounds;
-    }
-
-    private static Kind kindOf(MediaType mediaType) {
-        return switch (mediaType) {
-            case IMAGE -> Kind.IMAGE;
-        };
     }
 
     private static String extensionOf(String storageKey) {
