@@ -87,7 +87,6 @@ public class OwnerKickVoteService {
         }
 
         if (group.isKickVoteExpired(kickVoteExpiryHours)) {
-            resetVoteData(group, groupId);
             throw new BusinessException(ErrorCode.KICK_VOTE_EXPIRED);
         }
 
@@ -106,18 +105,12 @@ public class OwnerKickVoteService {
     }
 
     // ── 투표 현황 조회 ────────────────────────────────────────────────────────
-    @Transactional
     public KickVoteStatusResponse getVoteStatus(Long groupId, Long requesterId) {
         ChallengeGroup group = challengeGroupRepository
                 .findById(groupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_NOT_FOUND));
 
         getActiveMember(groupId, requesterId);
-
-        // 만료된 투표는 조회 시점에 조용히 정리하고 inProgress=false 로 반환한다
-        if (group.hasActiveKickVote() && group.isKickVoteExpired(kickVoteExpiryHours)) {
-            resetVoteData(group, groupId);
-        }
 
         return buildResponse(group, groupId, group.getOwnerId(), requesterId);
     }
@@ -303,10 +296,11 @@ public class OwnerKickVoteService {
         LocalDateTime expiresAt =
                 group.hasActiveKickVote() ? group.getKickVoteStartedAt().plusHours(kickVoteExpiryHours) : null;
 
+        boolean inProgress = group.hasActiveKickVote() && !group.isKickVoteExpired(kickVoteExpiryHours);
         return new KickVoteStatusResponse(
                 groupId,
                 targetOwnerId,
-                group.hasActiveKickVote(),
+                inProgress,
                 agree,
                 disagree,
                 (int) totalActive - 1,

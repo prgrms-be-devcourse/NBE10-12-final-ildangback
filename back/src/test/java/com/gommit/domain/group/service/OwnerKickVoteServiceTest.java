@@ -325,7 +325,7 @@ class OwnerKickVoteServiceTest {
         }
 
         @Test
-        @DisplayName("투표 기간이 만료됐으면 투표를 초기화하고 KICK_VOTE_EXPIRED")
+        @DisplayName("투표 기간이 만료됐으면 KICK_VOTE_EXPIRED를 던진다")
         void expiredVote() {
             ChallengeGroup group = group(12L, 1L);
             group.startKickVote();
@@ -338,8 +338,6 @@ class OwnerKickVoteServiceTest {
 
             assertBusinessException(
                     () -> ownerKickVoteService.castVote(12L, 2L, KickVoteChoice.AGREE), ErrorCode.KICK_VOTE_EXPIRED);
-            assertThat(group.hasActiveKickVote()).isFalse();
-            verify(groupMemberRepository).resetAllKickVoteChoices(12L, KickVoteChoice.NONE);
         }
 
         @Test
@@ -560,7 +558,7 @@ class OwnerKickVoteServiceTest {
         }
 
         @Test
-        @DisplayName("투표 기간이 만료됐으면 초기화하고 inProgress=false 로 반환한다")
+        @DisplayName("투표 기간이 만료됐으면 inProgress=false 로 반환한다")
         void expiredVote() {
             ChallengeGroup group = group(12L, 1L);
             group.startKickVote();
@@ -574,8 +572,6 @@ class OwnerKickVoteServiceTest {
             var response = ownerKickVoteService.getVoteStatus(12L, 2L);
 
             assertThat(response.inProgress()).isFalse();
-            assertThat(group.hasActiveKickVote()).isFalse();
-            verify(groupMemberRepository).resetAllKickVoteChoices(12L, KickVoteChoice.NONE);
         }
 
         @Test
