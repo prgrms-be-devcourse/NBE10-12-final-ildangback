@@ -24,6 +24,7 @@ class MediaValidatorTest {
     // 유효한 매직바이트 프리픽스
     private static final byte[] PNG_MAGIC = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
     private static final byte[] JPEG_MAGIC = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
+    private static final byte[] WEBM_MAGIC = {0x1A, 0x45, (byte) 0xDF, (byte) 0xA3};
 
     private final MediaValidator validator = new MediaValidator(properties(DataSize.ofMegabytes(5)));
 
@@ -88,6 +89,16 @@ class MediaValidatorTest {
                     .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                             .isEqualTo(ErrorCode.UNSUPPORTED_MEDIA_TYPE));
         }
+
+        @Test
+        @DisplayName("정책은 코덱 파라미터 없는 바탕 타입(video/webm)만 허용해도, 브라우저가 실제로 보내는" + " video/webm;codecs=vp9 선언은 정규화해서 통과시킨다")
+        void allowsRealBrowserContentTypeWithCodecParams() {
+            MediaValidator videoValidator = new MediaValidator(videoProperties());
+            MockMultipartFile clip =
+                    new MockMultipartFile("file", "clip.webm", "video/webm;codecs=vp9,opus", padded(WEBM_MAGIC, 32));
+            assertThatCode(() -> videoValidator.validate(clip, MediaRole.CHECKIN))
+                    .doesNotThrowAnyException();
+        }
     }
 
     @Test
@@ -112,6 +123,21 @@ class MediaValidatorTest {
                                 DataSize.ofMegabytes(5),
                                 Visibility.PUBLIC,
                                 Set.of("image/png", "image/jpeg", "image/webp"))));
+    }
+
+    // 실제 CHECKIN 정책(application.yml)처럼 이미지+영상 바탕 타입을 같이 허용한 버전.
+    private static MediaStorageProperties videoProperties() {
+        return new MediaStorageProperties(
+                "local",
+                new MediaStorageProperties.LocalPaths("./x", "http://localhost/media"),
+                null,
+                Map.of(
+                        MediaRole.CHECKIN,
+                        new StoragePolicy(
+                                "check-ins",
+                                DataSize.ofMegabytes(10),
+                                Visibility.PRIVATE,
+                                Set.of("image/png", "image/jpeg", "image/webp", "video/mp4", "video/webm"))));
     }
 
     // magic 뒤에 0 을 채워 원하는 길이로 만든다 (검증기는 선두 12바이트만 읽는다).

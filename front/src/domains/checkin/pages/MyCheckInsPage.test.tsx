@@ -22,6 +22,7 @@ function myCheckIn(over: Partial<MyCheckIn> = {}): MyCheckIn {
     checkInType: "PHOTO",
     mediaUrl: "https://cdn/1.jpg",
     mediaType: "IMAGE",
+    posterUrl: null,
     memo: null,
     createdAt: "2026-09-02T09:00:00",
     challengeId: 1,

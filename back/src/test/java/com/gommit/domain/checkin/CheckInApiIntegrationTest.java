@@ -10,12 +10,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.gommit.domain.checkin.dto.request.SubmitCheckInRequest;
 import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.domain.checkin.service.CheckInService;
+import com.gommit.domain.checkin.support.AbstractFfmpegTest;
 import com.gommit.domain.media.entity.MediaRole;
 import com.gommit.domain.media.service.StorageService;
 import com.gommit.domain.media.support.MediaContentType;
 import com.gommit.domain.point.service.PersonalPointService;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.time.BusinessClock;
+import com.gommit.support.ChallengeFixtures;
 import com.gommit.support.IntegrationTestSupport;
 import com.jayway.jsonpath.JsonPath;
 import java.io.IOException;
@@ -80,54 +82,26 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
         }
     }
 
-    // ===== 시딩 (challenge 도메인에 생성 로직이 없어 직접 넣는다) =====
+    // ===== 시딩 (ChallengeFixtures 에 위임 — CheckInApiCloudinaryIntegrationTest 도 같이 쓴다) =====
 
     private long userIdOf(String email) {
-        return jdbcTemplate.queryForObject("select id from users where email = ?", Long.class, email);
+        return ChallengeFixtures.userIdOf(jdbcTemplate, email);
     }
 
     private long seedGroup(long ownerId) {
-        jdbcTemplate.update(
-                "insert into challenge_groups"
-                        + " (name, description, category, map_type, visibility, max_members, owner_id, status, created_at, updated_at)"
-                        + " values ('테스트그룹', null, 'DEV', 'STUDY_ROOM', 'PUBLIC', 10, ?, 'ACTIVE', now(6), now(6))",
-                ownerId);
-        return jdbcTemplate.queryForObject("select id from challenge_groups order by id desc limit 1", Long.class);
+        return ChallengeFixtures.seedGroup(jdbcTemplate, ownerId);
     }
 
     private long seedChallenge(long groupId, int dailyCheckInCount, String challengeStatus) {
-        jdbcTemplate.update(
-                "insert into challenges"
-                        + " (group_id, seq_no, start_date, end_date, status, frequency_type, frequency_value,"
-                        + " days_of_week, daily_check_in_count, required_day_count, group_current_streak,"
-                        + " group_best_streak, allow_photo, created_at, updated_at)"
-                        + " values (?, 1, ?, ?, ?, 'DAILY', null, null, ?, 30, 0, 0, true, now(6), now(6))",
-                groupId,
-                LocalDate.now().minusDays(10),
-                LocalDate.now().plusDays(30),
-                challengeStatus,
-                dailyCheckInCount);
-        return jdbcTemplate.queryForObject("select id from challenges order by id desc limit 1", Long.class);
+        return ChallengeFixtures.seedChallenge(jdbcTemplate, groupId, dailyCheckInCount, challengeStatus);
     }
 
     private void seedMember(long challengeId, long userId, String memberStatus, LocalDate leftOn) {
-        jdbcTemplate.update(
-                "insert into challenge_members"
-                        + " (challenge_id, user_id, role, status, current_streak, best_streak, left_at,"
-                        + " extension_choice, created_at, updated_at)"
-                        + " values (?, ?, 'MEMBER', ?, 0, 0, ?, 'PENDING', now(6), now(6))",
-                challengeId,
-                userId,
-                memberStatus,
-                leftOn == null ? null : leftOn.atStartOfDay());
+        ChallengeFixtures.seedMember(jdbcTemplate, challengeId, userId, memberStatus, leftOn);
     }
 
     private long setUpChallenge(String memberEmail, int dailyCheckInCount) {
-        long userId = userIdOf(memberEmail);
-        long groupId = seedGroup(userId);
-        long challengeId = seedChallenge(groupId, dailyCheckInCount, "ACTIVE");
-        seedMember(challengeId, userId, "ACTIVE", null);
-        return challengeId;
+        return ChallengeFixtures.setUpChallenge(jdbcTemplate, memberEmail, dailyCheckInCount);
     }
 
     // ===== 요청 헬퍼 =====
@@ -179,6 +153,8 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(jsonPath("$.checkIn.roundNo").value(1))
                     .andExpect(jsonPath("$.checkIn.nickname").value(NICKNAME))
                     .andExpect(jsonPath("$.checkIn.mediaType").value("IMAGE"))
+                    // 사진 체크인은 포스터가 없다 — posterUrl 필드가 null 로 남아야 한다.
+                    .andExpect(jsonPath("$.checkIn.posterUrl").doesNotExist())
                     .andExpect(jsonPath("$.currentCount").value(1))
                     .andExpect(jsonPath("$.targetCount").value(3))
                     .andExpect(jsonPath("$.dailyCompleted").value(false))
@@ -745,6 +721,68 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.code").value("CHECK_IN_NOT_FOUND"));
         }
+
+        @Test
+        @DisplayName("이미지 체크인의 포스터 URL 로 접근하면 404 MEDIA_NOT_FOUND")
+        void posterNotFoundForImageCheckIn() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+            long challengeId = setUpChallenge(EMAIL, 3);
+
+            long checkInId = checkInIdOf(submit(challengeId, tokens.accessToken()));
+
+            mockMvc.perform(withToken(get("/api/check-ins/{id}/media/poster", checkInId), tokens.accessToken()))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("MEDIA_NOT_FOUND"));
+        }
+    }
+
+    // 로컬 ffmpeg 로 실제 트랜스코딩까지 거치는 e2e 검증. ffmpeg 이 PATH 에 없으면(CI 등) 스킵.
+    // (CheckInVideoTranscoderTest 와 같은 스킵 방식 — 이 클래스는 IntegrationTestSupport 를 이미 상속하므로
+    // AbstractFfmpegTest 를 같이 상속할 수 없어 판정 메서드만 별도로 둔다.)
+    @Nested
+    @DisplayName("영상 인증 제출/서빙")
+    @org.junit.jupiter.api.condition.EnabledIf("com.gommit.domain.checkin.support.AbstractFfmpegTest#ffmpegAvailable")
+    class VideoSubmission {
+
+        @Test
+        @DisplayName("영상으로 제출하면 트랜스코딩·포스터 생성을 거쳐 mp4 미디어와 jpg 포스터를 서빙한다")
+        void submitVideoAndServeMediaAndPoster() throws Exception {
+            var tokens = loginAs(EMAIL, NICKNAME);
+            long challengeId = setUpChallenge(EMAIL, 3);
+            jdbcTemplate.update("update challenges set allow_video = true where id = ?", challengeId);
+
+            // 회차 길이(2초)보다 짧은 원본 — 패딩 경로까지 실제 ffmpeg 로 검증.
+            var media = new MockMultipartFile(
+                    "media", "clip.mp4", "video/mp4", AbstractFfmpegTest.syntheticVideoBytes(0.5));
+            var builder = multipart("/api/challenges/{challengeId}/check-ins", challengeId)
+                    .file(media)
+                    .param("checkInType", "VIDEO")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokens.accessToken());
+
+            ResultActions result = mockMvc.perform(builder);
+            result.andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.checkIn.mediaType").value("VIDEO"))
+                    .andExpect(jsonPath("$.checkIn.posterUrl")
+                            .value(Matchers.matchesPattern("/api/check-ins/\\d+/media/poster")));
+
+            String body = result.andReturn().getResponse().getContentAsString();
+            String mediaUrl = JsonPath.read(body, "$.checkIn.mediaUrl");
+            String posterUrl = JsonPath.read(body, "$.checkIn.posterUrl");
+
+            mockMvc.perform(withToken(get(mediaUrl), tokens.accessToken()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().contentTypeCompatibleWith("video/mp4"));
+
+            mockMvc.perform(withToken(get(posterUrl), tokens.accessToken()))
+                    .andExpect(status().isOk())
+                    .andExpect(content().contentTypeCompatibleWith("image/jpeg"));
+        }
+    }
+
+    private long checkInIdOf(ResultActions submitResult) throws Exception {
+        String body = submitResult.andReturn().getResponse().getContentAsString();
+        Number id = JsonPath.read(body, "$.checkIn.id");
+        return id.longValue();
     }
 
     @Nested
@@ -850,6 +888,8 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
             var owner = loginAs(EMAIL, NICKNAME);
             long challengeId = setUpChallenge(EMAIL, 2);
             submit(challengeId, owner.accessToken());
+            // businessDate 는 자정이 아니라 04:00 컷오프 기준 — 00:00~03:59 사이엔 달력상 오늘(LocalDate.now())과
+            // 다르다. submit() 이 실제로 쓴 것과 같은 businessClock 으로 구해야 한다.
             LocalDate today = businessClock.today();
 
             mockMvc.perform(withToken(

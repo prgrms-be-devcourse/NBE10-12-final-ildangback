@@ -9,9 +9,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.gommit.domain.checkin.entity.MediaType;
+import com.gommit.domain.checkin.support.CheckInVideoTranscoder;
+import com.gommit.domain.checkin.support.CheckInVideoTranscoder.Transcoded;
 import com.gommit.domain.media.dto.StorageResult;
 import com.gommit.domain.media.entity.MediaRole;
 import com.gommit.domain.media.service.StorageService;
+import com.gommit.domain.media.support.MediaContentType;
 import com.gommit.domain.media.support.MediaValidator;
 import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
@@ -40,25 +44,65 @@ class CheckInMediaStoreTest {
     @Mock
     private MediaValidator mediaValidator;
 
+    @Mock
+    private CheckInVideoTranscoder videoTranscoder;
+
     private CheckInMediaStore adapter;
 
     @BeforeEach
     void setUp() {
-        adapter = new CheckInMediaStore(storageService, mediaValidator);
+        adapter = new CheckInMediaStore(storageService, mediaValidator, videoTranscoder);
     }
 
     @Test
-    @DisplayName("store: validate 를 먼저 통과시킨 뒤에만 storageService.store 를 호출한다")
+    @DisplayName("store: validate 를 먼저 통과시킨 뒤에만 storageService.store 를 호출한다(이미지)")
     void storeValidatesBeforeStoring() {
         MultipartFile file = new MockMultipartFile("media", "a.png", "image/png", new byte[] {1, 2, 3});
         when(storageService.store(file, MediaRole.CHECKIN)).thenReturn(new StorageResult("check-ins/2026/09/a.png"));
 
-        String storageKey = adapter.store(file);
+        UploadedMedia uploaded = adapter.store(file);
 
-        assertThat(storageKey).isEqualTo("check-ins/2026/09/a.png");
+        assertThat(uploaded.storageKey()).isEqualTo("check-ins/2026/09/a.png");
+        assertThat(uploaded.mediaType()).isEqualTo(MediaType.IMAGE);
+        assertThat(uploaded.posterKey()).isNull();
         InOrder order = inOrder(mediaValidator, storageService);
         order.verify(mediaValidator).validate(file, MediaRole.CHECKIN);
         order.verify(storageService).store(file, MediaRole.CHECKIN);
+        verify(videoTranscoder, never()).transcode(any(), any());
+    }
+
+    @Test
+    @DisplayName("store: 영상은 트랜스코드 후 영상·포스터를 각각 storageService 에 저장한다")
+    void storeTranscodesVideoAndStoresPoster() {
+        MultipartFile file = new MockMultipartFile("media", "a.webm", "video/webm", new byte[] {1, 2, 3});
+        when(videoTranscoder.transcode(file, "webm")).thenReturn(new Transcoded(new byte[] {9, 9}, new byte[] {8, 8}));
+        when(storageService.storeGenerated(new byte[] {9, 9}, MediaContentType.MP4, MediaRole.CHECKIN))
+                .thenReturn(new StorageResult("check-ins/2026/09/clip.mp4"));
+        when(storageService.storeGenerated(new byte[] {8, 8}, MediaContentType.JPEG, MediaRole.CHECKIN))
+                .thenReturn(new StorageResult("check-ins/2026/09/clip-poster.jpg"));
+
+        UploadedMedia uploaded = adapter.store(file);
+
+        assertThat(uploaded.storageKey()).isEqualTo("check-ins/2026/09/clip.mp4");
+        assertThat(uploaded.mediaType()).isEqualTo(MediaType.VIDEO);
+        assertThat(uploaded.posterKey()).isEqualTo("check-ins/2026/09/clip-poster.jpg");
+        verify(storageService, never()).store(any(), any());
+    }
+
+    @Test
+    @DisplayName("store: 포스터 저장이 실패하면 방금 올린 영상을 정리하고 예외를 되던진다")
+    void storeCleansUpVideoWhenPosterStorageFails() {
+        MultipartFile file = new MockMultipartFile("media", "a.mp4", "video/mp4", new byte[] {1, 2, 3});
+        when(videoTranscoder.transcode(file, "mp4")).thenReturn(new Transcoded(new byte[] {9}, new byte[] {8}));
+        when(storageService.storeGenerated(new byte[] {9}, MediaContentType.MP4, MediaRole.CHECKIN))
+                .thenReturn(new StorageResult("check-ins/2026/09/clip.mp4"));
+        RuntimeException posterFailure = new BusinessException(ErrorCode.MEDIA_STORAGE_FAILED);
+        when(storageService.storeGenerated(new byte[] {8}, MediaContentType.JPEG, MediaRole.CHECKIN))
+                .thenThrow(posterFailure);
+
+        assertThatThrownBy(() -> adapter.store(file)).isSameAs(posterFailure);
+
+        verify(storageService).delete("check-ins/2026/09/clip.mp4", MediaRole.CHECKIN);
     }
 
     @Test
@@ -71,14 +115,6 @@ class CheckInMediaStoreTest {
         assertThatThrownBy(() -> adapter.store(file)).isSameAs(validationFailure);
 
         verify(storageService, never()).store(any(), any());
-    }
-
-    @Test
-    @DisplayName("delete: MediaRole.CHECKIN 을 고정해서 storageService.delete 에 위임한다")
-    void deleteDelegatesWithCheckInRole() {
-        adapter.delete("check-ins/2026/09/a.png");
-
-        verify(storageService).delete("check-ins/2026/09/a.png", MediaRole.CHECKIN);
     }
 
     @Test

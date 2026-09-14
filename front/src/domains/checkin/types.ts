@@ -1,7 +1,7 @@
 /** checkin 도메인 응답/요청 타입. 제출 플로우 · 갤러리 탭 · 프로필 모아보기 · 일일 로그에서 쓴다. */
 
-/** 프론트는 현재 PHOTO 촬영만 지원. 백엔드 enum 엔 VIDEO·LIVE 도 있음(UI 미구현). */
-export type CheckInType = "PHOTO";
+/** 프론트는 사진·영상 촬영을 지원. 백엔드 enum 엔 LIVE 도 있음(UI 미구현). */
+export type CheckInType = "PHOTO" | "VIDEO";
 
 export type MediaType = "IMAGE" | "VIDEO";
 
@@ -14,6 +14,8 @@ export interface CheckIn {
   checkInType: CheckInType;
   mediaUrl: string;
   mediaType: MediaType;
+  /** 영상 체크인 전용 그리드 표시용 썸네일 URL. 이미지 체크인이면 null. */
+  posterUrl: string | null;
   memo: string | null;
   createdAt: string;
 }
@@ -40,7 +42,7 @@ export interface CheckInResultResponse {
   groupTotalCount: number;
 }
 
-/** 카메라에서 막 잡은 정사각 jpeg. previewUrl 은 URL.createObjectURL 결과. */
+/** 카메라에서 막 잡은 정사각 jpeg(사진) 또는 webm/mp4(영상). previewUrl 은 URL.createObjectURL 결과. */
 export interface CapturedPhoto {
   blob: Blob;
   previewUrl: string;

@@ -99,7 +99,15 @@ class ChallengeNudgeApiIntegrationTest extends IntegrationTestSupport {
     void completionPolicyAndPayload(int count) throws Exception {
         for (int round = 1; round <= count; round++) {
             checkIns.saveAndFlush(new CheckIn(
-                    challenge.getId(), receiverId, round, CheckInType.PHOTO, "test.jpg", MediaType.IMAGE, null, today));
+                    challenge.getId(),
+                    receiverId,
+                    round,
+                    CheckInType.PHOTO,
+                    "test.jpg",
+                    MediaType.IMAGE,
+                    null,
+                    null,
+                    today));
         }
         if (count == 3) {
             nudge(receiverId).andExpect(jsonPath("$.code").value("ALREADY_CHECKED_IN"));
@@ -179,7 +187,15 @@ class ChallengeNudgeApiIntegrationTest extends IntegrationTestSupport {
     void remindersExcludeCompletedInactiveAndAlreadyRemindedMembers() {
         for (int round = 1; round <= 3; round++) {
             checkIns.saveAndFlush(new CheckIn(
-                    challenge.getId(), senderId, round, CheckInType.PHOTO, "test.jpg", MediaType.IMAGE, null, today));
+                    challenge.getId(),
+                    senderId,
+                    round,
+                    CheckInType.PHOTO,
+                    "test.jpg",
+                    MediaType.IMAGE,
+                    null,
+                    null,
+                    today));
         }
         reminders.sendReminders();
         assertThat(notifications.findAll()).hasSize(1);

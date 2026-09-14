@@ -20,12 +20,22 @@ class MediaContentTypeTest {
             assertThat(MediaContentType.fromMimeType("image/jpeg")).contains(MediaContentType.JPEG);
             assertThat(MediaContentType.fromMimeType("image/webp")).contains(MediaContentType.WEBP);
             assertThat(MediaContentType.fromMimeType("video/mp4")).contains(MediaContentType.MP4);
+            assertThat(MediaContentType.fromMimeType("video/webm")).contains(MediaContentType.WEBM);
+            assertThat(MediaContentType.fromMimeType("video/quicktime")).contains(MediaContentType.MOV);
         }
 
         @Test
         @DisplayName("대소문자를 무시한다")
         void caseInsensitive() {
             assertThat(MediaContentType.fromMimeType("IMAGE/PNG")).contains(MediaContentType.PNG);
+        }
+
+        @Test
+        @DisplayName("코덱 파라미터(MediaRecorder Blob 이 붙이는 ;codecs=...)를 떼고 비교한다")
+        void stripsCodecParameter() {
+            assertThat(MediaContentType.fromMimeType("video/webm;codecs=vp9")).contains(MediaContentType.WEBM);
+            assertThat(MediaContentType.fromMimeType("video/mp4; codecs=\"avc1.42E01E\""))
+                    .contains(MediaContentType.MP4);
         }
 
         @Test
@@ -69,9 +79,11 @@ class MediaContentTypeTest {
     class Metadata {
 
         @Test
-        @DisplayName("isVideo 는 MP4 만 true")
+        @DisplayName("isVideo 는 MP4/WEBM/MOV 만 true")
         void isVideo() {
             assertThat(MediaContentType.MP4.isVideo()).isTrue();
+            assertThat(MediaContentType.WEBM.isVideo()).isTrue();
+            assertThat(MediaContentType.MOV.isVideo()).isTrue();
             assertThat(MediaContentType.PNG.isVideo()).isFalse();
             assertThat(MediaContentType.JPEG.isVideo()).isFalse();
             assertThat(MediaContentType.WEBP.isVideo()).isFalse();
@@ -122,6 +134,26 @@ class MediaContentTypeTest {
             byte[] mov = bytes(0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x71, 0x74, 0x20, 0x20); // ftyp "qt  "
             assertThat(MediaContentType.MP4.matchesSignature(heic)).isFalse();
             assertThat(MediaContentType.MP4.matchesSignature(mov)).isFalse();
+        }
+
+        @Test
+        @DisplayName("MOV 는 offset 4 에 ftyp + \"qt  \" 브랜드 — MP4 가 거부하는 바로 그 브랜드")
+        void mov() {
+            byte[] mov = bytes(0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x71, 0x74, 0x20, 0x20); // ftyp "qt  "
+            assertThat(MediaContentType.MOV.matchesSignature(mov)).isTrue();
+
+            byte[] mp4 = bytes(0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6F, 0x6D); // ftyp isom
+            assertThat(MediaContentType.MOV.matchesSignature(mp4)).isFalse();
+        }
+
+        @Test
+        @DisplayName("WEBM 은 EBML 매직넘버로 시작")
+        void webm() {
+            byte[] webm = bytes(0x1A, 0x45, 0xDF, 0xA3, 0, 0, 0, 0, 0, 0, 0, 0);
+            assertThat(MediaContentType.WEBM.matchesSignature(webm)).isTrue();
+
+            byte[] notWebm = bytes(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            assertThat(MediaContentType.WEBM.matchesSignature(notWebm)).isFalse();
         }
 
         @Test

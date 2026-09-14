@@ -1,4 +1,5 @@
 import { apiFetch } from "../../shared/api/client";
+import { extensionForMimeType } from "./lib/squareVideoCapture";
 import type {
   ChallengeAlbumSummary,
   ChallengeMember,
@@ -101,9 +102,14 @@ export function getTodayCheckInStatus(
 
 export interface SubmitCheckInInput {
   checkInType: CheckInType;
-  /** 카메라에서 만든 정사각 jpeg */
+  /** 카메라에서 만든 정사각 jpeg(사진) 또는 webm/mp4(영상) */
   media: Blob;
   memo?: string;
+}
+
+/** multipart 파일명. 확장자가 실제 콘텐츠와 달라도 안전한 이유는 {@link extensionForMimeType} 참고. */
+function mediaFileName(blob: Blob): string {
+  return `check-in.${extensionForMimeType(blob.type)}`;
 }
 
 /** POST /challenges/{challengeId}/check-ins (multipart/form-data) */
@@ -113,7 +119,7 @@ export function submitCheckIn(
 ): Promise<CheckInResultResponse> {
   const form = new FormData();
   form.append("checkInType", input.checkInType);
-  form.append("media", input.media, "check-in.jpg");
+  form.append("media", input.media, mediaFileName(input.media));
   if (input.memo) form.append("memo", input.memo);
 
   return apiFetch(`/api/challenges/${challengeId}/check-ins`, {

@@ -68,7 +68,8 @@ class GroupCompletionQueryServiceTest {
     }
 
     private CheckIn checkIn(long userId, LocalDate date, int round, LocalDateTime at) {
-        CheckIn row = new CheckIn(10L, userId, round, CheckInType.PHOTO, "test.webp", MediaType.IMAGE, null, date);
+        CheckIn row =
+                new CheckIn(10L, userId, round, CheckInType.PHOTO, "test.webp", MediaType.IMAGE, null, null, date);
         ReflectionTestUtils.setField(row, "id", nextId++);
         ReflectionTestUtils.setField(row, "createdAt", at);
         return row;

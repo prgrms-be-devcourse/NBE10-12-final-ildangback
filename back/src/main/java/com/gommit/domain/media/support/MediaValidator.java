@@ -33,13 +33,13 @@ public class MediaValidator {
             throw new BusinessException(ErrorCode.FILE_TOO_LARGE);
         }
 
-        String declaredType = file.getContentType();
-        if (declaredType == null || !policy.allowsContentType(declaredType)) {
+        // MediaContentType.fromMimeType 이 코덱 파라미터("video/webm;codecs=vp9")를 떼어내 정규화하므로,
+        // 정책 허용 여부도 선언값 그대로가 아니라 정규화된 mimeType() 으로 비교한다.
+        MediaContentType contentType = MediaContentType.fromMimeType(file.getContentType())
+                .orElseThrow(() -> new BusinessException(ErrorCode.UNSUPPORTED_MEDIA_TYPE));
+        if (!policy.allowsContentType(contentType.mimeType())) {
             throw new BusinessException(ErrorCode.UNSUPPORTED_MEDIA_TYPE);
         }
-
-        MediaContentType contentType = MediaContentType.fromMimeType(declaredType)
-                .orElseThrow(() -> new BusinessException(ErrorCode.UNSUPPORTED_MEDIA_TYPE));
 
         if (!contentType.matchesSignature(readHeader(file))) {
             throw new BusinessException(ErrorCode.UNSUPPORTED_MEDIA_TYPE);
