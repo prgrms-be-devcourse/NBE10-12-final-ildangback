@@ -181,11 +181,23 @@ public class ChallengeExtensionService {
     public void finalizeExtensionsDueToday() {
         LocalDate today = businessClock.today();
         List<Challenge> challenges = challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE);
+        // deadline이 지났으면(오늘 포함) 처리한다 - 활성화/종료 판정과 동일한 이유로
+        // 정확히 그날만 보면 안 된다.
         for (Challenge challenge : challenges) {
             LocalDate deadline = challenge.getEndDate().minusDays(2);
-            if (deadline.equals(today)) {
-                finalizeExtension(challenge.getId());
+            if (today.isBefore(deadline)) {
+                continue;
             }
+            // finalizeExtension()은 연장자가 있으면 다음 시즌을 새로 만들어서 멱등하지
+            // 않다 - 배치가 며칠 밀렸다가 한꺼번에 캐치업하면 같은 챌린지를 여러 날에
+            // 걸쳐 다시 만나므로, 이미 다음 시즌이 만들어졌으면 건너뛴다.
+            boolean alreadyFinalized = challengeRepository
+                    .findByGroupIdAndSeqNo(challenge.getGroupId(), challenge.getSeqNo() + 1)
+                    .isPresent();
+            if (alreadyFinalized) {
+                continue;
+            }
+            finalizeExtension(challenge.getId());
         }
     }
 }

@@ -105,6 +105,28 @@ cp src/infra/compose/deploy.sh .          # 이후 SSM 배포가 절대경로로
 chmod +x deploy.sh
 rsync -a src/infra/nginx/ nginx/
 rsync -a src/infra/monitoring/ monitoring/
+
+# blue-green active 색 최초 지정(1회) — nginx 가 include 하는 upstream 정의라 이거 없으면
+# nginx 기동 자체가 실패함. 이후로는 deploy.sh 가 이 파일을 읽고/새로 씀(git 비추적).
+# infra/docs/blue-green-deploy-plan-*.md 참고.
+cat > nginx/conf.d/active-backend.conf <<'EOF'
+# deploy.sh 생성 파일 — git 비추적. 활성 backend 색 = 배포 상태 그 자체.
+upstream backend {
+  server back-blue:8080;
+  keepalive 16;
+}
+EOF
+
+# 순서 기동(중요) — bare `docker compose up -d` 로 한 번에 올리지 않는다.
+# nginx 는 back-blue/back-green 에 대한 compose depends_on 이 없으므로(정적으로
+# "active 색"을 표현할 수 없어서 의도적으로 뺌), mysql → active 색(blue) → nginx
+# 순서로 직접 맞춰야 back-green 이 같이 뜨지 않고 nginx 도 콜드스타트 중에
+# proxying 을 시작하지 않는다.
+docker compose up -d mysql
+docker compose up -d --wait --wait-timeout 300 back-blue
+docker compose up -d nginx
+
+# 나머지(모니터링 등)는 순서 상관없어서 한 번에.
 docker compose up -d
 docker compose ps
 ```
@@ -174,7 +196,10 @@ sudo -u ec2-user bash /opt/team1-app/deploy.sh <이전-12자-SHA> <이전-풀-SH
 cd /opt/team1-app
 gunzip -c backups/gommit-YYYYMMDD-HHMM.sql.gz | \
   docker compose exec -T mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" gommit
-docker compose restart back
+# back 은 blue-green 이라 서비스명이 back-blue/back-green 로 나뉜다 — 지금 active 인
+# 쪽만 재시작(비활성 쪽까지 건드리면 안 쓰는 컨테이너가 괜히 뜬다).
+ACTIVE=$(grep -om1 'back-[a-z]*' nginx/conf.d/active-backend.conf)
+docker compose restart "$ACTIVE"
 ```
 
 ### 볼륨 복구 (수동 스냅샷에서)
@@ -194,7 +219,16 @@ docker compose restart back
 - **기동**: 매일 03:30 EventBridge Scheduler (`team1-ec2-start-0330`). 이미 running 이면 무시.
 - **수동 기동**: `aws ec2 start-instances --instance-ids <id> --region ap-northeast-2`
 - 기동 후 컨테이너는 `systemd team1-app.service` + `restart: unless-stopped` 로 자동 복귀.
-  안 뜨면: `sudo systemctl start team1-app` 또는 `cd /opt/team1-app && docker compose up -d`.
+  안 뜨면: `sudo systemctl start team1-app`. 그래도 안 되면 수동 기동하되 **bare `docker
+  compose up -d` 금지** — active 아닌 색(back-blue/back-green 중 하나)까지 같이 떠서
+  "평상시 한쪽만 running" 이 깨진다. active 색 확인 후 그 색만 지정:
+  ```bash
+  cd /opt/team1-app
+  grep back nginx/conf.d/active-backend.conf   # 예: back-blue
+  docker compose up -d mysql
+  docker compose up -d --wait --wait-timeout 300 back-blue   # 위에서 확인한 색으로 교체
+  docker compose up -d nginx
+  ```
 - EIP 덕분에 정지/기동 후에도 공인 IP 는 그대로 → DNS 수정 불필요.
 
 ---
@@ -208,7 +242,9 @@ aws ssm start-session --target <instance-id> --region ap-northeast-2
 
 cd /opt/team1-app
 docker compose ps
-docker compose logs -f --tail=100 back
+# back 은 blue-green(back-blue/back-green) — 지금 active 인 쪽은 conf.d/active-backend.conf 로 확인.
+grep back nginx/conf.d/active-backend.conf
+docker compose logs -f --tail=100 back-blue    # 또는 back-green, 위에서 확인한 쪽
 docker compose logs --tail=50 nginx
 docker stats --no-stream          # 메모리 압박 확인 (2GB 박스)
 free -h; swapon --show
@@ -248,9 +284,9 @@ IAM 을 나눠줄 수 없어 SSM 을 못 쓰는 운영자 1인 전용. 그 외�
 
 | 증상 | 확인 |
 |---|---|
-| 배포 실패 (health check failed) | `docker compose logs back` — Flyway/DB 연결/OOM |
-| `back` 계속 재시작 | `docker stats` 메모리, `-Xmx` 초과? `.env` DB 값? ffmpeg 겹침이면 아래 참고 |
-| `back` OOM-kill 반복 (인코딩 중) | 동시성 1 확인. 2회 이상이면 사이드카 분리 검토 — `infra-design.md` Q24 "ffmpeg 인코딩 확장 사다리" |
+| 배포 실패 (health check failed) | `docker compose logs back-blue`/`back-green`(배포 대상 색) — Flyway/DB 연결/OOM. deploy.sh 는 실패 시 active 색을 안 건드리므로 서비스는 안 끊김 |
+| `back-blue`/`back-green` 계속 재시작 | `docker stats` 메모리, `-Xmx` 초과? `.env` DB 값? ffmpeg 겹침이면 아래 참고 |
+| `back-blue`/`back-green` OOM-kill 반복 (인코딩 중) | 동시성 1 확인. 2회 이상이면 사이드카 분리 검토 — `infra-design.md` Q24 "ffmpeg 인코딩 확장 사다리" |
 | 502 from Cloudflare | nginx up? `certs/origin.*` 존재? `docker compose logs nginx` |
 | 526 (invalid SSL) from Cloudflare | Origin CA 인증서 만료/불일치, SSL 모드 Full(strict) 확인 |
 | ffmpeg 중 앱 느려짐 | 정상 (동시성 1, swap 사용). 지속되면 인코딩을 새벽으로 이동 |

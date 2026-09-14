@@ -4,10 +4,9 @@ import {
   DownloadSimpleIcon,
 } from "@phosphor-icons/react";
 import { toPng } from "html-to-image";
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { CheckInTrendChart } from "./CheckInTrendChart";
 import { MergeSummaryCard } from "./MergeSummaryCard";
-import { getCharacters } from "../../item/api";
 import { CharacterView } from "../../item/components/CharacterView";
 import { toCharacterArt } from "../../item/lib/shop";
 import { Button } from "../../../shared/ui/Button";
@@ -20,42 +19,21 @@ import type {
 type CharacterArt = Partial<Record<ItemSlot, string>>;
 
 /**
- * 참여자들의 캐릭터를 한 번에 받아 온다. 못 받아도 기본 몸통은 그려지므로
- * 머지 결과 자체는 그대로 보인다.
+ * 참여자 캐릭터는 머지 응답의 characterSlots(발행 시점 스냅샷)를 그대로 쓴다.
+ * 지금 착용 중인 옷을 실시간 조회하면 안 된다 - 그 당시 모습이 유지돼야 한다.
  */
 function useParticipantCharacters(
   participants: MergeParticipantResponse[],
 ): Record<number, CharacterArt> {
-  const [characters, setCharacters] = useState<Record<number, CharacterArt>>(
-    {},
-  );
-
-  // 배열은 렌더마다 새 참조라 id 목록을 키로 쓴다.
-  const userIdKey = participants.map((p) => p.userId).join(",");
-
-  useEffect(() => {
-    if (!userIdKey) return;
-
-    let cancelled = false;
-    getCharacters(userIdKey.split(",").map(Number))
-      .then((response) => {
-        if (cancelled) return;
-        const next: Record<number, CharacterArt> = {};
-        for (const [userId, slots] of Object.entries(response)) {
-          next[Number(userId)] = toCharacterArt(slots);
-        }
-        setCharacters(next);
-      })
-      .catch(() => {
-        // 캐릭터를 못 받아도 머지 결과는 보여준다.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [userIdKey]);
-
-  return characters;
+  return useMemo(() => {
+    const characters: Record<number, CharacterArt> = {};
+    for (const participant of participants) {
+      characters[participant.userId] = toCharacterArt(
+        participant.characterSlots,
+      );
+    }
+    return characters;
+  }, [participants]);
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -65,6 +43,46 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     image.onerror = reject;
     image.src = src;
   });
+}
+
+async function toDataUrl(src: string): Promise<string> {
+  const response = await fetch(src, { mode: "cors", cache: "reload" });
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * html-to-image는 캡처 대상 안의 img 하나가 CORS/캐시 등으로 못 읽히면 그
+ * 이미지만 빠지는 게 아니라 캐릭터 영역 전체가 통째로 비어버린다(라이브 화면은
+ * 브라우저가 깨진 이미지 하나만 조용히 넘어가서 괜찮아 보이지만, 캡처는 다르다).
+ * 그래서 캡처 직전에 안에 있는 img들을 전부 fetch해서 data URL로 바꿔치기하고
+ * (성공한 것만), 캡처가 끝나면 원래 src로 되돌린다.
+ */
+async function inlineImages(container: HTMLElement): Promise<() => void> {
+  const images = Array.from(container.querySelectorAll("img"));
+  const originalSrcs = images.map((img) => img.src);
+  await Promise.all(
+    images.map(async (img, i) => {
+      try {
+        img.src = await toDataUrl(originalSrcs[i]);
+        // src를 바꾼 직후엔 아직 디코드 전이라 캡처 시점에 그림이 안 그려져
+        // 있을 수 있다 - decode()로 실제로 그릴 수 있는 상태까지 기다린다.
+        await img.decode();
+      } catch {
+        // 이 이미지 하나만 원본 URL로 남기고 나머지 캡처는 계속 진행한다.
+      }
+    }),
+  );
+  return () => {
+    images.forEach((img, i) => {
+      img.src = originalSrcs[i];
+    });
+  };
 }
 
 interface MergeResultViewProps {
@@ -120,6 +138,7 @@ export function MergeResultView({
   const handleSaveImage = async () => {
     if (!resultCardRef.current || saving) return;
     setSaving(true);
+    const restoreImages = await inlineImages(resultCardRef.current);
     try {
       // html-to-image는 toPng()의 style 옵션으로 padding을 주더라도 캔버스
       // 크기는 원본 노드 크기 그대로 잡아서, 늘어난 여백만큼 오른쪽/아래가
@@ -150,6 +169,7 @@ export function MergeResultView({
     } catch {
       showToast("이미지 저장에 실패했어요. 다시 시도해 주세요.");
     } finally {
+      restoreImages();
       setSaving(false);
     }
   };

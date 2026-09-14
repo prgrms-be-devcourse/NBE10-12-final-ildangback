@@ -25,6 +25,7 @@ public class ChallengeScheduler {
         challengeLifecycleService.activateChallengesDueToday();
     }
 
+    // 매일 오전 4시(KST)
     // 어제까지가 마지막 날이었던 ACTIVE 챌린지를 ENDED로 변경
     @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
     public void endChallenges() {

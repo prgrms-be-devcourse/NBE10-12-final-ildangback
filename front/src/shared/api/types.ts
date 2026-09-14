@@ -171,6 +171,8 @@ export interface MergeParticipantResponse {
   /** "주간/월별 인증 추이" 그래프용. 값이 없으면(CheckIn 미연동) 빈 배열이다. */
   checkInTrendLabels: string[];
   checkInTrendCounts: number[];
+  /** 발행 시점 캐릭터 스냅샷. 이후 유저가 옷을 갈아입어도 이 값은 안 바뀐다. */
+  characterSlots: Record<ItemSlot, string | null>;
 }
 
 /** 머지 목록 화면(월간+최종 함께)의 한 항목. seqNo는 FINAL이면 null이다. */

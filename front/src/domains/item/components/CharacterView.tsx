@@ -50,6 +50,10 @@ export function CharacterView({
         art[slot] ? (
           <img
             key={slot}
+            // crossOrigin은 src보다 먼저 와야 한다 - 브라우저가 src를 만나는
+            // 순간 바로 요청을 시작해서, 그 뒤에 crossOrigin을 붙이면 이미
+            // non-CORS로 나간 요청엔 적용이 안 된다.
+            crossOrigin="anonymous"
             src={art[slot]}
             alt=""
             className="absolute inset-0 h-full w-full object-contain pixelated"
