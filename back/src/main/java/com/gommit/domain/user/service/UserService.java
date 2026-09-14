@@ -133,6 +133,12 @@ public class UserService {
         findNotDeleted(userId).updateStreak(businessDate, lastRequiredCheckInDay);
     }
 
+    // 신고 승인 시 닉네임 초기화와 자기소개 제거
+    @Transactional
+    public void resetProfileOnPenalty(Long userId) {
+        userRepository.findByIdAndDeletedAtIsNull(userId).ifPresent(User::resetProfileOnPenalty);
+    }
+
     // 닉네임 일괄 조회
     public Map<Long, String> findNicknames(Collection<Long> userIds) {
         if (userIds == null || userIds.isEmpty()) {

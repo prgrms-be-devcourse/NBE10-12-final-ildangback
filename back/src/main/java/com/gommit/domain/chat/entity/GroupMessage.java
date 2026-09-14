@@ -29,11 +29,22 @@ public class GroupMessage extends BaseEntity {
     @Column(nullable = false, length = 1000)
     private String content;
 
+    public static final String HIDDEN_CONTENT = "관리자가 삭제한 메시지입니다";
+
     @Builder
     public GroupMessage(Long groupId, Long senderId, String content) {
         this.groupId = groupId;
         this.senderId = senderId;
         this.content = content;
         this.messageType = MessageType.TEXT;
+    }
+
+    public void hide() {
+        this.content = HIDDEN_CONTENT;
+        this.messageType = MessageType.SYSTEM;
+    }
+
+    public boolean isHidden() {
+        return this.messageType == MessageType.SYSTEM;
     }
 }

@@ -62,6 +62,9 @@ class ChallengeLifecycleServiceTest {
     @Mock
     private BusinessClock businessClock;
 
+    @Mock
+    private com.gommit.domain.notification.repository.NotificationRepository notificationRepository;
+
     @InjectMocks
     private ChallengeLifecycleService challengeLifecycleService;
 
@@ -143,7 +146,7 @@ class ChallengeLifecycleServiceTest {
             LocalDate today = LocalDate.now(KST);
             Challenge challenge = challenge(50L, 1, ChallengeStatus.READY, today, today.plusDays(6));
             ChallengeGroup group = group(12L, 1L);
-            when(challengeRepository.findAllByStatus(ChallengeStatus.READY)).thenReturn(List.of(challenge));
+            when(challengeRepository.findReadyForActivation()).thenReturn(List.of(challenge));
             when(challengeGroupRepository.findAllById(Set.of(12L))).thenReturn(List.of(group));
 
             // when
@@ -162,7 +165,7 @@ class ChallengeLifecycleServiceTest {
             // given
             LocalDate today = LocalDate.now(KST);
             Challenge challenge = challenge(50L, 1, ChallengeStatus.READY, today.plusDays(1), today.plusDays(7));
-            when(challengeRepository.findAllByStatus(ChallengeStatus.READY)).thenReturn(List.of(challenge));
+            when(challengeRepository.findReadyForActivation()).thenReturn(List.of(challenge));
 
             // when
             challengeLifecycleService.activateChallengesDueToday();
@@ -180,7 +183,7 @@ class ChallengeLifecycleServiceTest {
             Challenge challenge = challenge(50L, 2, ChallengeStatus.READY, today, today.plusDays(6));
             ChallengeGroup group = group(12L, 1L);
             ChallengeMember owner = challengeMember(70L, challenge, 2L, ChallengeMemberRole.OWNER);
-            when(challengeRepository.findAllByStatus(ChallengeStatus.READY)).thenReturn(List.of(challenge));
+            when(challengeRepository.findReadyForActivation()).thenReturn(List.of(challenge));
             when(challengeGroupRepository.findAllById(Set.of(12L))).thenReturn(List.of(group));
             when(challengeMemberRepository.findByChallengeIdAndRole(50L, ChallengeMemberRole.OWNER))
                     .thenReturn(Optional.of(owner));
@@ -200,7 +203,7 @@ class ChallengeLifecycleServiceTest {
             // given
             LocalDate today = LocalDate.now(KST);
             Challenge challenge = challenge(50L, 1, ChallengeStatus.READY, today, today.plusDays(6));
-            when(challengeRepository.findAllByStatus(ChallengeStatus.READY)).thenReturn(List.of(challenge));
+            when(challengeRepository.findReadyForActivation()).thenReturn(List.of(challenge));
             when(challengeGroupRepository.findAllById(Set.of(12L))).thenReturn(List.of());
 
             // when & then
@@ -215,7 +218,7 @@ class ChallengeLifecycleServiceTest {
             LocalDate today = LocalDate.now(KST);
             Challenge challenge = challenge(50L, 2, ChallengeStatus.READY, today, today.plusDays(6));
             ChallengeGroup group = group(12L, 1L);
-            when(challengeRepository.findAllByStatus(ChallengeStatus.READY)).thenReturn(List.of(challenge));
+            when(challengeRepository.findReadyForActivation()).thenReturn(List.of(challenge));
             when(challengeGroupRepository.findAllById(Set.of(12L))).thenReturn(List.of(group));
             when(challengeMemberRepository.findByChallengeIdAndRole(50L, ChallengeMemberRole.OWNER))
                     .thenReturn(Optional.empty());
@@ -239,7 +242,7 @@ class ChallengeLifecycleServiceTest {
             Challenge challenge = challenge(50L, 1, ChallengeStatus.ACTIVE, today.minusDays(7), today.minusDays(1));
             ChallengeGroup group = group(12L, 1L);
             group.activate();
-            when(challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE)).thenReturn(List.of(challenge));
+            when(challengeRepository.findActiveForEnding()).thenReturn(List.of(challenge));
             when(challengeRepository.findByGroupIdAndSeqNo(12L, 2)).thenReturn(Optional.empty());
             when(challengeGroupRepository.findAllById(Set.of(12L))).thenReturn(List.of(group));
 
@@ -259,7 +262,7 @@ class ChallengeLifecycleServiceTest {
             // given
             LocalDate today = LocalDate.now(KST);
             Challenge challenge = challenge(50L, 1, ChallengeStatus.ACTIVE, today.minusDays(7), today);
-            when(challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE)).thenReturn(List.of(challenge));
+            when(challengeRepository.findActiveForEnding()).thenReturn(List.of(challenge));
 
             // when
             challengeLifecycleService.endChallengesDueToday();
@@ -277,7 +280,7 @@ class ChallengeLifecycleServiceTest {
             LocalDate today = LocalDate.now(KST);
             Challenge challenge = challenge(50L, 1, ChallengeStatus.ACTIVE, today.minusDays(7), today.minusDays(1));
             Challenge nextChallenge = challenge(51L, 2, ChallengeStatus.READY, today, today.plusDays(6));
-            when(challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE)).thenReturn(List.of(challenge));
+            when(challengeRepository.findActiveForEnding()).thenReturn(List.of(challenge));
             when(challengeRepository.findByGroupIdAndSeqNo(12L, 2)).thenReturn(Optional.of(nextChallenge));
 
             // when
@@ -295,7 +298,7 @@ class ChallengeLifecycleServiceTest {
             // given
             LocalDate today = LocalDate.now(KST);
             Challenge challenge = challenge(50L, 1, ChallengeStatus.ACTIVE, today.minusDays(7), today.minusDays(1));
-            when(challengeRepository.findAllByStatus(ChallengeStatus.ACTIVE)).thenReturn(List.of(challenge));
+            when(challengeRepository.findActiveForEnding()).thenReturn(List.of(challenge));
             when(challengeRepository.findByGroupIdAndSeqNo(12L, 2)).thenReturn(Optional.empty());
             when(challengeGroupRepository.findAllById(Set.of(12L))).thenReturn(List.of());
 

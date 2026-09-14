@@ -130,13 +130,20 @@ function SignedInHome() {
           onRetry={() => void notifications.reload()}
           onSelect={async (notification) => {
             if (await notifications.markRead(notification)) {
+              setNotificationsOpen(false);
               if (
-                notification.type === "CHECK_IN_NUDGE" &&
+                // These notification types store the related challenge ID in refId.
+                [
+                  "CHECK_IN_NUDGE",
+                  "CHECK_IN_REMINDER",
+                  "EXTENSION_REMINDER",
+                  "SEASON_STARTED",
+                  "SEASON_ENDED",
+                ].includes(notification.type) &&
                 notification.refId !== null &&
                 Number.isSafeInteger(notification.refId) &&
                 notification.refId > 0
               ) {
-                setNotificationsOpen(false);
                 navigate(`/challenges/${notification.refId}`);
               }
             }

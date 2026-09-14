@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { accessTokenUserId } from "../../../shared/lib/accessTokenRole";
+import { useToast } from "../../../shared/lib/useToast";
 import { currentMonth } from "../lib/month";
 import { useChallengeMembers } from "../lib/useChallengeMembers";
 import { useCheckInGallery } from "../lib/useCheckInGallery";
@@ -21,6 +23,7 @@ export function CheckInGalleryTab({
   challengeId: number;
   members?: ChallengeMember[] | null;
 }) {
+  const { showToast } = useToast();
   const [month, setMonth] = useState(currentMonth);
   const [userId, setUserId] = useState<number | null>(null);
   const [selected, setSelected] = useState<CheckIn | null>(null);
@@ -68,6 +71,8 @@ export function CheckInGalleryTab({
         item={selected}
         onClose={() => setSelected(null)}
         showAuthor
+        currentUserId={accessTokenUserId()}
+        onReported={() => showToast("신고를 접수했어요.")}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 package com.gommit.domain.user.service;
 
+import com.gommit.domain.report.service.PenaltyGate;
 import com.gommit.domain.user.dto.request.OAuthLoginRequest;
 import com.gommit.domain.user.dto.response.LoginResponse;
 import com.gommit.domain.user.dto.response.TokenResponse;
@@ -36,6 +37,7 @@ public class SocialAuthService {
     private final JwtProvider jwtProvider;
     private final OAuthProperties oAuthProperties;
     private final UserService userService;
+    private final PenaltyGate penaltyGate;
 
     public SocialAuthService(
             List<OAuthClient> oAuthClients,
@@ -44,7 +46,8 @@ public class SocialAuthService {
             RefreshTokenService refreshTokenService,
             JwtProvider jwtProvider,
             OAuthProperties oAuthProperties,
-            UserService userService) {
+            UserService userService,
+            PenaltyGate penaltyGate) {
         oAuthClients.forEach(client -> clients.put(client.provider(), client));
         this.userRepository = userRepository;
         this.authIdentityRepository = authIdentityRepository;
@@ -52,6 +55,7 @@ public class SocialAuthService {
         this.jwtProvider = jwtProvider;
         this.oAuthProperties = oAuthProperties;
         this.userService = userService;
+        this.penaltyGate = penaltyGate;
     }
 
     // 소셜 로그인
@@ -106,6 +110,7 @@ public class SocialAuthService {
     }
 
     private LoginResponse issue(User user, boolean newUser) {
+        penaltyGate.verifyNotBlocked(user.getId());
         String accessToken = jwtProvider.issue(user.getId(), user.getRole().name());
         TokenResponse tokens = new TokenResponse(accessToken, refreshTokenService.issue(user));
         return new LoginResponse(tokens, userService.toUserProfileResponse(user), newUser);

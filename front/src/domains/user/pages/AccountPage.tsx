@@ -55,6 +55,16 @@ export function AccountPage() {
 
           <button
             type="button"
+            onClick={() => navigate("/profile/penalties")}
+            className="flex w-full items-center gap-3 px-4 py-3 text-left"
+          >
+            <PixelIcon src={pixelIcons.privacyLock} />
+            <span className="flex-1 text-[14px] text-gray-900">내 제재</span>
+            <CaretRightIcon size={16} className="text-gray-500" aria-hidden />
+          </button>
+
+          <button
+            type="button"
             onClick={() => navigate("/profile/delete")}
             className="flex w-full items-center gap-3 px-4 py-3 text-left"
           >

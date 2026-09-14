@@ -6,6 +6,7 @@ import peopleIcon from "../../../assets/icons/people.webp";
 import { useCallback, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useAuth } from "../../../shared/lib/useAuth";
+import { ReportDialog } from "../../report/components/ReportDialog";
 import { useToast } from "../../../shared/lib/useToast";
 import { Button } from "../../../shared/ui/Button";
 import { FormAlert } from "../../../shared/ui/FormAlert";
@@ -209,6 +210,10 @@ function SeasonManagement({
   const { showToast } = useToast();
   const [editing, setEditing] = useState(false);
   const [delegating, setDelegating] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{
+    userId: number;
+    nickname: string;
+  } | null>(null);
   const [action, setAction] = useState<{
     type: "delegate" | "kick";
     userId: number;
@@ -314,23 +319,59 @@ function SeasonManagement({
                 위임하기
               </button>
             ) : null;
-          return canKick && member.userId !== detail.group.ownerId ? (
-            <button
-              type="button"
-              aria-label={`${member.nickname} 님 강퇴`}
-              className="min-h-7 rounded-full border border-red-200 bg-white px-2.5 text-[11px] font-semibold whitespace-nowrap text-red-600 hover:bg-red-50"
-              onClick={() =>
-                setAction({
-                  type: "kick",
-                  userId: member.userId,
-                  nickname: member.nickname,
-                })
-              }
-            >
-              강퇴
-            </button>
-          ) : null;
+          return (
+            <span className="flex items-center gap-1.5">
+              {member.userId !== user?.id && (
+                <button
+                  type="button"
+                  aria-label={`${member.nickname} 님 신고`}
+                  className="min-h-7 rounded-full border border-gray-200 bg-white px-2.5 text-[11px] font-semibold whitespace-nowrap text-gray-500 hover:bg-gray-50"
+                  onClick={() =>
+                    setReportTarget({
+                      userId: member.userId,
+                      nickname: member.nickname,
+                    })
+                  }
+                >
+                  신고
+                </button>
+              )}
+              {canKick && member.userId !== detail.group.ownerId && (
+                <button
+                  type="button"
+                  aria-label={`${member.nickname} 님 강퇴`}
+                  className="min-h-7 rounded-full border border-red-200 bg-white px-2.5 text-[11px] font-semibold whitespace-nowrap text-red-600 hover:bg-red-50"
+                  onClick={() =>
+                    setAction({
+                      type: "kick",
+                      userId: member.userId,
+                      nickname: member.nickname,
+                    })
+                  }
+                >
+                  강퇴
+                </button>
+              )}
+            </span>
+          );
         }}
+      />
+
+      <ReportDialog
+        isOpen={reportTarget !== null}
+        onClose={() => setReportTarget(null)}
+        targets={
+          reportTarget
+            ? [
+                {
+                  targetType: "USER",
+                  targetId: reportTarget.userId,
+                  label: `${reportTarget.nickname} 님`,
+                },
+              ]
+            : []
+        }
+        onSubmitted={() => showToast("신고를 접수했어요.")}
       />
       {seasonMembers.error && (
         <p role="alert" className="text-xs text-gray-500">

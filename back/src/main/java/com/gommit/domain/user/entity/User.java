@@ -17,6 +17,7 @@ public class User extends BaseEntity {
     private static final String DELETED_EMAIL_FORMAT = "deleted_%d@example.com";
     private static final String DELETED_PASSWORD = "(deleted)";
     private static final String DELETED_NICKNAME_PREFIX = "탈퇴한사용자_";
+    private static final String PENALIZED_NICKNAME_PREFIX = "제재된사용자_";
 
     @Column(nullable = false, length = 255)
     private String email;
@@ -74,6 +75,11 @@ public class User extends BaseEntity {
 
     public void changePassword(String encodedPassword) {
         this.password = encodedPassword;
+    }
+
+    public void resetProfileOnPenalty() {
+        this.nickname = PENALIZED_NICKNAME_PREFIX + getId();
+        this.introduction = null;
     }
 
     public void deleteAccount() {
