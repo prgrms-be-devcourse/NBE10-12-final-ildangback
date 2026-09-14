@@ -215,6 +215,12 @@ class ReportApiIntegrationTest extends IntegrationTestSupport {
         return balance == null ? 0 : balance;
     }
 
+    private boolean checkInExists(Long checkInId) {
+        Integer count =
+                jdbcTemplate.queryForObject("SELECT count(*) FROM check_ins WHERE id = ?", Integer.class, checkInId);
+        return count != null && count > 0;
+    }
+
     private List<Map<String, Object>> pointHistoriesOf(Long userId) {
         return jdbcTemplate.queryForList(
                 "SELECT reason, amount, balance_after FROM user_point_histories WHERE user_id = ? ORDER BY id", userId);
@@ -656,6 +662,24 @@ class ReportApiIntegrationTest extends IntegrationTestSupport {
             getReports(admin.accessToken(), "")
                     .andExpect(
                             jsonPath("$.content[0].reportedContent").value("미디어: check-ins/2026/09/abc.jpg | 메모: 메모"));
+        }
+
+        @Test
+        @DisplayName("제재 검증에 걸리면 인증이 지워지지 않는다")
+        void invalidPenaltyKeepsCheckIn() throws Exception {
+            var reporter = loginAs(REPORTER_EMAIL, REPORTER_NICKNAME);
+            var target = loginAs(TARGET_EMAIL, TARGET_NICKNAME);
+            Long targetId = userIdOf(TARGET_EMAIL);
+            Long groupId = createGroupAndReturnId(target.accessToken(), targetId);
+            Long checkInId = insertCheckIn(challengeIdOf(groupId), targetId, "check-ins/2026/09/keep.jpg", "메모");
+            var admin = loginAsAdmin();
+
+            Long reportId = submitReportAndGetId(reporter.accessToken(), "CHECK_IN", checkInId, "SEXUAL");
+            decideReport(admin.accessToken(), reportId, decideBody(true, suspension(400)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("INVALID_SUSPENSION_DAYS"));
+
+            assertThat(checkInExists(checkInId)).isTrue();
         }
 
         @Test

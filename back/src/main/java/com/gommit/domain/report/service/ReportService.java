@@ -101,10 +101,10 @@ public class ReportService {
         if (request.penaltiesOrEmpty().isEmpty()) {
             throw new BusinessException(ErrorCode.PENALTY_REQUIRED);
         }
-        applyContentAction(report);
         report.accept(userId);
         List<Penalty> penalties =
                 penaltyService.apply(report.getId(), report.getTargetUserId(), request.penaltiesOrEmpty());
+        applyContentAction(report);
         return toDetailResponse(report, penalties);
     }
 
