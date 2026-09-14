@@ -47,27 +47,13 @@ public class CloudinaryStorageService implements StorageService {
         this(cloudinary, properties, RestClient.builder());
     }
 
+    // 주입된 RestClient.Builder 의 requestFactory 를 CONNECT_TIMEOUT/REQUEST_TIMEOUT(5s/30s)으로 덮어쓴다.
     public CloudinaryStorageService(
             Cloudinary cloudinary, MediaStorageProperties properties, RestClient.Builder restClientBuilder) {
-        this(cloudinary, properties, restClientBuilder, CONNECT_TIMEOUT, REQUEST_TIMEOUT);
-    }
-
-    // 테스트 전용 — 특성화 테스트가 느린 응답 케이스를 30초 실측 대기 없이 짧은 타임아웃으로 검증할 수 있게 함.
-    // 운영 경로(2-arg/3-arg 생성자)는 항상 위 CONNECT_TIMEOUT/REQUEST_TIMEOUT(5s/30s)을 강제 적용한다 —
-    // 이 메서드가 주입받은 RestClient.Builder 의 requestFactory 를 그대로 덮어써서 강제하는 것이라,
-    // 3-arg 생성자에 타임아웃 없는 빌더를 넘겨도(Boot 오토컨피그 기본 빌더 등) 무제한 대기로 새지 않는다.
-    // (반대로 이 성질 때문에 3-arg 생성자로는 테스트가 원하는 "더 짧은" 타임아웃을 못 넣는다 — 그래서
-    // 이 package-private 오버로드가 따로 필요하다.)
-    CloudinaryStorageService(
-            Cloudinary cloudinary,
-            MediaStorageProperties properties,
-            RestClient.Builder restClientBuilder,
-            Duration connectTimeout,
-            Duration requestTimeout) {
         this.cloudinary = cloudinary;
         this.properties = properties;
         this.restClient = restClientBuilder
-                .requestFactory(requestFactory(connectTimeout, requestTimeout))
+                .requestFactory(requestFactory(CONNECT_TIMEOUT, REQUEST_TIMEOUT))
                 .build();
     }
 
@@ -126,21 +112,15 @@ public class CloudinaryStorageService implements StorageService {
     @Override
     public Resource load(String storageKey, MediaRole mediaRole) {
         String signedUrl = buildUrl(storageKey, deliveryType(properties.policyFor(mediaRole)), true);
-        return fetchResource(signedUrl, filenameOf(storageKey));
+        return fetchResource(signedUrl, filenameOf(storageKey), restClient);
     }
 
-    // URL 계산(buildUrl)과 분리된 GET + 상태코드/예외 매핑 부분. Cloudinary 서명 URL 생성기가
-    // res.cloudinary.com 도메인을 강제하기 때문에, 클라이언트 종류(HttpClient/RestClient)에
-    // 안 가리는 와이어레벨 특성화 테스트가 임의 URL(로컬 HttpServer)을 직접 넣을 수 있도록
-    // package-private 으로 뺀 것.
-    // 5xx(Cloudinary 쪽 실패)는 MEDIA_STORAGE_FAILED, 그 외 200이 아닌 상태코드(404 등, 리소스가
-    // 실제로 없거나 서명이 잘못된 경우)는 MEDIA_NOT_FOUND, 타임아웃/연결 실패 같은 RestClientException 은
-    // MEDIA_STORAGE_FAILED — HttpClient 시절엔 200 아니면 전부 NOT_FOUND였는데, 500까지 NOT_FOUND로
-    // 뭉뚱그리는 게 부정확해서 바로잡음(단순 클라이언트 교체가 아니라 의도적 동작 변경).
-    Resource fetchResource(String url, String filename) {
+    // package-private + RestClient 를 인자로 받음 — 특성화 테스트가 임의 URL·짧은 타임아웃의
+    // RestClient 를 직접 넣어 검증할 수 있게 함(운영 경로는 생성자가 만든 restClient 필드를 넘김)
+    Resource fetchResource(String url, String filename, RestClient client) {
         byte[] body;
         try {
-            body = restClient
+            body = client
                     .get()
                     .uri(url)
                     .retrieve()
