@@ -30,7 +30,7 @@ import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequ
 class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
 
     private static final String OWNER_EMAIL = "owner@example.com";
-    private static final String OWNER_NICKNAME = "방장";
+    private static final String OWNER_NICKNAME = "그룹장";
     private static final String ADMIN_EMAIL = "admin@example.com";
     private static final byte[] PNG_MAGIC = {
         (byte) 0x89, (byte) 0x50, (byte) 0x4E, (byte) 0x47, (byte) 0x0D, (byte) 0x0A, (byte) 0x1A, (byte) 0x0A
@@ -188,7 +188,7 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
         return jdbcTemplate.queryForObject("select max(id) from challenge_groups", Long.class);
     }
 
-    // 방장 1명 + members 명의 참여자로 그룹을 만든다. 반환값 0번이 방장 토큰이다.
+    // 그룹장 1명 + members 명의 참여자로 그룹을 만든다. 반환값 0번이 그룹장 토큰이다.
     private List<String> createGroupWith(int members, Long[] groupIdHolder) throws Exception {
         List<String> tokens = new ArrayList<>();
         String ownerToken = loginAs(OWNER_EMAIL, OWNER_NICKNAME).accessToken();
@@ -664,7 +664,7 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
             Long backgroundId = insertBackground("GYM", "헬스장", 100);
             giveGroupPoints(holder[0], 500);
 
-            // 4명, 과반 3. 방장 찬성 1 + 멤버0 찬성 1 = 2 로 아직 모자라다.
+            // 4명, 과반 3. 그룹장 찬성 1 + 멤버0 찬성 1 = 2 로 아직 모자라다.
             createRequest(tokens.get(0), holder[0], backgroundId).andExpect(status().isCreated());
             Long requestId = requestIdOf(holder[0]);
             vote(tokens.get(1), holder[0], requestId, true)
@@ -686,13 +686,13 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
             Long backgroundId = insertBackground("GYM", "헬스장", 100);
             giveGroupPoints(holder[0], 500);
 
-            // 4명, 과반 3. 방장 찬성 1 + 멤버0 찬성 1 = 2 로 아직 모자라다.
+            // 4명, 과반 3. 그룹장 찬성 1 + 멤버0 찬성 1 = 2 로 아직 모자라다.
             createRequest(tokens.get(0), holder[0], backgroundId).andExpect(status().isCreated());
             Long requestId = requestIdOf(holder[0]);
             vote(tokens.get(1), holder[0], requestId, true)
                     .andExpect(jsonPath("$.status").value("VOTING"));
 
-            // 미투표자 하나를 방장이 강퇴하면 3명 과반 2 가 되어 찬성 2로 가결된다.
+            // 미투표자 하나를 그룹장이 강퇴하면 3명 과반 2 가 되어 찬성 2로 가결된다.
             kickMember(tokens.get(0), holder[0], userIdOf("member1@example.com"))
                     .andExpect(status().isNoContent());
 
@@ -713,7 +713,7 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
             Long backgroundId = insertBackground("GYM", "헬스장", 100);
             giveGroupPoints(holder[0], 500);
 
-            // 4명, 과반 3. 방장 찬성 1 + 멤버0 찬성 1 = 2, 멤버1 반대.
+            // 4명, 과반 3. 그룹장 찬성 1 + 멤버0 찬성 1 = 2, 멤버1 반대.
             createRequest(tokens.get(0), holder[0], backgroundId).andExpect(status().isCreated());
             Long requestId = requestIdOf(holder[0]);
             vote(tokens.get(1), holder[0], requestId, true).andExpect(status().isCreated());
@@ -996,7 +996,7 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
             Long backgroundId = insertBackground("GYM", "헬스장", 100);
             giveGroupPoints(holder[0], 500);
 
-            // 방장 혼자라 과반 1. 제안하는 순간 가결되어 그룹이 보유한다.
+            // 그룹장 혼자라 과반 1. 제안하는 순간 가결되어 그룹이 보유한다.
             createRequest(ownerToken, holder[0], backgroundId).andExpect(status().isCreated());
             assertThat(ownedCountOf(holder[0])).isEqualTo(1);
 
@@ -1013,7 +1013,7 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
             Long backgroundId = insertBackground("GYM", "헬스장", 100);
             giveGroupPoints(holder[0], 500);
 
-            // 3명, 과반 2. 방장 찬성 1 뿐이라 아직 투표 중이고 보유는 아니다.
+            // 3명, 과반 2. 그룹장 찬성 1 뿐이라 아직 투표 중이고 보유는 아니다.
             createRequest(tokens.get(0), holder[0], backgroundId).andExpect(status().isCreated());
             assertThat(ownedCountOf(holder[0])).isZero();
 
@@ -1043,7 +1043,7 @@ class BackgroundShopApiIntegrationTest extends IntegrationTestSupport {
             Long backgroundId = insertBackground("GYM", "헬스장", 100);
             giveGroupPoints(holder[0], 500);
 
-            // 3명, 과반 2. 방장 찬성 1 상태에서 둘이 동시에 찬성한다.
+            // 3명, 과반 2. 그룹장 찬성 1 상태에서 둘이 동시에 찬성한다.
             createRequest(tokens.get(0), holder[0], backgroundId).andExpect(status().isCreated());
             Long requestId = requestIdOf(holder[0]);
 

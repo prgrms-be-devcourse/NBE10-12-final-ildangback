@@ -492,7 +492,7 @@ public class GroupService {
         }
     }
 
-    // 새 방장 선정
+    // 새 그룹장 선정
     private Long pickNewOwner(Long groupId, Long userId) {
         List<GroupMember> remainingMembers =
                 groupMemberRepository.findAllByGroupIdAndStatus(groupId, GroupMemberStatus.ACTIVE).stream()

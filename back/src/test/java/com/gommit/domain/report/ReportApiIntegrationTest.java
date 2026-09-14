@@ -48,7 +48,7 @@ class ReportApiIntegrationTest extends IntegrationTestSupport {
     private static final String ADMIN_EMAIL = "admin@example.com";
     private static final String ADMIN_NICKNAME = "관리자";
     private static final String OWNER_EMAIL = "owner@example.com";
-    private static final String OWNER_NICKNAME = "방장";
+    private static final String OWNER_NICKNAME = "그룹장";
 
     private static final String WARNING = "{\"penaltyType\":\"WARNING\"}";
     private static final String PERMANENT_BAN = "{\"penaltyType\":\"PERMANENT_BAN\"}";
@@ -875,7 +875,7 @@ class ReportApiIntegrationTest extends IntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("방장이 영구 정지되면 남은 멤버가 방장을 이어받는다")
+        @DisplayName("그룹장이 영구 정지되면 남은 멤버가 그룹장을 이어받는다")
         void banDelegatesOwnershipToRemainingMember() throws Exception {
             var target = loginAs(TARGET_EMAIL, TARGET_NICKNAME);
             Long groupId = createGroupAndReturnId(target.accessToken(), userIdOf(TARGET_EMAIL));
@@ -893,7 +893,7 @@ class ReportApiIntegrationTest extends IntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("혼자인 그룹의 방장이 영구 정지되면 그룹이 종료된다")
+        @DisplayName("혼자인 그룹의 그룹장이 영구 정지되면 그룹이 종료된다")
         void banEndsGroupWithNoRemainingMember() throws Exception {
             var target = loginAs(TARGET_EMAIL, TARGET_NICKNAME);
             Long groupId = createGroupAndReturnId(target.accessToken(), userIdOf(TARGET_EMAIL));

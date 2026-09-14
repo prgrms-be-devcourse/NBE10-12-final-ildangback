@@ -106,9 +106,9 @@ class AccountDeletionIntegrationTest extends IntegrationTestSupport {
                 userId);
     }
 
-    // 그룹 하나와 방장, 참여자 한 명을 만든다.
+    // 그룹 하나와 그룹장, 참여자 한 명을 만든다.
     private Fixture groupWithTwoMembers() throws Exception {
-        Tokens owner = loginAs(OWNER_EMAIL, "방장");
+        Tokens owner = loginAs(OWNER_EMAIL, "그룹장");
         Long ownerId = userIdOf(OWNER_EMAIL);
         createGroup(owner.accessToken(), "꼬밋 그룹").andExpect(status().isCreated());
         Long groupId = groupIdOf(ownerId);
@@ -123,7 +123,7 @@ class AccountDeletionIntegrationTest extends IntegrationTestSupport {
     private record Fixture(Tokens owner, Long ownerId, Tokens member, Long memberId, Long groupId, Long challengeId) {}
 
     @Test
-    @DisplayName("일반 멤버가 탈퇴하면 그룹과 시즌에서 LEFT 가 되고 방장은 그대로다")
+    @DisplayName("일반 멤버가 탈퇴하면 그룹과 시즌에서 LEFT 가 되고 그룹장은 그대로다")
     void deleteAccountLeavesGroupAndChallengeForPlainMember() throws Exception {
         Fixture fixture = groupWithTwoMembers();
 
@@ -155,7 +155,7 @@ class AccountDeletionIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("방장이 탈퇴하면 남은 멤버가 그룹 OWNER 와 시즌 OWNER 를 함께 받는다")
+    @DisplayName("그룹장이 탈퇴하면 남은 멤버가 그룹 OWNER 와 시즌 OWNER 를 함께 받는다")
     void deleteAccountHandsOverBothOwnerships() throws Exception {
         Fixture fixture = groupWithTwoMembers();
 
@@ -170,7 +170,7 @@ class AccountDeletionIntegrationTest extends IntegrationTestSupport {
 
     // role 이 OWNER 로 남으면 시즌 활성화 배치가 탈퇴자를 그룹 OWNER 로 앉힌다.
     @Test
-    @DisplayName("탈퇴한 방장의 시즌 역할은 MEMBER 로 내려간다")
+    @DisplayName("탈퇴한 그룹장의 시즌 역할은 MEMBER 로 내려간다")
     void deletedOwnerNoLongerHoldsChallengeOwnerRole() throws Exception {
         Fixture fixture = groupWithTwoMembers();
 
@@ -198,9 +198,9 @@ class AccountDeletionIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("1인 그룹의 방장이 탈퇴하면 그룹과 시즌이 종료된다")
+    @DisplayName("1인 그룹의 그룹장이 탈퇴하면 그룹과 시즌이 종료된다")
     void deleteAccountEndsGroupAndChallengeForSoleOwner() throws Exception {
-        Tokens owner = loginAs(OWNER_EMAIL, "방장");
+        Tokens owner = loginAs(OWNER_EMAIL, "그룹장");
         Long ownerId = userIdOf(OWNER_EMAIL);
         createGroup(owner.accessToken(), "혼자 하는 그룹").andExpect(status().isCreated());
         Long groupId = groupIdOf(ownerId);

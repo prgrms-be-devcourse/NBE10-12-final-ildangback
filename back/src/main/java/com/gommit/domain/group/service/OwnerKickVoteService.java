@@ -132,8 +132,8 @@ public class OwnerKickVoteService {
 
     // ── 내부 메서드 ───────────────────────────────────────────────────────────
 
-    // 과반수 판정. n = ACTIVE 멤버 수 - 1 (방장 제외)
-    // agree * 2 > n      → 가결: 방장 즉시 강퇴
+    // 과반수 판정. n = ACTIVE 멤버 수 - 1 (그룹장 제외)
+    // agree * 2 > n      → 가결: 그룹장 즉시 강퇴
     // disagree * 2 >= n  → 부결: 투표 종료
     private void checkAndConclude(ChallengeGroup group, Long groupId) {
         long totalActive = groupMemberRepository.countByGroupIdAndStatus(groupId, GroupMemberStatus.ACTIVE);
@@ -153,7 +153,7 @@ public class OwnerKickVoteService {
         // 결론 미달 → 투표 계속
     }
 
-    // 방장 GroupMember KICKED → ChallengeMember 역할 강등 후 KICKED → 새 방장 선정
+    // 그룹장 GroupMember KICKED → ChallengeMember 역할 강등 후 KICKED → 새 그룹장 선정
     private void executeOwnerKick(ChallengeGroup group, Long groupId) {
         Long ownerId = group.getOwnerId();
 
@@ -186,7 +186,13 @@ public class OwnerKickVoteService {
         }
 
         List<GroupMember> candidates;
-        if (readyChallenge != null) {
+        if (activeChallenge != null && readyChallenge != null) {
+            Set<Long> activeMemberIds =
+                    challengeMemberRepository
+                            .findAllByChallengeIdAndStatus(activeChallenge.getId(), ChallengeMemberStatus.ACTIVE)
+                            .stream()
+                            .map(ChallengeMember::getUserId)
+                            .collect(Collectors.toSet());
             Set<Long> readyMemberIds =
                     challengeMemberRepository
                             .findAllByChallengeIdAndStatus(readyChallenge.getId(), ChallengeMemberStatus.ACTIVE)
@@ -194,7 +200,39 @@ public class OwnerKickVoteService {
                             .map(ChallengeMember::getUserId)
                             .collect(Collectors.toSet());
             candidates = remaining.stream()
-                    .filter(member -> readyMemberIds.contains(member.getUserId()))
+                    .filter(member ->
+                            activeMemberIds.contains(member.getUserId()) && readyMemberIds.contains(member.getUserId()))
+                    .toList();
+            if (candidates.isEmpty()) {
+                candidates = remaining.stream()
+                        .filter(member -> activeMemberIds.contains(member.getUserId()))
+                        .toList();
+            }
+            if (candidates.isEmpty()) {
+                candidates = remaining;
+            }
+        } else if (activeChallenge != null) {
+            Set<Long> activeMemberIds =
+                    challengeMemberRepository
+                            .findAllByChallengeIdAndStatus(activeChallenge.getId(), ChallengeMemberStatus.ACTIVE)
+                            .stream()
+                            .map(ChallengeMember::getUserId)
+                            .collect(Collectors.toSet());
+            candidates = remaining.stream()
+                    .filter(m -> activeMemberIds.contains(m.getUserId()))
+                    .toList();
+            if (candidates.isEmpty()) {
+                candidates = remaining;
+            }
+        } else if (readyChallenge != null) {
+            Set<Long> readyMemberIds =
+                    challengeMemberRepository
+                            .findAllByChallengeIdAndStatus(readyChallenge.getId(), ChallengeMemberStatus.ACTIVE)
+                            .stream()
+                            .map(ChallengeMember::getUserId)
+                            .collect(Collectors.toSet());
+            candidates = remaining.stream()
+                    .filter(m -> readyMemberIds.contains(m.getUserId()))
                     .toList();
             if (candidates.isEmpty()) {
                 candidates = remaining;
@@ -215,7 +253,7 @@ public class OwnerKickVoteService {
         }
     }
 
-    // 방장 ChallengeMember: 역할을 OWNER → MEMBER로 먼저 낮춘 뒤 KICKED 처리
+    // 그룹장 ChallengeMember: 역할을 OWNER → MEMBER로 먼저 낮춘 뒤 KICKED 처리
     private void kickOwnerFromChallenge(Challenge challenge, Long ownerId) {
         challengeMemberRepository
                 .findByChallengeIdAndUserId(challenge.getId(), ownerId)
@@ -226,7 +264,7 @@ public class OwnerKickVoteService {
                 });
     }
 
-    // 새 방장 ChallengeMember role → OWNER
+    // 새 그룹장 ChallengeMember role → OWNER
     private void promoteToOwner(Challenge challenge, Long userId) {
         challengeMemberRepository
                 .findByChallengeIdAndUserId(challenge.getId(), userId)

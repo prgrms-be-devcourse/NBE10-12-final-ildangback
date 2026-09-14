@@ -275,7 +275,7 @@ class UserServiceTest {
             verify(groupService).leaveAllGroupsOnAccountDeletion(USER_ID);
         }
 
-        // 뒤로 가면 치환된 닉네임이 방장으로 앉는다. 순서를 되돌려도 위 테스트는 초록불이라 여기서만 막힌다.
+        // 뒤로 가면 치환된 닉네임이 그룹장으로 앉는다. 순서를 되돌려도 위 테스트는 초록불이라 여기서만 막힌다.
         @Test
         @DisplayName("그룹 정리는 식별자 치환보다 먼저 돈다")
         void deleteAccountLeavesGroupsBeforeErasingIdentifiers() {

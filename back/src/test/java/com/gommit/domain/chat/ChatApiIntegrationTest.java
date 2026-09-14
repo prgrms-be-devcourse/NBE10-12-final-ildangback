@@ -20,7 +20,7 @@ import org.springframework.test.web.servlet.ResultActions;
 class ChatApiIntegrationTest extends IntegrationTestSupport {
 
     private static final String OWNER_EMAIL = "owner@example.com";
-    private static final String OWNER_NICKNAME = "방장";
+    private static final String OWNER_NICKNAME = "그룹장";
     private static final String MEMBER_EMAIL = "member@example.com";
     private static final String MEMBER_NICKNAME = "멤버";
     private static final String STRANGER_EMAIL = "stranger@example.com";

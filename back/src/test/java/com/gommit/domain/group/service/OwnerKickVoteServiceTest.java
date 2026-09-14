@@ -217,7 +217,7 @@ class OwnerKickVoteServiceTest {
         }
 
         @Test
-        @DisplayName("방장이 개시하면 KICK_VOTE_OWNER_CANNOT_INITIATE")
+        @DisplayName("그룹장이 개시하면 KICK_VOTE_OWNER_CANNOT_INITIATE")
         void ownerCannotInitiate() {
             ChallengeGroup group = group(12L, 1L);
             GroupMember ownerMember = member(30L, group, 1L);
@@ -255,7 +255,7 @@ class OwnerKickVoteServiceTest {
         }
 
         @Test
-        @DisplayName("개시 즉시 과반수 달성(2인 그룹)이면 방장이 강퇴된다")
+        @DisplayName("개시 즉시 과반수 달성(2인 그룹)이면 그룹장이 강퇴된다")
         void immediatelyPassesInTwoMemberGroup() {
             // 2명(n=1), agree=1 → 1*2=2 > 1 → TRUE → 가결
             ChallengeGroup group = group(12L, 1L);
@@ -302,7 +302,7 @@ class OwnerKickVoteServiceTest {
         }
 
         @Test
-        @DisplayName("방장이 투표하면 KICK_VOTE_OWNER_CANNOT_VOTE")
+        @DisplayName("그룹장이 투표하면 KICK_VOTE_OWNER_CANNOT_VOTE")
         void ownerCannotVote() {
             ChallengeGroup group = group(12L, 1L);
             GroupMember ownerMember = member(30L, group, 1L);
@@ -393,7 +393,7 @@ class OwnerKickVoteServiceTest {
         }
 
         @Test
-        @DisplayName("과반수 찬성 달성 → 방장 KICKED, 새 방장 선정, 투표 초기화")
+        @DisplayName("과반수 찬성 달성 → 그룹장 KICKED, 새 그룹장 선정, 투표 초기화")
         void agreedMajorityKicksOwner() {
             // 3명(n=2), agree=2 → 4 > 2 → TRUE(가결)
             ChallengeGroup group = group(12L, 1L);
@@ -431,7 +431,7 @@ class OwnerKickVoteServiceTest {
         }
 
         @Test
-        @DisplayName("과반수 반대 달성 → 투표 종료, 방장 유지")
+        @DisplayName("과반수 반대 달성 → 투표 종료, 그룹장 유지")
         void disagreedMajorityEndsVote() {
             // 3명(n=2), disagree=1 → 2 >= 2 → TRUE(부결)
             ChallengeGroup group = group(12L, 1L);
@@ -444,7 +444,7 @@ class OwnerKickVoteServiceTest {
             var response = ownerKickVoteService.castVote(12L, 2L, KickVoteChoice.DISAGREE);
 
             assertThat(response.inProgress()).isFalse();
-            assertThat(group.getOwnerId()).isEqualTo(1L); // 방장 유지
+            assertThat(group.getOwnerId()).isEqualTo(1L); // 그룹장 유지
             assertThat(group.hasActiveKickVote()).isFalse();
             verify(groupMemberRepository).resetAllKickVoteChoices(12L, KickVoteChoice.NONE);
         }
@@ -472,12 +472,12 @@ class OwnerKickVoteServiceTest {
 
             ownerKickVoteService.castVote(12L, 2L, KickVoteChoice.AGREE);
 
-            // 새 방장 선정 없이 그룹이 종료됨
+            // 새 그룹장 선정 없이 그룹이 종료됨
             verify(challengeMemberRepository, never()).findByChallengeIdAndUserId(eq(50L), eq(2L));
         }
 
         @Test
-        @DisplayName("READY 챌린지가 있으면 방장 강퇴 및 새 방장 승격이 ACTIVE·READY 모두 적용된다")
+        @DisplayName("READY 챌린지가 있으면 그룹장 강퇴 및 새 그룹장 승격이 ACTIVE·READY 모두 적용된다")
         void readyChallengeIsAlsoKickedAndReassigned() {
             // 3명(n=2), agree=2 → 가결
             ChallengeGroup group = group(12L, 1L);
@@ -503,6 +503,8 @@ class OwnerKickVoteServiceTest {
             when(challengeMemberRepository.findByChallengeIdAndUserId(51L, 1L)).thenReturn(Optional.of(ownerReadyM));
             when(groupMemberRepository.findAllByGroupIdAndStatus(12L, GroupMemberStatus.ACTIVE))
                     .thenReturn(List.of(remainingMember));
+            when(challengeMemberRepository.findAllByChallengeIdAndStatus(50L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(List.of(remainActiveM));
             when(challengeMemberRepository.findAllByChallengeIdAndStatus(51L, ChallengeMemberStatus.ACTIVE))
                     .thenReturn(List.of(remainReadyM));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 3L)).thenReturn(Optional.of(remainActiveM));

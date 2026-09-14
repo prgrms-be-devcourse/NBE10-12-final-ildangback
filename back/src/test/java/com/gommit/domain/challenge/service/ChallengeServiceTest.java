@@ -558,7 +558,7 @@ class ChallengeServiceTest {
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(requester));
             when(challengeMemberRepository.findAllByChallengeIdAndStatus(50L, ChallengeMemberStatus.ACTIVE))
                     .thenReturn(List.of(requester, member));
-            when(userRepository.findAllByIdIn(List.of(1L, 2L))).thenReturn(List.of(user(1L, "방장"), user(2L, "멤버")));
+            when(userRepository.findAllByIdIn(List.of(1L, 2L))).thenReturn(List.of(user(1L, "그룹장"), user(2L, "멤버")));
 
             when(businessClock.today()).thenReturn(LocalDate.of(2026, 9, 10));
             member.changeExtensionChoice(choice);
@@ -572,7 +572,7 @@ class ChallengeServiceTest {
 
             // then
             assertThat(response).hasSize(2);
-            assertThat(response.get(0).nickname()).isEqualTo("방장");
+            assertThat(response.get(0).nickname()).isEqualTo("그룹장");
             assertThat(response.get(0).todayCheckInCount()).isZero();
             assertThat(response.get(1).nickname()).isEqualTo("멤버");
             assertThat(response.get(1).todayCheckInCount()).isEqualTo(2);
@@ -986,7 +986,7 @@ class ChallengeServiceTest {
             // then
             assertThat(currentOwner.getRole()).isEqualTo(ChallengeMemberRole.MEMBER);
             assertThat(targetMember.getRole()).isEqualTo(ChallengeMemberRole.OWNER);
-            assertThat(group.getOwnerId()).isEqualTo(1L); // seqNo=2 READY → 그룹 방장 변경 없음
+            assertThat(group.getOwnerId()).isEqualTo(1L); // seqNo=2 READY → 그룹 그룹장 변경 없음
         }
 
         @Test

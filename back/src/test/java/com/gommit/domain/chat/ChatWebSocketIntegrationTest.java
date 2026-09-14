@@ -36,7 +36,7 @@ import org.springframework.web.socket.messaging.WebSocketStompClient;
 class ChatWebSocketIntegrationTest extends IntegrationTestSupport {
 
     private static final String OWNER_EMAIL = "wsowner@example.com";
-    private static final String OWNER_NICKNAME = "방장";
+    private static final String OWNER_NICKNAME = "그룹장";
     private static final String STRANGER_EMAIL = "wsstranger@example.com";
     private static final String STRANGER_NICKNAME = "지나가는사람";
     private static final String ERROR_QUEUE = "/user/queue/errors";

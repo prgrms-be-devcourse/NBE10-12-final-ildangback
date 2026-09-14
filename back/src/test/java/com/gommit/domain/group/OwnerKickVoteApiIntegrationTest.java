@@ -13,11 +13,11 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.ResultActions;
 
-@DisplayName("방장 강퇴 투표 API")
+@DisplayName("그룹장 강퇴 투표 API")
 class OwnerKickVoteApiIntegrationTest extends IntegrationTestSupport {
 
     private static final String OWNER_EMAIL = "owner@example.com";
-    private static final String OWNER_NICK = "방장";
+    private static final String OWNER_NICK = "그룹장";
     private static final String MEMBER1_EMAIL = "member1@example.com";
     private static final String MEMBER1_NICK = "멤버1";
     private static final String MEMBER2_EMAIL = "member2@example.com";
@@ -171,7 +171,7 @@ class OwnerKickVoteApiIntegrationTest extends IntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("방장이 투표를 개시하면 403")
+        @DisplayName("그룹장이 투표를 개시하면 403")
         void ownerCannotInitiate() throws Exception {
             var owner = loginAs(OWNER_EMAIL, OWNER_NICK);
             Long groupId = createReadyGroup(owner);
@@ -223,7 +223,7 @@ class OwnerKickVoteApiIntegrationTest extends IntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("비OWNER 멤버가 1명일 때 개시하면 즉시 과반수로 방장이 강퇴된다")
+        @DisplayName("비OWNER 멤버가 1명일 때 개시하면 즉시 과반수로 그룹장이 강퇴된다")
         void immediatelyKicksOwnerInTwoMemberGroup() throws Exception {
             // owner + member1 = 2명, n=1, agree(1)*2=2 > 1 → TRUE, 즉시 가결
             var owner = loginAs(OWNER_EMAIL, OWNER_NICK);
@@ -258,7 +258,7 @@ class OwnerKickVoteApiIntegrationTest extends IntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("방장은 자신의 강퇴 투표에 참여할 수 없다 → 403")
+        @DisplayName("그룹장은 자신의 강퇴 투표에 참여할 수 없다 → 403")
         void ownerCannotVote() throws Exception {
             // 3명: member1 개시 후 agree=1, agree*2=2 > 2=n → FALSE, 투표 유지됨
             var owner = loginAs(OWNER_EMAIL, OWNER_NICK);
@@ -331,7 +331,7 @@ class OwnerKickVoteApiIntegrationTest extends IntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("과반수 찬성 달성 → 방장이 즉시 KICKED되고 새 방장이 선정된다")
+        @DisplayName("과반수 찬성 달성 → 그룹장이 즉시 KICKED되고 새 그룹장이 선정된다")
         void ownerIsKickedWhenMajorityAgrees() throws Exception {
             // 3명(n=2): member1 AGREE(개시), member2 AGREE → agree(2)*2=4 > 2 → 가결
             var g = setupThreePersonActiveGroup();
@@ -348,7 +348,7 @@ class OwnerKickVoteApiIntegrationTest extends IntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("과반수 반대 달성 → 투표가 종료되고 방장은 유지된다")
+        @DisplayName("과반수 반대 달성 → 투표가 종료되고 그룹장은 유지된다")
         void voteEndsWhenMajorityDisagrees() throws Exception {
             // 3명(n=2): member1 AGREE(개시), member2 DISAGREE → disagree(1)*2=2 >= 2 → 부결
             var g = setupThreePersonActiveGroup();

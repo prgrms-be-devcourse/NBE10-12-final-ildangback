@@ -298,7 +298,7 @@ function SeasonManagement({
               onClick={() => setKickVoteOpen(true)}
               className="min-h-8 shrink-0 rounded-full border border-red-200 bg-white px-3 text-xs font-semibold whitespace-nowrap text-red-600 transition-colors hover:bg-red-50"
             >
-              방장 강퇴 투표
+              그룹장 강퇴 투표
             </button>
           ) : undefined
         }

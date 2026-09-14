@@ -78,7 +78,7 @@ export function OwnerKickVoteDialog({
     : null;
 
   return (
-    <BottomSheet isOpen={isOpen} onClose={onClose} title="방장 강퇴 투표">
+    <BottomSheet isOpen={isOpen} onClose={onClose} title="그룹장 강퇴 투표">
       <div className="space-y-3 pb-2">
         <FormAlert message={error} />
 
@@ -92,10 +92,10 @@ export function OwnerKickVoteDialog({
         {!loading && status && !status.inProgress && (
           <>
             <p className="text-sm leading-relaxed text-gray-600">
-              현재 진행 중인 방장 강퇴 투표가 없어요.
+              현재 진행 중인 그룹장 강퇴 투표가 없어요.
               <br />
-              투표를 시작하면 자동으로 찬성 처리되며, 과반수 찬성 시 방장이 즉시
-              교체돼요.
+              투표를 시작하면 자동으로 찬성 처리되며, 과반수 찬성 시 그룹장이
+              즉시 교체돼요.
             </p>
             <p className="rounded-xl bg-purple-50 px-4 py-3 text-sm text-purple-700">
               ⏱ 투표는 개시 후 24시간 동안 유효해요.
@@ -122,7 +122,7 @@ export function OwnerKickVoteDialog({
               expiresLabel={expiresLabel}
             />
             <p className="text-center text-sm text-gray-600">
-              방장 강퇴에 동의하시나요?
+              그룹장 강퇴에 동의하시나요?
             </p>
             <div className="flex gap-2">
               <Button

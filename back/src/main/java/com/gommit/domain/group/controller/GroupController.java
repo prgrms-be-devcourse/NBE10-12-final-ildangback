@@ -124,8 +124,8 @@ public class GroupController {
     }
 
     @Operation(
-            summary = "방장 강퇴 투표",
-            description = "ACTIVE 챌린지가 진행 중인 그룹에서 방장이 아닌 그룹원이 방장 강퇴 투표를 시작. 개시자는 자동을 AGREE 처리, 과반수 이상 찬성이면 결과 확정")
+            summary = "그룹장 강퇴 투표",
+            description = "ACTIVE 챌린지가 진행 중인 그룹에서 그룹장이 아닌 그룹원이 그룹장 강퇴 투표를 시작. 개시자는 자동을 AGREE 처리, 과반수 이상 찬성이면 결과 확정")
     @PostMapping("/{groupId}/ownerKickVotes")
     public ResponseEntity<KickVoteStatusResponse> initiateVote(
             @PathVariable Long groupId, @CurrentUser SecurityUser actor) {
@@ -134,15 +134,15 @@ public class GroupController {
     }
 
     @Operation(
-            summary = "방장 강퇴 투표 참여(AGREE 또는 DISAGREE)",
-            description = "방장 강퇴 투표에 AGREE 또는 DISAGREE로 참여. 방장은 참여 불가하며 중복 투표와 NONE 선택은 허용하지 않음.")
+            summary = "그룹장 강퇴 투표 참여(AGREE 또는 DISAGREE)",
+            description = "그룹장 강퇴 투표에 AGREE 또는 DISAGREE로 참여. 그룹장은 참여 불가하며 중복 투표와 NONE 선택은 허용하지 않음.")
     @PostMapping("/{groupId}/ownerKickVotes/cast")
     public ResponseEntity<KickVoteStatusResponse> castVote(
             @PathVariable Long groupId, @Valid @RequestBody CastVoteRequest request, @CurrentUser SecurityUser actor) {
         return ResponseEntity.ok(ownerKickVoteService.castVote(groupId, actor.getId(), request.choice()));
     }
 
-    @Operation(summary = "방장 강퇴 투표 현황 조회", description = "현재 진행 중인 방장 강퇴 투표의 찬성과 반대 수. 만료 시각, 본인의 투표 여부를 조회.")
+    @Operation(summary = "그룹장 강퇴 투표 현황 조회", description = "현재 진행 중인 그룹장 강퇴 투표의 찬성과 반대 수. 만료 시각, 본인의 투표 여부를 조회.")
     @GetMapping("/{groupId}/ownerKickVotes")
     public ResponseEntity<KickVoteStatusResponse> getVoteStatus(
             @PathVariable Long groupId, @CurrentUser SecurityUser actor) {
