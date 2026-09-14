@@ -7,6 +7,7 @@ import {
   CHECKIN_VIDEO_MAX_EDGE,
   pickRecorderMimeType,
 } from "../lib/squareVideoCapture";
+import { CameraPermissionError } from "./CameraPermissionError";
 
 interface Props {
   onCaptured: (blob: Blob) => void;
@@ -175,27 +176,23 @@ export function CheckInVideoCamera({ onCaptured }: Props) {
 
   if (state === "denied" || state === "error" || state === "unsupported") {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
-        <p className="text-[15px] font-semibold text-gray-900">
-          {state === "denied"
+      <CameraPermissionError
+        title={
+          state === "denied"
             ? "카메라 권한이 필요해요"
             : state === "unsupported"
               ? "이 기기에서는 영상 녹화를 지원하지 않아요"
-              : "카메라를 열 수 없어요"}
-        </p>
-        <p className="mt-2 text-[13px] text-gray-500">
-          {state === "denied"
+              : "카메라를 열 수 없어요"
+        }
+        description={
+          state === "denied"
             ? "브라우저 설정에서 이 사이트의 카메라 접근을 허용한 뒤 다시 시도해 주세요."
             : state === "unsupported"
               ? "대신 사진으로 인증해 주세요."
-              : "카메라를 쓸 수 있는 기기인지 확인한 뒤 다시 시도해 주세요."}
-        </p>
-        {state !== "unsupported" && (
-          <Button variant="secondary" className="mt-6" onClick={retry}>
-            다시 시도
-          </Button>
-        )}
-      </div>
+              : "카메라를 쓸 수 있는 기기인지 확인한 뒤 다시 시도해 주세요."
+        }
+        onRetry={state === "unsupported" ? undefined : retry}
+      />
     );
   }
 
