@@ -1,0 +1,16 @@
+[versions]
+agp = "9.4.0"
+kotlin = "2.4.20"
+androidxActivity = "1.13.0"
+androidxBrowser = "1.10.0"
+androidxCore = "1.19.0"
+
+[libraries]
+androidx-activity = { module = "androidx.activity:activity-ktx", version.ref = "androidxActivity" }
+androidx-browser = { module = "androidx.browser:browser", version.ref = "androidxBrowser" }
+androidx-core = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

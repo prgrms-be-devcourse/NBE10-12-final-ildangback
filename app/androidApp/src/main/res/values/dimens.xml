@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      상태바 아래 숨통. 웹 화면은 브라우저 주소창(56dp)이 사이에 있는 것을 전제로 그려져서,
+      주소창이 없는 앱에서는 화면 제목이 상태바에 붙어 보인다.
+
+      앱 전용 보정이다. 아이폰 홈 화면 추가에서도 같은 문제가 나는데 그쪽은 프론트에서
+      고쳐야 한다 - docs/앱설계.md 5-0.
+    -->
+    <dimen name="web_top_breathing_room">6dp</dimen>
+</resources>
