@@ -39,6 +39,10 @@ public class CheckIn extends BaseEntity {
     @Column(nullable = false, length = 20)
     private MediaType mediaType;
 
+    // 영상 체크인의 그리드 표시용 썸네일(정지 프레임) storage key. 이미지 체크인은 null.
+    @Column(length = 255)
+    private String posterKey;
+
     @Column(length = MEMO_MAX_LENGTH)
     private String memo;
 
@@ -52,6 +56,7 @@ public class CheckIn extends BaseEntity {
             CheckInType checkInType,
             String mediaKey,
             MediaType mediaType,
+            String posterKey,
             String memo,
             LocalDate businessDate) {
         this.challengeId = challengeId;
@@ -60,7 +65,13 @@ public class CheckIn extends BaseEntity {
         this.checkInType = checkInType;
         this.mediaKey = mediaKey;
         this.mediaType = mediaType;
+        this.posterKey = posterKey;
         this.memo = memo;
         this.businessDate = businessDate;
+    }
+
+    // posterKey 유무는 이 엔티티의 사실이라 여기 둔다(CheckInMediaUrl 은 ID 전용 포맷터로 유지).
+    public boolean hasPoster() {
+        return posterKey != null;
     }
 }

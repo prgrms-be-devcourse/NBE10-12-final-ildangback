@@ -44,8 +44,8 @@ export const groupCreateSchema = z
         .min(1, "하루 최소 1회 인증해야 합니다.")
         .max(4, "하루 최대 4회까지 설정할 수 있어요."),
       allowedTypes: z
-        .array(z.literal("PHOTO"))
-        .length(1, "사진 인증을 선택해주세요."),
+        .array(z.enum(["PHOTO", "VIDEO"]))
+        .min(1, "인증 방식을 하나 이상 선택해주세요."),
     }),
   })
   .superRefine((values, ctx) => {

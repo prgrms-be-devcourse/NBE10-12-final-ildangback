@@ -11,6 +11,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
@@ -32,7 +33,9 @@ import com.gommit.domain.checkin.dto.response.TodayCheckInStatusResponse;
 import com.gommit.domain.checkin.entity.CheckIn;
 import com.gommit.domain.checkin.entity.CheckInType;
 import com.gommit.domain.checkin.entity.MediaType;
+import com.gommit.domain.checkin.event.OrphanMediaCleanupEvent;
 import com.gommit.domain.checkin.media.CheckInMediaStore;
+import com.gommit.domain.checkin.media.UploadedMedia;
 import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.checkin.support.CheckInPreconditions;
 import com.gommit.domain.checkin.support.CheckInPreconditions.ReadDateAccess;
@@ -60,6 +63,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -105,6 +109,9 @@ class CheckInServiceTest {
     @Mock
     private DailyLogService dailyLogService;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private final PointProperties pointProperties = new PointProperties(10, 5, 0, 0);
 
     private CheckInService service;
@@ -124,7 +131,8 @@ class CheckInServiceTest {
                 challengeGroupRepository,
                 pointProperties,
                 new BusinessClock(clock),
-                dailyLogService);
+                dailyLogService,
+                eventPublisher);
         lenient().when(userService.findNicknames(anyList())).thenReturn(Map.of(USER_ID, "인증러"));
         lenient().when(challengeGroupRepository.findNameById(1L)).thenReturn(Optional.of("오운완 모임"));
     }
@@ -138,13 +146,14 @@ class CheckInServiceTest {
     }
 
     private void givenActiveMemberAndValidDay(Challenge challenge) {
-        when(preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
+        when(preconditions.getActiveChallengeForActiveMemberForUpdate(CHALLENGE_ID, USER_ID))
                 .thenReturn(challenge);
         lenient().when(progressCalculator.isCheckInDay(challenge, TODAY)).thenReturn(true);
     }
 
     private CheckIn checkInRow(Long id) {
-        CheckIn checkIn = new CheckIn(CHALLENGE_ID, USER_ID, 1, CheckInType.PHOTO, "key", MediaType.IMAGE, null, TODAY);
+        CheckIn checkIn =
+                new CheckIn(CHALLENGE_ID, USER_ID, 1, CheckInType.PHOTO, "key", MediaType.IMAGE, null, null, TODAY);
         ReflectionTestUtils.setField(checkIn, "id", id);
         return checkIn;
     }
@@ -160,7 +169,8 @@ class CheckInServiceTest {
             givenActiveMemberAndValidDay(challenge);
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(1);
-            when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
+            when(mediaStore.store(any()))
+                    .thenReturn(new UploadedMedia("check-ins/2026/09/uuid.png", MediaType.IMAGE, null));
             when(checkInRepository.saveAndFlush(any(CheckIn.class))).thenAnswer(inv -> {
                 CheckIn c = inv.getArgument(0);
                 ReflectionTestUtils.setField(c, "id", 100L);
@@ -190,7 +200,8 @@ class CheckInServiceTest {
             givenActiveMemberAndValidDay(challenge);
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(0);
-            when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
+            when(mediaStore.store(any()))
+                    .thenReturn(new UploadedMedia("check-ins/2026/09/uuid.png", MediaType.IMAGE, null));
             when(checkInRepository.saveAndFlush(any(CheckIn.class))).thenAnswer(inv -> inv.getArgument(0));
             when(challengeStreakService.onMemberDailyComplete(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(new MemberCheckInResult(3, 2, 4, false));
@@ -210,7 +221,8 @@ class CheckInServiceTest {
             givenActiveMemberAndValidDay(challenge);
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(1);
-            when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
+            when(mediaStore.store(any()))
+                    .thenReturn(new UploadedMedia("check-ins/2026/09/uuid.png", MediaType.IMAGE, null));
             when(checkInRepository.saveAndFlush(any(CheckIn.class))).thenAnswer(inv -> inv.getArgument(0));
             when(challengeGroupRepository.findNameById(1L)).thenReturn(Optional.empty());
 
@@ -224,7 +236,7 @@ class CheckInServiceTest {
         @Test
         @DisplayName("진행 중이 아닌 챌린지면 CHALLENGE_NOT_ACTIVE")
         void rejectsInactiveChallenge() {
-            when(preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
+            when(preconditions.getActiveChallengeForActiveMemberForUpdate(CHALLENGE_ID, USER_ID))
                     .thenThrow(new BusinessException(ErrorCode.CHALLENGE_NOT_ACTIVE));
 
             assertBusiness(
@@ -235,7 +247,7 @@ class CheckInServiceTest {
         @Test
         @DisplayName("참여자가 아니거나 이탈했으면 CHALLENGE_NOT_MEMBER")
         void rejectsNonMember() {
-            when(preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
+            when(preconditions.getActiveChallengeForActiveMemberForUpdate(CHALLENGE_ID, USER_ID))
                     .thenThrow(new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER));
 
             assertBusiness(
@@ -247,7 +259,7 @@ class CheckInServiceTest {
         @DisplayName("인증 대상일이 아니면 NOT_CHECK_IN_DAY")
         void rejectsNonCheckInDay() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
-            when(preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
+            when(preconditions.getActiveChallengeForActiveMemberForUpdate(CHALLENGE_ID, USER_ID))
                     .thenReturn(challenge);
             when(progressCalculator.isCheckInDay(challenge, TODAY)).thenReturn(false);
 
@@ -260,13 +272,33 @@ class CheckInServiceTest {
         void rejectsDisallowedType() {
             // allowPhoto=false → 허용 방식 목록이 비어 PHOTO 제출이 거부된다.
             Challenge challenge = challenge(CHALLENGE_ID, FrequencyType.DAILY, null, null, 1, false);
-            when(preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
+            when(preconditions.getActiveChallengeForActiveMemberForUpdate(CHALLENGE_ID, USER_ID))
                     .thenReturn(challenge);
             when(progressCalculator.isCheckInDay(challenge, TODAY)).thenReturn(true);
 
             assertBusiness(
                     () -> service.submit(USER_ID, CHALLENGE_ID, request(null), media()),
                     ErrorCode.CHECK_IN_TYPE_NOT_ALLOWED);
+        }
+
+        @Test
+        @DisplayName("요청 checkInType 과 업로드 파일에서 유도된 mediaType 이 다르면 CHECK_IN_TYPE_MEDIA_MISMATCH")
+        void rejectsCheckInTypeMediaMismatch() {
+            // request(null) 은 checkInType=PHOTO 인데, 실제 업로드가 영상으로 판정된 상황(예: 클라이언트가
+            // PHOTO 로 선언하고 영상 파일을 올림) — allowedCheckInTypes() 검증만으론 못 잡는다.
+            Challenge challenge = dailyChallenge(CHALLENGE_ID, 3);
+            givenActiveMemberAndValidDay(challenge);
+            when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
+                    .thenReturn(0);
+            when(mediaStore.store(any()))
+                    .thenReturn(new UploadedMedia("check-ins/2026/09/clip.mp4", MediaType.VIDEO, "poster.jpg"));
+
+            assertBusiness(
+                    () -> service.submit(USER_ID, CHALLENGE_ID, request(null), media()),
+                    ErrorCode.CHECK_IN_TYPE_MEDIA_MISMATCH);
+
+            verify(mediaStore).delete("check-ins/2026/09/clip.mp4", "poster.jpg");
+            verify(checkInRepository, never()).saveAndFlush(any());
         }
 
         @Test
@@ -289,7 +321,8 @@ class CheckInServiceTest {
             givenActiveMemberAndValidDay(challenge);
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(0);
-            when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
+            when(mediaStore.store(any()))
+                    .thenReturn(new UploadedMedia("check-ins/2026/09/uuid.png", MediaType.IMAGE, null));
             when(checkInRepository.saveAndFlush(any(CheckIn.class)))
                     .thenThrow(new DataIntegrityViolationException("uk_check_ins"));
 
@@ -297,8 +330,9 @@ class CheckInServiceTest {
                     () -> service.submit(USER_ID, CHALLENGE_ID, request(null), media()),
                     ErrorCode.DAILY_LIMIT_EXCEEDED);
 
-            // insert 가 실패하면 방금 쓴 파일을 정리한다 — orphan 방지.
-            verify(mediaStore).delete(anyString());
+            // insert 가 실패하면 방금 쓴 파일을 정리한다 — orphan 방지 (롤백 이후 비동기 이벤트로).
+            // (이미지라 posterKey 는 null)
+            verify(eventPublisher).publishEvent(new OrphanMediaCleanupEvent("check-ins/2026/09/uuid.png", null));
             verify(personalPointService, never()).reward(anyLong(), anyLong(), anyInt(), any(), any());
         }
 
@@ -309,7 +343,8 @@ class CheckInServiceTest {
             givenActiveMemberAndValidDay(challenge);
             when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
                     .thenReturn(1);
-            when(mediaStore.store(any())).thenReturn("check-ins/2026/09/uuid.png");
+            when(mediaStore.store(any()))
+                    .thenReturn(new UploadedMedia("check-ins/2026/09/uuid.png", MediaType.IMAGE, null));
             when(checkInRepository.saveAndFlush(any(CheckIn.class))).thenAnswer(inv -> inv.getArgument(0));
             doThrow(new IllegalStateException("적립 실패"))
                     .when(personalPointService)
@@ -318,7 +353,7 @@ class CheckInServiceTest {
             assertThatThrownBy(() -> service.submit(USER_ID, CHALLENGE_ID, request(null), media()))
                     .isInstanceOf(IllegalStateException.class);
 
-            verify(mediaStore).delete("check-ins/2026/09/uuid.png");
+            verify(eventPublisher).publishEvent(new OrphanMediaCleanupEvent("check-ins/2026/09/uuid.png", null));
         }
     }
 
@@ -507,6 +542,32 @@ class CheckInServiceTest {
 
             assertBusiness(() -> service.loadCheckInMedia(USER_ID, 5L), ErrorCode.CHALLENGE_NOT_MEMBER);
         }
+
+        @Test
+        @DisplayName("포스터 서빙 — 영상 체크인(posterKey 있음)은 포스터 파일을 로드한다")
+        void loadPoster() {
+            CheckIn checkIn = checkIn(5L, CHALLENGE_ID, TODAY.minusDays(2));
+            ReflectionTestUtils.setField(checkIn, "posterKey", "check-ins/2026/09/uuid-poster.jpg");
+            when(checkInRepository.findById(5L)).thenReturn(Optional.of(checkIn));
+            when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID))
+                    .thenReturn(new ReadDateAccess(challenge, null));
+            Resource resource = new ByteArrayResource(new byte[] {9});
+            when(mediaStore.load("check-ins/2026/09/uuid-poster.jpg")).thenReturn(resource);
+
+            assertThat(service.loadCheckInPoster(USER_ID, 5L)).isSameAs(resource);
+        }
+
+        @Test
+        @DisplayName("포스터 서빙 — 이미지 체크인(posterKey 없음)은 MEDIA_NOT_FOUND")
+        void loadPosterWithoutPosterKey() {
+            CheckIn checkIn = checkIn(5L, CHALLENGE_ID, TODAY.minusDays(2));
+            when(checkInRepository.findById(5L)).thenReturn(Optional.of(checkIn));
+            when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID))
+                    .thenReturn(new ReadDateAccess(challenge, null));
+
+            assertBusiness(() -> service.loadCheckInPoster(USER_ID, 5L), ErrorCode.MEDIA_NOT_FOUND);
+            verify(mediaStore, never()).load(any());
+        }
     }
 
     @Nested
@@ -562,11 +623,70 @@ class CheckInServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("deleteByAdmin")
+    class DeleteByAdmin {
+
+        @Test
+        @DisplayName("성공 — 인증 행을 지우고 미디어(mediaKey, posterKey)를 함께 정리한다")
+        void deletesRowAndMedia() {
+            CheckIn checkIn = new CheckIn(
+                    CHALLENGE_ID,
+                    USER_ID,
+                    1,
+                    CheckInType.VIDEO,
+                    "check-ins/2026/09/uuid.mp4",
+                    MediaType.VIDEO,
+                    "check-ins/2026/09/uuid-poster.jpg",
+                    null,
+                    TODAY);
+            ReflectionTestUtils.setField(checkIn, "id", 100L);
+            when(checkInRepository.findById(100L)).thenReturn(Optional.of(checkIn));
+
+            service.deleteByAdmin(100L);
+
+            verify(checkInRepository).delete(checkIn);
+            verify(mediaStore).delete("check-ins/2026/09/uuid.mp4", "check-ins/2026/09/uuid-poster.jpg");
+        }
+
+        @Test
+        @DisplayName("미디어 삭제가 실패해도 인증 행 삭제는 이미 커밋된 채로 예외를 삼킨다")
+        void swallowsMediaDeleteFailure() {
+            CheckIn checkIn = checkInRow(100L);
+            when(checkInRepository.findById(100L)).thenReturn(Optional.of(checkIn));
+            doThrow(new RuntimeException("storage down"))
+                    .when(mediaStore)
+                    .delete(anyString(), isNull());
+
+            service.deleteByAdmin(100L);
+
+            verify(checkInRepository).delete(checkIn);
+        }
+
+        @Test
+        @DisplayName("없는 id 는 아무 것도 하지 않는다")
+        void noopWhenNotFound() {
+            when(checkInRepository.findById(999L)).thenReturn(Optional.empty());
+
+            service.deleteByAdmin(999L);
+
+            verify(checkInRepository, never()).delete(any(CheckIn.class));
+        }
+    }
+
     // ===== helpers =====
 
     private static CheckIn checkIn(long id, long challengeId, LocalDate businessDate) {
         CheckIn checkIn = new CheckIn(
-                challengeId, USER_ID, 1, CheckInType.PHOTO, "check-ins/k.png", MediaType.IMAGE, null, businessDate);
+                challengeId,
+                USER_ID,
+                1,
+                CheckInType.PHOTO,
+                "check-ins/k.png",
+                MediaType.IMAGE,
+                null,
+                null,
+                businessDate);
         ReflectionTestUtils.setField(checkIn, "id", id);
         return checkIn;
     }

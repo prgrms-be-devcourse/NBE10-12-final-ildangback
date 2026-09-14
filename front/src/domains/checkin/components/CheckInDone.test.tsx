@@ -14,6 +14,7 @@ const base: CheckInResultResponse = {
     checkInType: "PHOTO",
     mediaUrl: "https://cdn/1.jpg",
     mediaType: "IMAGE",
+    posterUrl: null,
     memo: null,
     createdAt: "2026-09-02T10:00:00",
   },

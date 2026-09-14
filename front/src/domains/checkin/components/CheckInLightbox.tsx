@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { formatDateTimeMinute } from "../../../shared/lib/date";
 import { useBodyScrollLock } from "../../../shared/lib/useBodyScrollLock";
 import { AuthedImage } from "../../../shared/ui/AuthedImage";
+import { AuthedVideo } from "../../../shared/ui/AuthedVideo";
 import { ReportDialog } from "../../report/components/ReportDialog";
 import { badgeColor, nicknameInitial } from "../lib/authorBadge";
 import type { CheckIn } from "../types";
@@ -82,12 +83,23 @@ export function CheckInLightbox({
         onClick={(e) => e.stopPropagation()}
         className="m-auto w-full max-w-[430px] px-4 py-14"
       >
-        <AuthedImage
-          src={item.mediaUrl}
-          lazy={false}
-          alt={`${item.nickname}의 인증`}
-          className="w-full rounded-xl object-contain"
-        />
+        {item.mediaType === "VIDEO" ? (
+          <AuthedVideo
+            src={item.mediaUrl}
+            controls
+            autoPlay
+            loop
+            playsInline
+            className="w-full rounded-xl"
+          />
+        ) : (
+          <AuthedImage
+            src={item.mediaUrl}
+            lazy={false}
+            alt={`${item.nickname}의 인증`}
+            className="w-full rounded-xl object-contain"
+          />
+        )}
 
         <div className="mt-5 text-white">
           {showAuthor && (

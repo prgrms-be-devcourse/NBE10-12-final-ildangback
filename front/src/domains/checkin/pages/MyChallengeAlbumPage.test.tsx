@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -94,14 +94,27 @@ describe("MyChallengeAlbumPage", () => {
     );
   });
 
-  it("toasts instead of filtering on the unsupported video chip", async () => {
+  it("filters by the video chip", async () => {
     renderAt(2);
     await screen.findByText("매일 독서 30분 앨범");
 
     await userEvent.click(screen.getByRole("button", { name: "영상" }));
 
+    await waitFor(() => {
+      expect(getMyCheckIns).toHaveBeenLastCalledWith(
+        expect.objectContaining({ checkInType: "VIDEO" }),
+      );
+    });
+  });
+
+  it("toasts instead of filtering on the unsupported live chip", async () => {
+    renderAt(2);
+    await screen.findByText("매일 독서 30분 앨범");
+
+    await userEvent.click(screen.getByRole("button", { name: "라이브" }));
+
     expect(
-      await screen.findByText("영상 인증은 아직 지원하지 않아요"),
+      await screen.findByText("라이브 인증은 아직 지원하지 않아요"),
     ).toBeInTheDocument();
   });
 });

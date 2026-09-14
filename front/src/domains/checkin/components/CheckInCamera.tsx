@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Button } from "../../../shared/ui/Button";
 import { captureSquareJpeg } from "../lib/squareCapture";
+import { useCameraStream } from "../lib/useCameraStream";
+import { CameraPermissionError } from "./CameraPermissionError";
 
 interface Props {
   onCaptured: (blob: Blob) => void;
@@ -13,62 +15,19 @@ type CamState = "starting" | "ready" | "denied" | "error";
  * 마스킹한다. 실제 크롭은 촬영 시 canvas 가 한다(ADR 0001). 갤러리에서 불러오는 경로는 없다.
  */
 export function CheckInCamera({ onCaptured }: Props) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  // HTTP(비보안 컨텍스트)·일부 인앱 브라우저는 mediaDevices 자체가 없다 — 바로 시작.
-  const [state, setState] = useState<CamState>(() =>
-    navigator.mediaDevices ? "starting" : "error",
-  );
-  const [attempt, setAttempt] = useState(0);
+  const { videoRef, error, stop, retry } = useCameraStream();
+  // "ready" 는 첫 프레임 메타데이터가 온 뒤 <video onLoadedMetadata> 에서 set 한다.
+  const [ready, setReady] = useState(false);
+  const [captureError, setCaptureError] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const stop = useCallback(() => {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    // 멈춘 스트림 참조를 <video> 에서 끊어 미디어 객체 회수를 앞당긴다.
-    if (videoRef.current) videoRef.current.srcObject = null;
-  }, []);
+  const state: CamState =
+    error ?? (captureError ? "error" : ready ? "ready" : "starting");
 
-  useEffect(() => {
-    let cancelled = false;
-    // mediaDevices 가 없으면 초기 state 가 이미 "error" 다. getUserMedia 접근 시
-    // 동기 TypeError 로 렌더 트리가 죽으므로 호출 자체를 건너뛴다.
-    if (!navigator.mediaDevices) return;
-    navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: "environment" }, audio: false })
-      .then((stream) => {
-        if (cancelled) {
-          stream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          // play() 거부(자동재생 정책 등)는 권한 거부가 아니다. muted+playsInline+autoPlay
-          // 로 대개 스스로 재생되므로 여기서 실패해도 화면을 막지 않는다.
-          void videoRef.current.play().catch(() => {});
-        }
-        // "ready" 는 첫 프레임 메타데이터가 온 뒤 <video onLoadedMetadata> 에서 set 한다.
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setState(
-          err instanceof DOMException && err.name === "NotAllowedError"
-            ? "denied"
-            : "error",
-        );
-      });
-
-    return () => {
-      cancelled = true;
-      stop();
-    };
-  }, [attempt, stop]);
-
-  function retry() {
-    if (!navigator.mediaDevices) return; // 되돌릴 수 없는 환경 — 재시도 무의미
-    setState("starting");
-    setAttempt((n) => n + 1);
+  function handleRetry() {
+    setReady(false);
+    setCaptureError(false);
+    retry();
   }
 
   async function shoot() {
@@ -89,7 +48,7 @@ export function CheckInCamera({ onCaptured }: Props) {
       onCaptured(blob);
     } catch {
       stop(); // 캡처 실패해도 카메라 스트림은 반드시 놓는다(자원 누수·사생활)
-      setState("error");
+      setCaptureError(true);
     } finally {
       setBusy(false);
     }
@@ -97,21 +56,19 @@ export function CheckInCamera({ onCaptured }: Props) {
 
   if (state === "denied" || state === "error") {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
-        <p className="text-[15px] font-semibold text-gray-900">
-          {state === "denied"
+      <CameraPermissionError
+        title={
+          state === "denied"
             ? "카메라 권한이 필요해요"
-            : "카메라를 열 수 없어요"}
-        </p>
-        <p className="mt-2 text-[13px] text-gray-500">
-          {state === "denied"
+            : "카메라를 열 수 없어요"
+        }
+        description={
+          state === "denied"
             ? "브라우저 설정에서 이 사이트의 카메라 접근을 허용한 뒤 다시 시도해 주세요."
-            : "카메라를 쓸 수 있는 기기인지 확인한 뒤 다시 시도해 주세요."}
-        </p>
-        <Button variant="secondary" className="mt-6" onClick={retry}>
-          다시 시도
-        </Button>
-      </div>
+            : "카메라를 쓸 수 있는 기기인지 확인한 뒤 다시 시도해 주세요."
+        }
+        onRetry={handleRetry}
+      />
     );
   }
 
@@ -123,7 +80,7 @@ export function CheckInCamera({ onCaptured }: Props) {
           autoPlay
           playsInline
           muted
-          onLoadedMetadata={() => setState("ready")}
+          onLoadedMetadata={() => setReady(true)}
           className="size-full object-cover"
         />
         {state === "starting" && (

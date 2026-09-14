@@ -4,11 +4,13 @@ import com.gommit.domain.challenge.entity.ChallengeMember;
 import com.gommit.domain.challenge.entity.ChallengeMemberRole;
 import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.entity.ExtensionChoice;
+import jakarta.persistence.LockModeType;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -16,6 +18,13 @@ public interface ChallengeMemberRepository extends JpaRepository<ChallengeMember
     List<ChallengeMember> findAllByChallengeId(Long challengeId);
 
     Optional<ChallengeMember> findByChallengeIdAndUserId(Long challengeId, Long userId);
+
+    // 인증 제출 동시성 제어용. 같은 (challengeId, userId) 로 들어온 요청을 이 행 락으로 줄 세워서
+    // round_no 계산~insert 구간에서 uk_check_ins 경합(데드락 포함)이 안 생기게 한다.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select m from ChallengeMember m where m.challenge.id = :challengeId and m.userId = :userId")
+    Optional<ChallengeMember> findByChallengeIdAndUserIdForUpdate(
+            @Param("challengeId") Long challengeId, @Param("userId") Long userId);
 
     Optional<ChallengeMember> findByChallengeIdAndRole(Long challengeId, ChallengeMemberRole role);
 
