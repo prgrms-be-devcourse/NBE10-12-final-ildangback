@@ -1,5 +1,42 @@
-# EC2 /opt/team1-app 에 배치. CD 가 .env 의 IMAGE_TAG 를 갱신하고 `docker compose up -d`.
+# EC2 /opt/team1-app 에 배치. CD 가 .env 의 IMAGE_TAG 를 갱신하고 deploy.sh 를 돌린다.
+#
+# back 은 로컬 blue-green: back-blue/back-green 둘 다 정의만 해두고, 배포 중에만 비활성 색을 새 이미지로 잠깐
+# 같이 띄운 뒤 nginx upstream 을 그쪽으로 스위치, 이전 색은 내린다. 평상시엔 한쪽만 running.
+# 어느 쪽이 active 인지는 컨테이너 정의가 아니라 nginx/conf.d/active-backend.conf(런타임 생성,
+# git 비추적)가 갖는다 — deploy.sh 가 그 파일을 읽고 쓴다.
 name: gommit
+
+x-back-common: &back-common
+  image: ghcr.io/${GHCR_REPO}/back:${IMAGE_TAG:-latest}
+  restart: unless-stopped
+  env_file:
+    - .env
+  environment:
+    JAVA_OPTS: "-Xms256m -Xmx768m -XX:+ExitOnOutOfMemoryError -Duser.timezone=Asia/Seoul"
+    SPRING_PROFILES_ACTIVE: prod
+  volumes:
+    - media-tmp:/app/media-tmp      # ffmpeg 임시파일
+  depends_on:
+    mysql:
+      condition: service_healthy
+  # montageExecutor(MontageAsyncConfig)의 awaitTerminationSeconds=30 이 실제로 발동하려면
+  # SIGTERM 후 SIGKILL 까지 최소 30초는 있어야 함 — docker 기본 10초보다 여유 둠.
+  stop_grace_period: 40s
+  # 1600M = 인스턴스 4GB(t3a.medium) 전환분 반영. DailyLog 몽타주(feat/36, main 미병합) 완화
+  # blue/green 이 배포 중 잠깐 같이 뜨는 순간에도 둘이 겹쳐 인스턴스 메모리(4G)를 넘으면 안 되어 조정
+  deploy:
+    resources:
+      limits:
+        memory: 1600M
+  # 이미지 Dockerfile 의 HEALTHCHECK 와 값을 맞춘다 (드리프트 방지).
+  # retries 5 = start_period 후 ~150s 여유 — 아침 콜드스타트(2분+)에 --wait 가
+  # 조기에 unhealthy 로 판정하지 않도록.
+  healthcheck:
+    test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+    interval: 30s
+    timeout: 3s
+    retries: 5
+    start_period: 90s
 
 services:
   nginx:
@@ -11,42 +48,18 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./certs:/etc/nginx/certs:ro   # origin.pem / origin.key (Cloudflare Origin CA)
-    depends_on:
-      back:
-        condition: service_healthy
     deploy:
       resources:
         limits:
           memory: 64M
 
-  back:
-    image: ghcr.io/${GHCR_REPO}/back:${IMAGE_TAG:-latest}
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      JAVA_OPTS: "-Xms256m -Xmx768m -XX:+ExitOnOutOfMemoryError -Duser.timezone=Asia/Seoul"
-      SPRING_PROFILES_ACTIVE: prod
-    volumes:
-      - media-tmp:/app/media-tmp      # ffmpeg 임시파일
-    depends_on:
-      mysql:
-        condition: service_healthy
-    # 1800M = 인스턴스 4GB(t3a.medium) 전환분 반영. DailyLog 몽타주(feat/36, main 미병합) 완화
-    # 실측 최악 1,264~1,327M(6×8회차+갤러리12명 동시)에 안전율(측정환경=Docker Desktop VM, 실 EC2 Linux 오차 보정).
-    deploy:
-      resources:
-        limits:
-          memory: 1800M
-    # 이미지 Dockerfile 의 HEALTHCHECK 와 값을 맞춘다 (드리프트 방지).
-    # retries 5 = start_period 후 ~150s 여유 — 아침 콜드스타트(2분+)에 --wait 가
-    # 조기에 unhealthy 로 판정하지 않도록.
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 5
-      start_period: 90s
+  back-blue:
+    <<: *back-common
+    container_name: back-blue
+
+  back-green:
+    <<: *back-common
+    container_name: back-green
 
   mysql:
     image: mysql:8.4
@@ -91,11 +104,16 @@ services:
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
-    depends_on:
-      back:
-        condition: service_healthy
-    # 예측 200~400M (aws-usage-summary.md) + 여유. back(1800)+mysql(600)+nginx(64) 기존 합계
-    # 위에 이 4개 컨테이너 예측 합 ~1,064M 을 더해도 4GB 대비 헤드룸 안에 들어온다.
+    # back 에 대한 depends_on 없음 — blue-green 전환으로 back 서비스가 없어짐(back-blue/back-green),
+    # 어느 쪽이 active 인지 compose 로 정적으로 표현 불가라 nginx 와 같은 이유로 뺐다. 스크레이프
+    # 실패는 prometheus 가 알아서 재시도하므로 기동 순서 문제 없음.
+    # 예측 200~400M (aws-usage-summary.md) + 여유. back(1600)+mysql(600)+nginx(64) 기존 합계(2,264M)
+    # 위에 이 4개 컨테이너(prometheus/loki/promtail/grafana) 예측 합 ~1,064M 을 더한 평상시 합은
+    # 3,328M 로 4GB 안에 들어온다. 단, 배포 중 blue/green 이 잠깐 겹치는 순간(back ×2)은
+    # 3,864M(back-common 메모의 계산) + 이 1,064M = 4,928M 로 인스턴스 한도를 넘는다 — 지금은
+    # limit 일 뿐 실측 사용량은 그보다 낮게 잡아 버텨왔지만, 모니터링까지 상시 켜진 채로
+    # 배포하는 조합은 별도로 검증 안 됨. 인프라 담당자 확인 필요(리소스 추가 조정 또는 배포
+    # 시간대에 모니터링 스택 일시 정지 등).
     deploy:
       resources:
         limits:
