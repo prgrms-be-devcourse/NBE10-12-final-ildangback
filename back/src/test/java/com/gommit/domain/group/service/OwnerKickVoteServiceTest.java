@@ -503,6 +503,8 @@ class OwnerKickVoteServiceTest {
             when(challengeMemberRepository.findByChallengeIdAndUserId(51L, 1L)).thenReturn(Optional.of(ownerReadyM));
             when(groupMemberRepository.findAllByGroupIdAndStatus(12L, GroupMemberStatus.ACTIVE))
                     .thenReturn(List.of(remainingMember));
+            when(challengeMemberRepository.findAllByChallengeIdAndStatus(51L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(List.of(remainReadyM));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 3L)).thenReturn(Optional.of(remainActiveM));
             when(challengeMemberRepository.findByChallengeIdAndUserId(51L, 3L)).thenReturn(Optional.of(remainReadyM));
 

@@ -198,7 +198,7 @@ public class OwnerKickVoteService {
                             .map(ChallengeMember::getUserId)
                             .collect(Collectors.toSet());
             candidates = remaining.stream()
-                    .filter(member -> readyMemberIds.contains(member.getId()))
+                    .filter(member -> readyMemberIds.contains(member.getUserId()))
                     .toList();
             if (candidates.isEmpty()) {
                 candidates = remaining;
@@ -208,7 +208,7 @@ public class OwnerKickVoteService {
         }
 
         Long newOwnerId =
-                candidates.get(SECURE_RANDOM.nextInt(remaining.size())).getUserId();
+                candidates.get(SECURE_RANDOM.nextInt(candidates.size())).getUserId();
         group.changeOwner(newOwnerId);
 
         if (activeChallenge != null) {
