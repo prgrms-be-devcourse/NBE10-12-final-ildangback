@@ -276,6 +276,26 @@ class CheckInServiceTest {
         }
 
         @Test
+        @DisplayName("요청 checkInType 과 업로드 파일에서 유도된 mediaType 이 다르면 CHECK_IN_TYPE_MEDIA_MISMATCH")
+        void rejectsCheckInTypeMediaMismatch() {
+            // request(null) 은 checkInType=PHOTO 인데, 실제 업로드가 영상으로 판정된 상황(예: 클라이언트가
+            // PHOTO 로 선언하고 영상 파일을 올림) — allowedCheckInTypes() 검증만으론 못 잡는다.
+            Challenge challenge = dailyChallenge(CHALLENGE_ID, 3);
+            givenActiveMemberAndValidDay(challenge);
+            when(checkInRepository.countByChallengeIdAndUserIdAndBusinessDate(CHALLENGE_ID, USER_ID, TODAY))
+                    .thenReturn(0);
+            when(mediaStore.store(any()))
+                    .thenReturn(new UploadedMedia("check-ins/2026/09/clip.mp4", MediaType.VIDEO, "poster.jpg"));
+
+            assertBusiness(
+                    () -> service.submit(USER_ID, CHALLENGE_ID, request(null), media()),
+                    ErrorCode.CHECK_IN_TYPE_MEDIA_MISMATCH);
+
+            verify(mediaStore).delete("check-ins/2026/09/clip.mp4", "poster.jpg");
+            verify(checkInRepository, never()).saveAndFlush(any());
+        }
+
+        @Test
         @DisplayName("이미 목표 회차를 채웠으면 DAILY_LIMIT_EXCEEDED")
         void rejectsWhenLimitReached() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 2);

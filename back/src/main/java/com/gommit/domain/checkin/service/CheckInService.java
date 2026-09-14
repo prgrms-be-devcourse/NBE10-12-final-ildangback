@@ -14,6 +14,7 @@ import com.gommit.domain.checkin.dto.response.RecentCheckInResponse.RecentCheckI
 import com.gommit.domain.checkin.dto.response.TodayCheckInStatusResponse;
 import com.gommit.domain.checkin.entity.CheckIn;
 import com.gommit.domain.checkin.entity.CheckInType;
+import com.gommit.domain.checkin.entity.MediaType;
 import com.gommit.domain.checkin.media.CheckInMediaStore;
 import com.gommit.domain.checkin.media.UploadedMedia;
 import com.gommit.domain.checkin.repository.CheckInRepository;
@@ -98,6 +99,10 @@ public class CheckInService {
         }
 
         UploadedMedia uploaded = mediaStore.store(media);
+        if (!matchesCheckInType(form.checkInType(), uploaded.mediaType())) {
+            deleteQuietly(uploaded.storageKey(), uploaded.posterKey());
+            throw new BusinessException(ErrorCode.CHECK_IN_TYPE_MEDIA_MISMATCH);
+        }
         String mediaKey = uploaded.storageKey(); // 여기서 CheckIn.mediaKey 로 번역
         int roundNo = already + 1;
 
@@ -321,6 +326,17 @@ public class CheckInService {
             throw new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER);
         }
         return checkIn;
+    }
+
+    // 요청 checkInType 은 클라이언트 자기신고라, 실제 업로드 파일에서 유도된 mediaType 과 어긋나면
+    // (예: checkInType=PHOTO 로 선언하고 영상 파일을 올림) allowedCheckInTypes() 검증이 사실상
+    // 우회된다. LIVE 는 애초에 allowedCheckInTypes() 에 포함되지 않아 이 지점에 도달하지 않는다.
+    private boolean matchesCheckInType(CheckInType checkInType, MediaType mediaType) {
+        return switch (checkInType) {
+            case PHOTO -> mediaType == MediaType.IMAGE;
+            case VIDEO -> mediaType == MediaType.VIDEO;
+            case LIVE -> false;
+        };
     }
 
     private void deleteQuietly(String mediaKey, String posterKey) {
