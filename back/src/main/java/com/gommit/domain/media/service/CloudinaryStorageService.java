@@ -120,8 +120,7 @@ public class CloudinaryStorageService implements StorageService {
     Resource fetchResource(String url, String filename, RestClient client) {
         byte[] body;
         try {
-            body = client
-                    .get()
+            body = client.get()
                     .uri(url)
                     .retrieve()
                     .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
