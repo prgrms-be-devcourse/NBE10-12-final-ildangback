@@ -63,9 +63,12 @@ export function ChallengeRulesCard({
           {settings.dailyCheckInCount}회
         </InfoRow>
         <InfoRow label="인증 방식" icon={cameraIcon}>
-          {settings.allowedTypes.includes("PHOTO")
-            ? "사진"
-            : "지원되는 인증 방식 없음"}
+          {[
+            settings.allowedTypes.includes("PHOTO") && "사진",
+            settings.allowedTypes.includes("VIDEO") && "영상",
+          ]
+            .filter(Boolean)
+            .join(" · ") || "지원되는 인증 방식 없음"}
         </InfoRow>
         <InfoRow label="인증 가능 시간">04:00 ~ 익일 03:59 (KST)</InfoRow>
       </dl>

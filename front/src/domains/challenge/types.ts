@@ -13,7 +13,7 @@ export interface ChallengeSettings {
   frequencyValue: number | null;
   daysOfWeek: DaysOfWeek[] | null;
   dailyCheckInCount: number;
-  // This release can only submit PHOTO. Reads remain tolerant of older data.
+  // This release can only submit PHOTO/VIDEO. LIVE is a separate subsystem, not yet built.
   allowedTypes: CheckInType[];
 }
 export interface ChallengeSummary extends ChallengeSettings {
@@ -53,7 +53,7 @@ export interface ChallengeUpdateRequest {
   frequencyValue?: number | null;
   daysOfWeek?: DaysOfWeek[] | null;
   dailyCheckInCount?: number | null;
-  allowedTypes?: "PHOTO"[] | null;
+  allowedTypes?: ("PHOTO" | "VIDEO")[] | null;
 }
 export interface ChallengeUpdateResponse extends ChallengeSettings {
   id: number;
