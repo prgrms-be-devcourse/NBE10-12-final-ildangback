@@ -12,6 +12,7 @@ import {
   InfoRow,
 } from "../../challenge/components/ChallengeInfo";
 import { frequencyLabel } from "../../challenge/presentation";
+import { toggleAllowedType } from "../../challenge/types";
 import type { FrequencyType } from "../../challenge/types";
 import { CATEGORIES, CATEGORY_LABEL, categoryMap } from "../constants";
 import {
@@ -351,12 +352,9 @@ export function GroupCreateSteps({ step }: { step: number }) {
                     showToast("준비중입니다.");
                     return;
                   }
-                  // 사진/영상은 동시에 허용할 수 있다 — 카드 토글이지 라디오가 아니다.
                   setValue(
                     "challenge.allowedTypes",
-                    selected
-                      ? settings.allowedTypes.filter((t) => t !== value)
-                      : [...settings.allowedTypes, value],
+                    toggleAllowedType(settings.allowedTypes, value),
                     { shouldValidate: true },
                   );
                 }}

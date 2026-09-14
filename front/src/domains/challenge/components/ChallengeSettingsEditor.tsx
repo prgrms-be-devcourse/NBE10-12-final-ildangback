@@ -9,7 +9,7 @@ import { FormAlert } from "../../../shared/ui/FormAlert";
 import { TextField } from "../../../shared/ui/TextField";
 import { groupCreateSchema, WEEKDAYS } from "../../group/validation";
 import { updateChallenge } from "../api";
-import { isSupportedCheckInType } from "../types";
+import { isSupportedCheckInType, toggleAllowedType } from "../types";
 import type { ChallengeDetail } from "../types";
 
 const schema = groupCreateSchema.shape.challenge.superRefine((value, ctx) => {
@@ -211,12 +211,9 @@ export function ChallengeSettingsEditor({
                 type="button"
                 aria-pressed={allowedTypes.includes(type)}
                 onClick={() =>
-                  // 사진/영상은 동시에 허용할 수 있다 — 카드 토글이지 라디오가 아니다.
                   form.setValue(
                     "allowedTypes",
-                    allowedTypes.includes(type)
-                      ? allowedTypes.filter((t) => t !== type)
-                      : [...allowedTypes, type],
+                    toggleAllowedType(allowedTypes, type),
                     { shouldValidate: true },
                   )
                 }

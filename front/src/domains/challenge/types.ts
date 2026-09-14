@@ -11,6 +11,15 @@ export function isSupportedCheckInType(
 ): type is SupportedCheckInType {
   return type === "PHOTO" || type === "VIDEO";
 }
+/** 인증 방식 선택 카드를 토글한다 — 라디오가 아니라 사진/영상 동시 선택을 허용한다. */
+export function toggleAllowedType(
+  current: SupportedCheckInType[],
+  value: SupportedCheckInType,
+): SupportedCheckInType[] {
+  return current.includes(value)
+    ? current.filter((t) => t !== value)
+    : [...current, value];
+}
 export type ChallengeMemberRole = "OWNER" | "MEMBER";
 export type ExtensionChoice = "PENDING" | "EXTEND" | "DECLINE";
 export interface ChallengeSettings {
