@@ -5,7 +5,7 @@ import { CheckInGridSection } from "../components/CheckInGridSection";
 import { CheckInLightbox } from "../components/CheckInLightbox";
 import { CheckInTypeChips } from "../components/CheckInTypeChips";
 import { MonthNav } from "../components/MonthNav";
-import { currentMonth } from "../lib/month";
+import { currentMonth, monthOf } from "../lib/month";
 import { useChallengeAlbumSummary } from "../lib/useChallengeAlbumSummary";
 import { useMyCheckIns } from "../lib/useMyCheckIns";
 import type { CheckInType, MyCheckIn } from "../types";
@@ -53,7 +53,12 @@ export function MyChallengeAlbumPage() {
         )}
 
         <div className="mt-4">
-          <MonthNav month={month} onChange={setMonth} />
+          <MonthNav
+            month={month}
+            onChange={setMonth}
+            minMonth={summary ? monthOf(summary.startDate) : undefined}
+            maxMonth={summary ? monthOf(summary.endDate) : undefined}
+          />
           {summary && (
             <p className="mt-1 text-center text-[12px] text-gray-400">
               {periodLabel(summary.startDate, summary.endDate)}

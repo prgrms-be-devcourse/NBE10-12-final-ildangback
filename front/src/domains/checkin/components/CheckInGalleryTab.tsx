@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { currentMonth } from "../lib/month";
+import {
+  clampToRange,
+  currentMonth,
+  monthRangeOf,
+  type DatePeriod,
+} from "../lib/month";
 import { useChallengeMembers } from "../lib/useChallengeMembers";
 import { useCheckInGallery } from "../lib/useCheckInGallery";
 import type { ChallengeMember, CheckIn } from "../types";
@@ -17,11 +22,17 @@ import { MonthNav } from "./MonthNav";
 export function CheckInGalleryTab({
   challengeId,
   members: preloadedMembers,
+  period,
 }: {
   challengeId: number;
   members?: ChallengeMember[] | null;
+  /** 챌린지 시작·종료일. 기록이 없는 달로 못 넘어가게 월 네비 범위를 좁히고, 초기 진입 달도 그 범위 안으로 당겨온다. */
+  period?: DatePeriod;
 }) {
-  const [month, setMonth] = useState(currentMonth);
+  const { minMonth, maxMonth } = monthRangeOf(period);
+  const [month, setMonth] = useState(() =>
+    clampToRange(currentMonth(), minMonth, maxMonth),
+  );
   const [userId, setUserId] = useState<number | null>(null);
   const [selected, setSelected] = useState<CheckIn | null>(null);
 
@@ -34,7 +45,12 @@ export function CheckInGalleryTab({
 
   return (
     <div className="pt-2">
-      <MonthNav month={month} onChange={setMonth} />
+      <MonthNav
+        month={month}
+        onChange={setMonth}
+        minMonth={minMonth}
+        maxMonth={maxMonth}
+      />
 
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
         <Chip active={userId === null} onClick={() => setUserId(null)}>

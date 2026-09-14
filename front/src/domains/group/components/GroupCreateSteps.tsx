@@ -18,6 +18,7 @@ import {
   endDateForDuration,
   GROUP_DESCRIPTION_MAX,
   GROUP_NAME_MAX,
+  tomorrowDate,
   WEEKDAYS,
 } from "../validation";
 import type { GroupCreateForm } from "../validation";
@@ -149,6 +150,7 @@ export function GroupCreateSteps({ step }: { step: number }) {
           <TextField
             label="시작일"
             type="date"
+            min={tomorrowDate()}
             error={errors.challenge?.startDate?.message}
             {...register("challenge.startDate")}
           />

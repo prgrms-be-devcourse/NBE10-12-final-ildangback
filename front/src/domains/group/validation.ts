@@ -98,6 +98,17 @@ export const STEP_FIELDS = [
 ] as const;
 export const CREATE_FIELDS = STEP_FIELDS.flat();
 
+/**
+ * 날짜 인풋의 `min` 속성용. 서버가 '내일'과 영업일 경계의 최종 판단자이고
+ * START_DATE_INVALID 도 서버가 내려주니, 이건 그 정책의 재구현이 아니라
+ * 브라우저 달력에서 당일/과거를 미리 안 보여주는 UI 편의일 뿐이다.
+ */
+export function tomorrowDate(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 /** A duration shortcut for user input only, never a progress/business-day calculation. */
 export function endDateForDuration(start: string, days: number): string | null {
   if (

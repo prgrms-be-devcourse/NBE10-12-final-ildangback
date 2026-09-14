@@ -326,9 +326,22 @@ export function ChallengeDashboard({
             <MergeArchiveSection challengeId={challenge.id} />
           </div>
         ) : tab === "일일 로그" ? (
-          <DailyLogTimeline challengeId={challenge.id} />
+          <DailyLogTimeline
+            challengeId={challenge.id}
+            period={{
+              startDate: challenge.startDate,
+              endDate: challenge.endDate,
+            }}
+          />
         ) : (
-          <CheckInGalleryTab challengeId={challenge.id} members={members} />
+          <CheckInGalleryTab
+            challengeId={challenge.id}
+            members={members}
+            period={{
+              startDate: challenge.startDate,
+              endDate: challenge.endDate,
+            }}
+          />
         )}
       </section>
       {canNudge && selectedMember && (
