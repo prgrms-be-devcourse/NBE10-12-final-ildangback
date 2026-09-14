@@ -515,6 +515,32 @@ class CheckInServiceTest {
 
             assertBusiness(() -> service.loadCheckInMedia(USER_ID, 5L), ErrorCode.CHALLENGE_NOT_MEMBER);
         }
+
+        @Test
+        @DisplayName("포스터 서빙 — 영상 체크인(posterKey 있음)은 포스터 파일을 로드한다")
+        void loadPoster() {
+            CheckIn checkIn = checkIn(5L, CHALLENGE_ID, TODAY.minusDays(2));
+            ReflectionTestUtils.setField(checkIn, "posterKey", "check-ins/2026/09/uuid-poster.jpg");
+            when(checkInRepository.findById(5L)).thenReturn(Optional.of(checkIn));
+            when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID))
+                    .thenReturn(new ReadDateAccess(challenge, null));
+            Resource resource = new ByteArrayResource(new byte[] {9});
+            when(mediaStore.load("check-ins/2026/09/uuid-poster.jpg")).thenReturn(resource);
+
+            assertThat(service.loadCheckInPoster(USER_ID, 5L)).isSameAs(resource);
+        }
+
+        @Test
+        @DisplayName("포스터 서빙 — 이미지 체크인(posterKey 없음)은 MEDIA_NOT_FOUND")
+        void loadPosterWithoutPosterKey() {
+            CheckIn checkIn = checkIn(5L, CHALLENGE_ID, TODAY.minusDays(2));
+            when(checkInRepository.findById(5L)).thenReturn(Optional.of(checkIn));
+            when(preconditions.resolveReadDateAccess(CHALLENGE_ID, USER_ID))
+                    .thenReturn(new ReadDateAccess(challenge, null));
+
+            assertBusiness(() -> service.loadCheckInPoster(USER_ID, 5L), ErrorCode.MEDIA_NOT_FOUND);
+            verify(mediaStore, never()).load(any());
+        }
     }
 
     @Nested
