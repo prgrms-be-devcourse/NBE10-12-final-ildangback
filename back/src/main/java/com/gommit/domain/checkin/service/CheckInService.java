@@ -384,7 +384,7 @@ public class CheckInService {
             checkInRepository.delete(checkIn);
             checkInRepository.flush();
             try {
-                mediaStore.delete(checkIn.getMediaKey());
+                mediaStore.delete(checkIn.getMediaKey(), checkIn.getPosterKey());
             } catch (Exception e) {
                 log.warn("인증 미디어 삭제 실패: checkInId={}, mediaKey={}", checkInId, checkIn.getMediaKey(), e);
             }

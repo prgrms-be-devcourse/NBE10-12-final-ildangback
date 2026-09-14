@@ -616,6 +616,57 @@ class CheckInServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("deleteByAdmin")
+    class DeleteByAdmin {
+
+        @Test
+        @DisplayName("성공 — 인증 행을 지우고 미디어(mediaKey, posterKey)를 함께 정리한다")
+        void deletesRowAndMedia() {
+            CheckIn checkIn = new CheckIn(
+                    CHALLENGE_ID,
+                    USER_ID,
+                    1,
+                    CheckInType.VIDEO,
+                    "check-ins/2026/09/uuid.mp4",
+                    MediaType.VIDEO,
+                    "check-ins/2026/09/uuid-poster.jpg",
+                    null,
+                    TODAY);
+            ReflectionTestUtils.setField(checkIn, "id", 100L);
+            when(checkInRepository.findById(100L)).thenReturn(Optional.of(checkIn));
+
+            service.deleteByAdmin(100L);
+
+            verify(checkInRepository).delete(checkIn);
+            verify(mediaStore).delete("check-ins/2026/09/uuid.mp4", "check-ins/2026/09/uuid-poster.jpg");
+        }
+
+        @Test
+        @DisplayName("미디어 삭제가 실패해도 인증 행 삭제는 이미 커밋된 채로 예외를 삼킨다")
+        void swallowsMediaDeleteFailure() {
+            CheckIn checkIn = checkInRow(100L);
+            when(checkInRepository.findById(100L)).thenReturn(Optional.of(checkIn));
+            doThrow(new RuntimeException("storage down"))
+                    .when(mediaStore)
+                    .delete(anyString(), isNull());
+
+            service.deleteByAdmin(100L);
+
+            verify(checkInRepository).delete(checkIn);
+        }
+
+        @Test
+        @DisplayName("없는 id 는 아무 것도 하지 않는다")
+        void noopWhenNotFound() {
+            when(checkInRepository.findById(999L)).thenReturn(Optional.empty());
+
+            service.deleteByAdmin(999L);
+
+            verify(checkInRepository, never()).delete(any(CheckIn.class));
+        }
+    }
+
     // ===== helpers =====
 
     private static CheckIn checkIn(long id, long challengeId, LocalDate businessDate) {
