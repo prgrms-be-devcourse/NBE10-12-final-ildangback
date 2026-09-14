@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 
+import com.gommit.domain.report.service.PenaltyGate;
 import com.gommit.domain.user.UserFixture;
 import com.gommit.domain.user.dto.request.OAuthLoginRequest;
 import com.gommit.domain.user.entity.AuthIdentity;
@@ -52,6 +53,9 @@ class SocialAuthServiceTest {
     @Mock
     private UserService userService;
 
+    @Mock
+    private PenaltyGate penaltyGate;
+
     private StubOAuthClient googleClient;
     private SocialAuthService socialAuthService;
 
@@ -69,7 +73,8 @@ class SocialAuthServiceTest {
                 refreshTokenService,
                 jwtProvider,
                 properties,
-                userService);
+                userService,
+                penaltyGate);
     }
 
     @Nested

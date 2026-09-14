@@ -1,4 +1,8 @@
-import { CaretLeftIcon, PaperPlaneRightIcon } from "@phosphor-icons/react";
+import {
+  CaretLeftIcon,
+  PaperPlaneRightIcon,
+  SirenIcon,
+} from "@phosphor-icons/react";
 import type { FormEvent } from "react";
 import {
   Fragment,
@@ -11,7 +15,9 @@ import {
 import { useNavigate, useParams } from "react-router";
 import { dateKey, formatMonthDay, formatTime } from "../../../shared/lib/date";
 import { useAuth } from "../../../shared/lib/useAuth";
+import { useToast } from "../../../shared/lib/useToast";
 import { getGroupMessages, markMessagesRead } from "../api";
+import { ReportDialog } from "../../report/components/ReportDialog";
 import { useGroupChatSocket } from "../lib/chatSocket";
 import type { ChatMessageResponse } from "../types";
 
@@ -27,6 +33,7 @@ export function GroupChatPage() {
 function GroupChatContent({ groupId }: { groupId: number }) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { showToast } = useToast();
 
   const [messages, setMessages] = useState<ChatMessageResponse[]>([]);
   const [cursor, setCursor] = useState<number | null>(null);
@@ -36,6 +43,9 @@ function GroupChatContent({ groupId }: { groupId: number }) {
   const [error, setError] = useState(false);
   const [draft, setDraft] = useState("");
   const [socketError, setSocketError] = useState<string | null>(null);
+  const [reportTarget, setReportTarget] = useState<ChatMessageResponse | null>(
+    null,
+  );
 
   const listRef = useRef<HTMLDivElement | null>(null);
   const topSentinelRef = useRef<HTMLDivElement | null>(null);
@@ -202,11 +212,35 @@ function GroupChatContent({ groupId }: { groupId: number }) {
                 <ChatBubble
                   message={message}
                   mine={message.senderId === user?.id}
+                  onReport={
+                    message.messageType === "TEXT" &&
+                    message.senderId !== null &&
+                    message.senderId !== user?.id
+                      ? () => setReportTarget(message)
+                      : undefined
+                  }
                 />
               </Fragment>
             );
           })}
       </div>
+
+      <ReportDialog
+        isOpen={reportTarget !== null}
+        onClose={() => setReportTarget(null)}
+        onSubmitted={() => showToast("신고를 접수했어요.")}
+        targets={
+          reportTarget
+            ? [
+                {
+                  targetType: "CHAT_MESSAGE",
+                  targetId: reportTarget.messageId,
+                  label: `${reportTarget.senderNickname} 님의 이 메시지`,
+                },
+              ]
+            : []
+        }
+      />
 
       {socketError && (
         <p className="px-4 pb-1 text-center text-[11px] text-red-500">
@@ -252,9 +286,12 @@ function DateDivider({ createdAt }: { createdAt: string }) {
 function ChatBubble({
   message,
   mine,
+  onReport,
 }: {
   message: ChatMessageResponse;
   mine: boolean;
+  /** 남의 일반 메시지에만 넘어온다. 시스템 메시지와 내 메시지는 신고 대상이 아니다. */
+  onReport?: () => void;
 }) {
   if (message.messageType === "SYSTEM") {
     return (
@@ -287,8 +324,20 @@ function ChatBubble({
           {message.content}
         </p>
         {!mine && (
-          <span className="shrink-0 text-[10px] text-gray-400">
-            {formatTime(message.createdAt)}
+          <span className="flex shrink-0 items-center gap-1">
+            <span className="text-[10px] text-gray-400">
+              {formatTime(message.createdAt)}
+            </span>
+            {onReport && (
+              <button
+                type="button"
+                onClick={onReport}
+                aria-label={`${message.senderNickname} 님의 메시지 신고`}
+                className="text-gray-300 hover:text-gray-500"
+              >
+                <SirenIcon size={13} weight="fill" />
+              </button>
+            )}
           </span>
         )}
       </div>
