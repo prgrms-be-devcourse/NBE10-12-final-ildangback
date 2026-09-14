@@ -486,7 +486,7 @@ public class GroupService {
                 group.changeOwner(newOwnerId);
                 if (group.hasActiveKickVote()) {
                     group.endKickVote();
-                    groupMemberRepository.resetAllKickVoteChoices(group.getId(), KickVoteChoice.NONE);
+                    groupMemberRepository.resetAllKickVoteChoices(group.getId());
                 }
             }
         }

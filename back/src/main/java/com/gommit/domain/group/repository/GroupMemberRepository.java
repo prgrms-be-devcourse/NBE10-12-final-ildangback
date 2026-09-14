@@ -42,10 +42,10 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
-        UPDATE GroupMember gm SET gm.kickVoteChoice = :none
+        UPDATE GroupMember gm SET gm.kickVoteChoice = 'NONE'
         WHERE gm.group.id = :groupId AND gm.status = 'ACTIVE'
     """)
-    void resetAllKickVoteChoices(@Param("groupId") Long groupId, @Param("none") KickVoteChoice none);
+    void resetAllKickVoteChoices(@Param("groupId") Long groupId);
 
     @Modifying(clearAutomatically = true)
     @Query("""

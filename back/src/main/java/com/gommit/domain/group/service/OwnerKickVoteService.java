@@ -27,14 +27,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class OwnerKickVoteService {
 
-    @Value("${group.kick-vote.expiry-hours:24}")
-    private int kickVoteExpiryHours;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final ChallengeGroupRepository challengeGroupRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final ChallengeRepository challengeRepository;
     private final ChallengeMemberRepository challengeMemberRepository;
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+    @Value("${group.kick-vote.expiry-hours:24}")
+    private int kickVoteExpiryHours;
 
     // ── 투표 개시 ─────────────────────────────────────────────────────────────
     @Transactional
@@ -268,7 +269,7 @@ public class OwnerKickVoteService {
     // 투표 종료 시 그룹·멤버 모든 투표 데이터 초기화 (완료/부결/만료 공통)
     private void resetVoteData(ChallengeGroup group, Long groupId) {
         group.endKickVote();
-        groupMemberRepository.resetAllKickVoteChoices(groupId, KickVoteChoice.NONE);
+        groupMemberRepository.resetAllKickVoteChoices(groupId);
     }
 
     // ACTIVE 그룹 멤버 조회 헬퍼

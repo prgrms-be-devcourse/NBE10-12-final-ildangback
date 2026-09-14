@@ -56,7 +56,7 @@ public enum ErrorCode {
     KICK_VOTE_ALREADY_VOTED(HttpStatus.CONFLICT, "이미 투표에 참여하셨습니다."),
     KICK_VOTE_OWNER_CANNOT_VOTE(HttpStatus.FORBIDDEN, "그룹장은 자신의 강퇴 투표에 참여할 수 없습니다."),
     KICK_VOTE_OWNER_CANNOT_INITIATE(HttpStatus.FORBIDDEN, "그룹장은 그룹장 강퇴 투표를 개시할 수 없습니다."),
-    KICK_VOTE_EXPIRED(HttpStatus.CONFLICT, "투표 기간이 만료되었습니다."),
+    KICK_VOTE_EXPIRED(HttpStatus.BAD_REQUEST, "투표 기간이 만료되었습니다."),
     KICK_VOTE_NOT_ENOUGH_MEMBERS(HttpStatus.CONFLICT, "투표를 진행할 멤버 수가 부족합니다."),
     GROUP_ENDED(HttpStatus.CONFLICT, "이미 종료된 그룹입니다."),
     BACKGROUND_NOT_FOUND(HttpStatus.NOT_FOUND, "배경을 찾을 수 없습니다."),

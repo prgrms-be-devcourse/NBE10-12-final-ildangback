@@ -125,7 +125,7 @@ public class GroupController {
 
     @Operation(
             summary = "그룹장 강퇴 투표",
-            description = "ACTIVE 챌린지가 진행 중인 그룹에서 그룹장이 아닌 그룹원이 그룹장 강퇴 투표를 시작. 개시자는 자동을 AGREE 처리, 과반수 이상 찬성이면 결과 확정")
+            description = "ACTIVE 챌린지가 진행 중인 그룹에서 그룹장이 아닌 그룹원이 그룹장 강퇴 투표를 시작. 개시자는 자동으로 AGREE 처리, 과반수 이상 찬성이면 결과 확정")
     @PostMapping("/{groupId}/ownerKickVotes")
     public ResponseEntity<KickVoteStatusResponse> initiateVote(
             @PathVariable Long groupId, @CurrentUser SecurityUser actor) {

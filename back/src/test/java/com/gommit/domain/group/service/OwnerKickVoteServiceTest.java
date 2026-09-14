@@ -283,7 +283,7 @@ class OwnerKickVoteServiceTest {
             assertThat(ownerMember.getStatus()).isEqualTo(GroupMemberStatus.KICKED);
             assertThat(ownerChallengeMember.getStatus()).isEqualTo(ChallengeMemberStatus.KICKED);
             assertThat(ownerChallengeMember.getRole()).isEqualTo(ChallengeMemberRole.MEMBER); // OWNER→MEMBER→KICKED
-            verify(groupMemberRepository).resetAllKickVoteChoices(12L, KickVoteChoice.NONE);
+            verify(groupMemberRepository).resetAllKickVoteChoices(12L);
         }
     }
 
@@ -425,7 +425,7 @@ class OwnerKickVoteServiceTest {
             assertThat(remainingChallengeMember.getRole()).isEqualTo(ChallengeMemberRole.OWNER);
             assertThat(group.getOwnerId()).isEqualTo(3L);
             assertThat(group.hasActiveKickVote()).isFalse();
-            verify(groupMemberRepository).resetAllKickVoteChoices(12L, KickVoteChoice.NONE);
+            verify(groupMemberRepository).resetAllKickVoteChoices(12L);
         }
 
         @Test
@@ -444,7 +444,7 @@ class OwnerKickVoteServiceTest {
             assertThat(response.inProgress()).isFalse();
             assertThat(group.getOwnerId()).isEqualTo(1L); // 그룹장 유지
             assertThat(group.hasActiveKickVote()).isFalse();
-            verify(groupMemberRepository).resetAllKickVoteChoices(12L, KickVoteChoice.NONE);
+            verify(groupMemberRepository).resetAllKickVoteChoices(12L);
         }
 
         @Test
