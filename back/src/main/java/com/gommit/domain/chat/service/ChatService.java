@@ -13,6 +13,7 @@ import com.gommit.global.exception.ErrorCode;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class ChatService {
+
+    private static final String REPORTED_CONTENT_FORMAT = "메시지: %s";
 
     private final GroupMessageRepository groupMessageRepository;
     private final GroupService groupService;
@@ -76,6 +79,23 @@ public class ChatService {
         long count = groupMessageRepository.countByGroupIdAndIdGreaterThan(groupId, cursor == null ? 0L : cursor);
         return new ChatUnreadCountResponse(count);
     }
+
+    // 신고 판정용 조회
+    public Optional<ReportedMessage> findForReport(Long messageId) {
+        return groupMessageRepository
+                .findById(messageId)
+                .filter(message -> message.getSenderId() != null)
+                .map(message -> new ReportedMessage(
+                        message.getSenderId(), REPORTED_CONTENT_FORMAT.formatted(message.getContent())));
+    }
+
+    // 신고 승인 시 메세지 숨김
+    @Transactional
+    public void hideByAdmin(Long messageId) {
+        groupMessageRepository.findById(messageId).ifPresent(GroupMessage::hide);
+    }
+
+    public record ReportedMessage(Long senderId, String reportedContent) {}
 
     // ACTIVE 멤버 확인
     private void verifyActiveMember(Long groupId, Long userId) {
