@@ -2,13 +2,20 @@ package com.gommit.domain.report.repository;
 
 import com.gommit.domain.report.entity.Appeal;
 import com.gommit.domain.report.entity.AppealStatus;
+import jakarta.persistence.LockModeType;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface AppealRepository extends JpaRepository<Appeal, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from Appeal a where a.id = :appealId")
+    Optional<Appeal> findByIdWithLock(@Param("appealId") Long appealId);
 
     boolean existsByReportId(Long reportId);
 

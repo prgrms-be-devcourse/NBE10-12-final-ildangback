@@ -86,7 +86,9 @@ public class ReportService {
     // 신고 판정
     @Transactional
     public ReportDetailResponse decide(Long userId, Long reportId, DecideReportRequest request) {
-        Report report = getReport(reportId);
+        Report report = reportRepository
+                .findByIdWithLock(reportId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.REPORT_NOT_FOUND));
         if (!report.isPending()) {
             throw new BusinessException(ErrorCode.REPORT_ALREADY_DECIDED);
         }

@@ -60,7 +60,7 @@ public class AppealService {
     @Transactional
     public AppealDetailResponse decide(Long userId, Long appealId, DecideAppealRequest request) {
         Appeal appeal = appealRepository
-                .findById(appealId)
+                .findByIdWithLock(appealId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.APPEAL_NOT_FOUND));
         if (!appeal.isPending()) {
             throw new BusinessException(ErrorCode.APPEAL_ALREADY_DECIDED);

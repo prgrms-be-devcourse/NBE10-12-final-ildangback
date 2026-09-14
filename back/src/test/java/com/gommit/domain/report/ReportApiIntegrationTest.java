@@ -8,18 +8,38 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.gommit.domain.report.dto.request.DecideAppealRequest;
+import com.gommit.domain.report.dto.request.DecideReportRequest;
+import com.gommit.domain.report.dto.request.PenaltyCommand;
+import com.gommit.domain.report.entity.PenaltyType;
+import com.gommit.domain.report.service.AppealService;
+import com.gommit.domain.report.service.ReportService;
+import com.gommit.global.exception.BusinessException;
 import com.gommit.support.IntegrationTestSupport;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.ResultActions;
 
 @DisplayName("신고 및 이의제기 API")
 class ReportApiIntegrationTest extends IntegrationTestSupport {
+
+    @Autowired
+    private ReportService reportService;
+
+    @Autowired
+    private AppealService appealService;
 
     private static final String REPORTER_EMAIL = "reporter@example.com";
     private static final String REPORTER_NICKNAME = "신고자";
@@ -271,6 +291,74 @@ class ReportApiIntegrationTest extends IntegrationTestSupport {
         Long reportId = submitReportAndGetId(reporter.accessToken(), userIdOf(TARGET_EMAIL), "ABUSE");
         decideReport(admin.accessToken(), reportId, decideBody(true, penalties)).andExpect(status().isOk());
         return reportId;
+    }
+
+    // 여러 스레드가 같은 판정을 동시에 부른다. 성공한 횟수를 돌려준다
+    private int decideConcurrently(int threadCount, Runnable decide) throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(threadCount);
+        List<Callable<Boolean>> tasks = IntStream.range(0, threadCount)
+                .<Callable<Boolean>>mapToObj(i -> () -> {
+                    try {
+                        decide.run();
+                        return true;
+                    } catch (BusinessException e) {
+                        return false;
+                    }
+                })
+                .toList();
+        List<Future<Boolean>> futures = pool.invokeAll(tasks);
+        pool.shutdown();
+        pool.awaitTermination(30, TimeUnit.SECONDS);
+        int succeeded = 0;
+        for (Future<Boolean> future : futures) {
+            if (future.get()) {
+                succeeded++;
+            }
+        }
+        return succeeded;
+    }
+
+    @Nested
+    @DisplayName("동시 판정")
+    class ConcurrentDecision {
+
+        @Test
+        @DisplayName("같은 신고를 동시에 승인해도 제재와 압수는 한 번만 일어난다")
+        void concurrentReportDecisionAppliesPenaltyOnce() throws Exception {
+            var reporter = loginAs(REPORTER_EMAIL, REPORTER_NICKNAME);
+            loginAs(TARGET_EMAIL, TARGET_NICKNAME);
+            Long targetId = userIdOf(TARGET_EMAIL);
+            givePoints(targetId, 500);
+            var admin = loginAsAdmin();
+            Long adminId = userIdOf(ADMIN_EMAIL);
+            Long reportId = submitReportAndGetId(reporter.accessToken(), targetId, "FAKE");
+            DecideReportRequest request =
+                    new DecideReportRequest(true, List.of(new PenaltyCommand(PenaltyType.POINT_FORFEIT, null, 200)));
+
+            int succeeded = decideConcurrently(8, () -> reportService.decide(adminId, reportId, request));
+
+            assertThat(succeeded).isEqualTo(1);
+            assertThat(activePenaltyCountOf(reportId)).isEqualTo(1);
+            assertThat(balanceOf(targetId)).isEqualTo(300);
+        }
+
+        @Test
+        @DisplayName("같은 이의제기를 동시에 인용해도 압수 포인트는 한 번만 환급된다")
+        void concurrentAppealDecisionRefundsOnce() throws Exception {
+            var target = loginAs(TARGET_EMAIL, TARGET_NICKNAME);
+            Long targetId = userIdOf(TARGET_EMAIL);
+            givePoints(targetId, 500);
+            Long reportId = acceptWith(pointForfeit(200));
+            Long appealId = submitAppealAndGetId(target.accessToken(), reportId);
+            Long adminId = userIdOf(ADMIN_EMAIL);
+            DecideAppealRequest request = new DecideAppealRequest(true);
+
+            int succeeded = decideConcurrently(8, () -> appealService.decide(adminId, appealId, request));
+
+            assertThat(succeeded).isEqualTo(1);
+            assertThat(balanceOf(targetId)).isEqualTo(500);
+            assertThat(pointHistoriesOf(targetId)).hasSize(2);
+        }
     }
 
     @Nested
