@@ -84,7 +84,9 @@ export type UserPointReason =
   | "CHALLENGE_BONUS"
   | "MONTHLY_MERGE_BONUS"
   | "ITEM_PURCHASE"
-  | "WITHDRAWAL_PENALTY";
+  | "WITHDRAWAL_PENALTY"
+  | "PENALTY_FORFEIT"
+  | "PENALTY_REFUND";
 
 export interface PointBalanceResponse {
   balance: number;

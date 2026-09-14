@@ -272,6 +272,28 @@ class HomeServiceTest {
         }
 
         @Test
+        @DisplayName("PENALTY_FORFEIT는 fix: 접두사를 가진다")
+        void t17() {
+            given(pointService.getRecentHistories(USER_ID, 3))
+                    .willReturn(List.of(history(UserPointReason.PENALTY_FORFEIT, null)));
+
+            SliceResponse<ActivityResponse> result = homeService.getActivities(USER_ID);
+
+            assertThat(result.content().get(0).commitPrefix()).isEqualTo("fix:");
+        }
+
+        @Test
+        @DisplayName("PENALTY_REFUND는 feat: 접두사를 가진다")
+        void t18() {
+            given(pointService.getRecentHistories(USER_ID, 3))
+                    .willReturn(List.of(history(UserPointReason.PENALTY_REFUND, null)));
+
+            SliceResponse<ActivityResponse> result = homeService.getActivities(USER_ID);
+
+            assertThat(result.content().get(0).commitPrefix()).isEqualTo("feat:");
+        }
+
+        @Test
         @DisplayName("MONTHLY_MERGE_BONUS는 feat: 접두사를 가진다")
         void t11() {
             given(pointService.getRecentHistories(USER_ID, 3))

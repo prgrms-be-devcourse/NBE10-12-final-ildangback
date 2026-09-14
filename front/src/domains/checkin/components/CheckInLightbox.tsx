@@ -1,9 +1,10 @@
-import { XIcon } from "@phosphor-icons/react";
-import { useEffect } from "react";
+import { SirenIcon, XIcon } from "@phosphor-icons/react";
+import { useEffect, useState } from "react";
 import { formatDateTimeMinute } from "../../../shared/lib/date";
 import { useBodyScrollLock } from "../../../shared/lib/useBodyScrollLock";
 import { AuthedImage } from "../../../shared/ui/AuthedImage";
 import { AuthedVideo } from "../../../shared/ui/AuthedVideo";
+import { ReportDialog } from "../../report/components/ReportDialog";
 import { badgeColor, nicknameInitial } from "../lib/authorBadge";
 import type { CheckIn } from "../types";
 
@@ -13,14 +14,28 @@ interface Props {
   onClose: () => void;
   /** 작성자 한 줄 표시. 갤러리 탭만. */
   showAuthor?: boolean;
+  /**
+   * 보고 있는 사람. 남의 인증일 때만 신고 버튼을 띄운다.
+   * 여기서 useAuth 를 부르지 않는 이유는 이 컴포넌트가 프로바이더 없이도 그려져야 하기 때문이다.
+   */
+  currentUserId?: number | null;
+  /** 신고가 접수되면 부른다. 토스트는 프로바이더가 있는 쪽에서 띄운다. */
+  onReported?: () => void;
 }
 
 /**
  * 인증 사진 확대 뷰. 전체화면 어두운 오버레이 + 큰 정사각 이미지, 아래에 시간과 memo.
  * 닫기: ✕ 버튼 · 배경 탭 · Esc · 하드웨어 뒤로가기.
  */
-export function CheckInLightbox({ item, onClose, showAuthor = false }: Props) {
+export function CheckInLightbox({
+  item,
+  onClose,
+  showAuthor = false,
+  currentUserId = null,
+  onReported,
+}: Props) {
   const open = item !== null;
+  const [reporting, setReporting] = useState(false);
   useBodyScrollLock(open);
 
   useEffect(() => {
@@ -50,7 +65,9 @@ export function CheckInLightbox({ item, onClose, showAuthor = false }: Props) {
       role="dialog"
       aria-modal="true"
       aria-label="인증 사진"
-      onClick={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-black/90"
     >
       <button
@@ -104,8 +121,32 @@ export function CheckInLightbox({ item, onClose, showAuthor = false }: Props) {
               {item.memo}
             </p>
           )}
+
+          {currentUserId !== null && currentUserId !== item.userId && (
+            <button
+              type="button"
+              onClick={() => setReporting(true)}
+              className="mt-6 flex items-center gap-1.5 rounded-full border border-white/25 px-3 py-1.5 text-[13px] font-semibold text-white/80"
+            >
+              <SirenIcon size={16} weight="fill" aria-hidden />
+              신고
+            </button>
+          )}
         </div>
       </div>
+
+      <ReportDialog
+        isOpen={reporting}
+        onClose={() => setReporting(false)}
+        onSubmitted={onReported}
+        targets={[
+          {
+            targetType: "CHECK_IN",
+            targetId: item.id,
+            label: `${item.nickname} 님의 이 인증`,
+          },
+        ]}
+      />
     </div>
   );
 }

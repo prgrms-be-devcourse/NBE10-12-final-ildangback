@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
+import com.gommit.domain.report.service.PenaltyGate;
 import com.gommit.domain.user.UserFixture;
 import com.gommit.domain.user.dto.request.LoginRequest;
 import com.gommit.domain.user.dto.request.SignUpRequest;
@@ -47,6 +48,9 @@ class AuthServiceTest {
 
     @Mock
     private UserService userService;
+
+    @Mock
+    private PenaltyGate penaltyGate;
 
     @InjectMocks
     private AuthService authService;

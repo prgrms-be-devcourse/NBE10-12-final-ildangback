@@ -78,6 +78,18 @@ public class PersonalPointService {
                 UserPointHistory.ofWithoutChallenge(userId, sourceName, -amount, reason, point.getBalance()));
     }
 
+    // 압수한 포인트를 다시 돌려준다
+    @Transactional
+    public void refund(Long userId, int amount, UserPointReason reason, String sourceName) {
+        if (amount <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        UserPoint point = lockOrCreatePoint(userId);
+        point.add(amount);
+        userPointHistoryRepository.save(
+                UserPointHistory.ofWithoutChallenge(userId, sourceName, amount, reason, point.getBalance()));
+    }
+
     public PointBalanceResponse getMyBalance(Long userId) {
         LocalDateTime startOfThisMonth = periodCalculator.toDateRange(PeriodFilter.THIS_MONTH, null, null)[0];
         int balance = userPointRepository

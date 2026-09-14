@@ -2,6 +2,7 @@ import {
   CheckSquareIcon,
   GitMergeIcon,
   MinusCircleIcon,
+  ArrowCounterClockwiseIcon,
   ShoppingBagIcon,
   type Icon,
 } from "@phosphor-icons/react";
@@ -14,6 +15,8 @@ export const REASON_TITLE: Record<UserPointReason, string> = {
   MONTHLY_MERGE_BONUS: "월간 머지 완주 보너스",
   ITEM_PURCHASE: "아이템 구매",
   WITHDRAWAL_PENALTY: "챌린지 중도 탈퇴 차감",
+  PENALTY_FORFEIT: "제재 포인트 압수",
+  PENALTY_REFUND: "이의제기 인용 환급",
 };
 
 /** 상세 화면 "내역 유형" 필드용 짧은 표현. */
@@ -23,6 +26,8 @@ export const REASON_TYPE_LABEL: Record<UserPointReason, string> = {
   MONTHLY_MERGE_BONUS: "머지 보너스",
   ITEM_PURCHASE: "아이템 구매",
   WITHDRAWAL_PENALTY: "탈퇴 차감",
+  PENALTY_FORFEIT: "제재 압수",
+  PENALTY_REFUND: "제재 환급",
 };
 
 const REASON_VERB: Record<UserPointReason, string> = {
@@ -31,6 +36,8 @@ const REASON_VERB: Record<UserPointReason, string> = {
   MONTHLY_MERGE_BONUS: "완주로 적립했어요",
   ITEM_PURCHASE: "구매로 사용했어요",
   WITHDRAWAL_PENALTY: "중도 탈퇴로 차감됐어요",
+  PENALTY_FORFEIT: "제재로 압수됐어요",
+  PENALTY_REFUND: "이의제기가 받아들여져 돌려받았어요",
 };
 
 /** 상세 화면 히어로 문구. "오운완 인증으로 적립했어요" 처럼 sourceName 과 이어붙인다. */
@@ -47,6 +54,8 @@ export const REASON_ICON: Record<UserPointReason, Icon> = {
   MONTHLY_MERGE_BONUS: GitMergeIcon,
   ITEM_PURCHASE: ShoppingBagIcon,
   WITHDRAWAL_PENALTY: MinusCircleIcon,
+  PENALTY_FORFEIT: MinusCircleIcon,
+  PENALTY_REFUND: ArrowCounterClockwiseIcon,
 };
 
 /** 목록 아이콘 배지 색. 적립이면 보라, 차감이면 회색. */

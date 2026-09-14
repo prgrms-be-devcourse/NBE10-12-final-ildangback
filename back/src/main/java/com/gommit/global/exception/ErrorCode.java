@@ -95,6 +95,24 @@ public enum ErrorCode {
     MONTHLY_MERGE_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 월간 머지입니다."),
     FINAL_MERGE_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 최종 머지입니다."),
 
+    // ===== report =====
+    REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "신고를 찾을 수 없습니다."),
+    REPORT_TARGET_NOT_SUPPORTED(HttpStatus.BAD_REQUEST, "아직 신고할 수 없는 대상입니다."),
+    CHAT_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "메시지를 찾을 수 없습니다."),
+    SELF_REPORT_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "자기 자신은 신고할 수 없습니다."),
+    REPORT_DETAIL_REQUIRED(HttpStatus.BAD_REQUEST, "기타 사유는 상황 설명을 입력해야 합니다."),
+    DUPLICATE_PENDING_REPORT(HttpStatus.CONFLICT, "이미 처리 대기 중인 신고가 있습니다."),
+    REPORT_ALREADY_DECIDED(HttpStatus.CONFLICT, "이미 판정이 끝난 신고입니다."),
+    PENALTY_REQUIRED(HttpStatus.BAD_REQUEST, "승인하려면 제재를 하나 이상 선택해야 합니다."),
+    INVALID_SUSPENSION_DAYS(HttpStatus.BAD_REQUEST, "정지 일수는 1일 이상 365일 이하여야 합니다."),
+    INVALID_FORFEIT_AMOUNT(HttpStatus.BAD_REQUEST, "압수 금액은 1 이상이어야 합니다."),
+    ACCOUNT_SUSPENDED(HttpStatus.FORBIDDEN, "이용이 정지된 계정입니다. 정지 기간이 끝난 뒤 다시 로그인해 주세요."),
+    ACCOUNT_BANNED(HttpStatus.FORBIDDEN, "영구 정지된 계정입니다."),
+    APPEAL_NOT_FOUND(HttpStatus.NOT_FOUND, "이의제기를 찾을 수 없습니다."),
+    APPEAL_NOT_ALLOWED(HttpStatus.FORBIDDEN, "승인된 신고의 제재 대상만 이의제기할 수 있습니다."),
+    APPEAL_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 이의제기한 건입니다."),
+    APPEAL_ALREADY_DECIDED(HttpStatus.CONFLICT, "이미 판정이 끝난 이의제기입니다."),
+
     // ===== user =====
     EMAIL_DUPLICATED(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
     NICKNAME_DUPLICATED(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
