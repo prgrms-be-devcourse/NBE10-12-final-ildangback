@@ -2,6 +2,7 @@ package com.gommit.domain.challenge.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -12,6 +13,7 @@ import com.gommit.domain.challenge.entity.ChallengeMember;
 import com.gommit.domain.challenge.entity.ChallengeMemberRole;
 import com.gommit.domain.challenge.entity.ChallengeStatus;
 import com.gommit.domain.challenge.entity.FrequencyType;
+import com.gommit.domain.challenge.event.ChallengeEndedEvent;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
 import com.gommit.domain.group.entity.ChallengeGroup;
@@ -37,6 +39,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,6 +55,9 @@ class ChallengeLifecycleServiceTest {
 
     @Mock
     private ChallengeGroupRepository challengeGroupRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @Mock
     private BusinessClock businessClock;
@@ -244,6 +250,7 @@ class ChallengeLifecycleServiceTest {
             assertThat(challenge.getStatus()).isEqualTo(ChallengeStatus.ENDED);
             assertThat(group.getStatus()).isEqualTo(GroupStatus.ENDED);
             verify(challengeGroupRepository).findAllById(Set.of(12L));
+            verify(eventPublisher).publishEvent(new ChallengeEndedEvent(50L));
         }
 
         @Test
@@ -260,6 +267,7 @@ class ChallengeLifecycleServiceTest {
             // then
             assertThat(challenge.getStatus()).isEqualTo(ChallengeStatus.ACTIVE);
             verify(challengeRepository, never()).findByGroupIdAndSeqNo(12L, 2);
+            verify(eventPublisher, never()).publishEvent(any());
         }
 
         @Test
@@ -278,6 +286,7 @@ class ChallengeLifecycleServiceTest {
             // then
             assertThat(challenge.getStatus()).isEqualTo(ChallengeStatus.ENDED);
             verify(challengeGroupRepository, never()).findById(12L);
+            verify(eventPublisher).publishEvent(new ChallengeEndedEvent(50L));
         }
 
         @Test

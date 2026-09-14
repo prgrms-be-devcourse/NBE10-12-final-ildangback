@@ -1,9 +1,12 @@
 package com.gommit.domain.record.dto.response;
 
+import com.gommit.domain.item.entity.ItemSlot;
 import com.gommit.domain.record.entity.FinalMergeResult;
 import com.gommit.domain.record.entity.MonthlyMergeResult;
 import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -18,7 +21,8 @@ public record MergeParticipantResponse(
         int earnedPoints,
         int contributionRate,
         List<String> checkInTrendLabels,
-        List<Integer> checkInTrendCounts) {
+        List<Integer> checkInTrendCounts,
+        Map<ItemSlot, String> characterSlots) {
 
     public static MergeParticipantResponse from(MonthlyMergeResult result, String nickname) {
         return new MergeParticipantResponse(
@@ -32,7 +36,12 @@ public record MergeParticipantResponse(
                 result.getEarnedPoints(),
                 result.getContributionRate(),
                 splitLabels(result.getCheckInTrendLabels()),
-                splitCounts(result.getCheckInTrendCounts()));
+                splitCounts(result.getCheckInTrendCounts()),
+                characterSlots(
+                        result.getHeadImageUrl(),
+                        result.getTopImageUrl(),
+                        result.getBottomImageUrl(),
+                        result.getShoesImageUrl()));
     }
 
     public static MergeParticipantResponse from(FinalMergeResult result, String nickname) {
@@ -47,7 +56,21 @@ public record MergeParticipantResponse(
                 result.getEarnedPoints(),
                 result.getContributionRate(),
                 splitLabels(result.getCheckInTrendLabels()),
-                splitCounts(result.getCheckInTrendCounts()));
+                splitCounts(result.getCheckInTrendCounts()),
+                characterSlots(
+                        result.getHeadImageUrl(),
+                        result.getTopImageUrl(),
+                        result.getBottomImageUrl(),
+                        result.getShoesImageUrl()));
+    }
+
+    private static Map<ItemSlot, String> characterSlots(String head, String top, String bottom, String shoes) {
+        Map<ItemSlot, String> slots = new EnumMap<>(ItemSlot.class);
+        slots.put(ItemSlot.HEAD, head);
+        slots.put(ItemSlot.TOP, top);
+        slots.put(ItemSlot.BOTTOM, bottom);
+        slots.put(ItemSlot.SHOES, shoes);
+        return slots;
     }
 
     private static List<String> splitLabels(String csv) {
