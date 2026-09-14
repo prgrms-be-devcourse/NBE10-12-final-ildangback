@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { accessTokenUserId } from "../../../shared/lib/accessTokenRole";
+import { useToast } from "../../../shared/lib/useToast";
 import {
   clampToRange,
   currentMonth,
@@ -29,6 +31,7 @@ export function CheckInGalleryTab({
   /** 챌린지 시작·종료일. 기록이 없는 달로 못 넘어가게 월 네비 범위를 좁히고, 초기 진입 달도 그 범위 안으로 당겨온다. */
   period?: DatePeriod;
 }) {
+  const { showToast } = useToast();
   const { minMonth, maxMonth } = monthRangeOf(period);
   const [month, setMonth] = useState(() =>
     clampToRange(currentMonth(), minMonth, maxMonth),
@@ -84,6 +87,8 @@ export function CheckInGalleryTab({
         item={selected}
         onClose={() => setSelected(null)}
         showAuthor
+        currentUserId={accessTokenUserId()}
+        onReported={() => showToast("신고를 접수했어요.")}
       />
     </div>
   );

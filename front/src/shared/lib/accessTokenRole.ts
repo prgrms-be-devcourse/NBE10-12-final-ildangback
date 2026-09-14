@@ -21,6 +21,21 @@ export function accessTokenRole(): UserRole | null {
   return role === "ADMIN" || role === "USER" ? role : null;
 }
 
+/**
+ * AT 의 `sub` 클레임(userId)을 읽는다. 프로바이더 없이 "이게 내 것인가" 만 가릴 때 쓴다.
+ *
+ * `accessTokenRole` 과 같은 이유로 **보안이 아니다.** 본인 콘텐츠에 신고 버튼을 안 띄우는
+ * 정도에만 쓰고, 실제 차단은 서버가 자기 신고를 400 으로 막는 것이다.
+ */
+export function accessTokenUserId(): number | null {
+  const token = tokenStore.getAccessToken();
+  if (!token) return null;
+
+  const sub = claim(token, "sub");
+  const userId = Number(sub);
+  return typeof sub === "string" && Number.isInteger(userId) ? userId : null;
+}
+
 function claim(token: string, name: string): unknown {
   const payload = token.split(".")[1];
   if (!payload) return undefined;

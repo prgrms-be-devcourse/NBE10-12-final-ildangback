@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ToastProvider } from "../../../shared/ui/ToastProvider";
 import type { CheckIn, CheckInCursorResponse } from "../types";
 import { CheckInGalleryTab } from "./CheckInGalleryTab";
 
@@ -25,6 +26,14 @@ function checkIn(over: Partial<CheckIn> = {}): CheckIn {
     createdAt: "2026-09-02T09:00:00",
     ...over,
   };
+}
+
+function renderTab() {
+  return render(
+    <ToastProvider>
+      <CheckInGalleryTab challengeId={1} />
+    </ToastProvider>,
+  );
 }
 
 function pageOf(content: CheckIn[]): CheckInCursorResponse {
@@ -56,7 +65,7 @@ describe("CheckInGalleryTab", () => {
       ]),
     );
 
-    render(<CheckInGalleryTab challengeId={1} />);
+    renderTab();
 
     expect(await screen.findAllByRole("img", { name: /인증/ })).toHaveLength(2);
     // 닉네임 뱃지는 뜨지만 memo 는 타일에 안 나온다
@@ -76,7 +85,7 @@ describe("CheckInGalleryTab", () => {
       ]),
     );
 
-    render(<CheckInGalleryTab challengeId={1} />);
+    renderTab();
     const tile = await screen.findByRole("button", { name: /Noah의 인증/ });
     await userEvent.click(tile);
 
@@ -87,7 +96,7 @@ describe("CheckInGalleryTab", () => {
 
   it("shows the empty state when there are no check-ins", async () => {
     vi.mocked(getChallengeGallery).mockResolvedValue(pageOf([]));
-    render(<CheckInGalleryTab challengeId={1} />);
+    renderTab();
     expect(
       await screen.findByText("이번 달 인증이 없어요"),
     ).toBeInTheDocument();
@@ -95,7 +104,7 @@ describe("CheckInGalleryTab", () => {
 
   it("moves the month and refetches", async () => {
     vi.mocked(getChallengeGallery).mockResolvedValue(pageOf([checkIn()]));
-    render(<CheckInGalleryTab challengeId={1} />);
+    renderTab();
     await screen.findByRole("button", { name: /Ari의 인증/ });
 
     const shown = screen.getByText(/\d{4}년 \d{1,2}월/).textContent!;
@@ -109,7 +118,7 @@ describe("CheckInGalleryTab", () => {
 
   it("filters by participant chip", async () => {
     vi.mocked(getChallengeGallery).mockResolvedValue(pageOf([checkIn()]));
-    render(<CheckInGalleryTab challengeId={1} />);
+    renderTab();
     await screen.findByRole("button", { name: /Ari의 인증/ });
 
     await userEvent.click(screen.getByRole("button", { name: "Noah" }));

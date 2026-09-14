@@ -6,6 +6,9 @@ import { AdminHomePage } from "./domains/admin/pages/AdminHomePage";
 import { BackgroundAdminPage } from "./domains/admin/pages/BackgroundAdminPage";
 import { ItemAdminPage } from "./domains/admin/pages/ItemAdminPage";
 import { GroupShopPage } from "./domains/background/pages/GroupShopPage";
+import { MyPenaltiesPage } from "./domains/report/pages/MyPenaltiesPage";
+import { ReportAdminPage } from "./domains/admin/pages/ReportAdminPage";
+import { AppealAdminPage } from "./domains/admin/pages/AppealAdminPage";
 import { TabLayout } from "./app/TabLayout";
 import { ForgotPasswordPage } from "./domains/auth/pages/ForgotPasswordPage";
 import { LoginPage } from "./domains/auth/pages/LoginPage";
@@ -120,6 +123,7 @@ export function App() {
           <Route path="profile/password" element={<ChangePasswordPage />} />
           <Route path="profile/delete" element={<DeleteAccountPage />} />
           <Route path="profile/points" element={<PointHistoryPage />} />
+          <Route path="profile/penalties" element={<MyPenaltiesPage />} />
           <Route
             path="profile/points/:historyId"
             element={<PointHistoryDetailPage />}
@@ -171,6 +175,8 @@ export function App() {
             <Route index element={<AdminHomePage />} />
             <Route path="items" element={<ItemAdminPage />} />
             <Route path="backgrounds" element={<BackgroundAdminPage />} />
+            <Route path="reports" element={<ReportAdminPage />} />
+            <Route path="appeals" element={<AppealAdminPage />} />
           </Route>
         </Route>
       </Route>
