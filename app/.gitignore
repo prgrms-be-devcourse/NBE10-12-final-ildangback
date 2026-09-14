@@ -1,0 +1,22 @@
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+### 로컬 SDK 경로 ###
+local.properties
+
+### Gradle 이 자동 생성한다. 커밋하면 팀원 전원의 데몬 JVM 이 여기 적힌 버전으로 묶인다 ###
+gradle/gradle-daemon-jvm.properties
+
+### 서명 키 ###
+*.jks
+*.keystore
+keystore.properties
+
+### IntelliJ IDEA / Android Studio ###
+.idea
+*.iws
+*.iml
+*.ipr
+.cxx/
+captures/

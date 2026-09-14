@@ -82,8 +82,12 @@ public class ChallengeExtensionService {
         }
     }
 
+    public static LocalDate extensionDeadline(Challenge challenge) {
+        return challenge.getEndDate().minusDays(2);
+    }
+
     private void validateExtensionChoicePeriod(Challenge challenge) {
-        LocalDate deadline = challenge.getEndDate().minusDays(2);
+        LocalDate deadline = extensionDeadline(challenge);
         LocalDate today = businessClock.today();
         if (today.isAfter(deadline)) {
             throw new BusinessException(ErrorCode.EXTENSION_CHOICE_CLOSED);

@@ -47,6 +47,34 @@ export function redirectUriOf(provider: OAuthProviderId): string {
 }
 
 // ---------------------------------------------------------------------------
+// 안드로이드 앱 웹뷰인가
+//
+// 앱 셸이 웹뷰 UA 뒤에 접미를 붙인다. 붙이는 쪽은 MainActivity 의
+// APP_USER_AGENT_SUFFIX 다 — 값을 바꾸면 양쪽을 같이 바꿔야 한다.
+//
+// 이 판별을 두 곳에서 쓴다. startOAuth 는 state 에 접두어를 붙일지 정하고,
+// 콜백 페이지는 커스텀 스킴으로 튕길지 정한다. 자세한 것은 docs/앱설계.md 4-1.
+// ---------------------------------------------------------------------------
+
+const APP_USER_AGENT_SUFFIX = "Gommit-App/1.0";
+
+/** 앱에서 시작한 로그인이라는 표시. OAuth 왕복을 타고 넘어간다. */
+const APP_STATE_PREFIX = "app:";
+
+export function isAppWebView(): boolean {
+  return navigator.userAgent.includes(APP_USER_AGENT_SUFFIX);
+}
+
+export function isAppState(state: string | null): boolean {
+  return state !== null && state.startsWith(APP_STATE_PREFIX);
+}
+
+/** 앱이 인텐트로 받는 주소. 경로 마지막 칸의 프로바이더를 앱이 읽는다. */
+export function appCallbackUrl(provider: string, query: string): string {
+  return `gommit://oauth/callback/${provider}${query}`;
+}
+
+// ---------------------------------------------------------------------------
 // PKCE
 // ---------------------------------------------------------------------------
 
@@ -109,7 +137,9 @@ export async function startOAuth(provider: OAuthProviderId): Promise<void> {
     throw new Error(`${provider} client id is not configured`);
   }
 
-  const state = randomToken();
+  // 앱에서 시작했으면 접두어를 붙인다. 프로바이더가 state 를 그대로 돌려주므로
+  // 콜백 페이지가 이걸 보고 앱으로 튕겨야 하는 왕복인지 안다.
+  const state = (isAppWebView() ? APP_STATE_PREFIX : "") + randomToken();
   const codeVerifier = randomToken();
 
   const pending: PendingOAuth = { provider, state, codeVerifier };

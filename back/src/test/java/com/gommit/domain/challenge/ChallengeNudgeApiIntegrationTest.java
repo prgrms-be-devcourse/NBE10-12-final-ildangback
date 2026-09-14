@@ -179,4 +179,220 @@ class ChallengeNudgeApiIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.code").value("ALREADY_NUDGED"));
         assertThat(notifications.count()).isEqualTo(1);
     }
+
+    @Autowired
+    com.gommit.domain.notification.service.CheckInReminderService reminders;
+
+    @Test
+    void remindersExcludeCompletedInactiveAndAlreadyRemindedMembers() {
+        for (int round = 1; round <= 3; round++) {
+            checkIns.saveAndFlush(new CheckIn(
+                    challenge.getId(),
+                    senderId,
+                    round,
+                    CheckInType.PHOTO,
+                    "test.jpg",
+                    MediaType.IMAGE,
+                    null,
+                    null,
+                    today));
+        }
+        reminders.sendReminders();
+        assertThat(notifications.findAll()).hasSize(1);
+        var reminder = notifications.findAll().getFirst();
+        assertThat(reminder.getUserId()).isEqualTo(receiverId);
+        assertThat(reminder.getType()).isEqualTo(NotificationType.CHECK_IN_REMINDER);
+        assertThat(reminder.getRefId()).isEqualTo(challenge.getId());
+        jdbcTemplate.update(
+                "UPDATE notifications SET created_at = ?, read_at = ?", today.atTime(21, 0), today.atTime(22, 0));
+        reminders.sendReminders();
+        assertThat(notifications.count()).isEqualTo(1);
+        when(clock.today()).thenReturn(today.plusDays(1));
+        jdbcTemplate.update("UPDATE challenge_members SET status = 'LEFT' WHERE challenge_id = ?", challenge.getId());
+        reminders.sendReminders();
+        assertThat(notifications.count()).isEqualTo(1);
+        jdbcTemplate.update("UPDATE challenge_members SET status = 'ACTIVE' WHERE challenge_id = ?", challenge.getId());
+        for (String status : new String[] {"READY", "ENDED"}) {
+            jdbcTemplate.update("UPDATE challenges SET status = ? WHERE id = ?", status, challenge.getId());
+            reminders.sendReminders();
+            assertThat(notifications.count()).isEqualTo(1);
+        }
+    }
+
+    @Autowired
+    com.gommit.domain.notification.service.ExtensionReminderService extensionReminders;
+
+    @ParameterizedTest
+    @ValueSource(strings = {"PENDING", "EXTEND", "DECLINE"})
+    void extensionRemindersRespectChoiceAndReadDuplicates(String choice) {
+        jdbcTemplate.update("UPDATE challenges SET end_date = ? WHERE id = ?", today.plusDays(3), challenge.getId());
+        jdbcTemplate.update("UPDATE challenge_members SET extension_choice = 'EXTEND' WHERE user_id = ?", senderId);
+        jdbcTemplate.update("UPDATE challenge_members SET extension_choice = ? WHERE user_id = ?", choice, receiverId);
+        extensionReminders.sendReminders();
+        if (!choice.equals("PENDING")) {
+            assertThat(notifications.count()).isZero();
+            return;
+        }
+        assertThat(notifications.findAll()).hasSize(1);
+        var notification = notifications.findAll().getFirst();
+        assertThat(notification.getType()).isEqualTo(NotificationType.EXTENSION_REMINDER);
+        assertThat(notification.getUserId()).isEqualTo(receiverId);
+        assertThat(notification.getRefId()).isEqualTo(challenge.getId());
+        assertThat(notification.getBody()).isEqualTo("다음 시즌 참여 여부를 아직 선택하지 않았어요! 마감 전에 선택해주세요 🔔");
+        notification.read();
+        notifications.saveAndFlush(notification);
+        extensionReminders.sendReminders();
+        assertThat(notifications.count()).isEqualTo(1);
+    }
+
+    @Test
+    void extensionRemindersExcludeOtherDatesAndInactiveTargets() {
+        extensionReminders.sendReminders();
+        assertThat(notifications.count()).isZero();
+        jdbcTemplate.update("UPDATE challenges SET end_date = ? WHERE id = ?", today.plusDays(2), challenge.getId());
+        extensionReminders.sendReminders();
+        assertThat(notifications.count()).isZero();
+        jdbcTemplate.update("UPDATE challenges SET end_date = ? WHERE id = ?", today.plusDays(3), challenge.getId());
+        for (String status : new String[] {"READY", "ENDED"}) {
+            jdbcTemplate.update("UPDATE challenges SET status = ? WHERE id = ?", status, challenge.getId());
+            extensionReminders.sendReminders();
+            assertThat(notifications.count()).isZero();
+        }
+        jdbcTemplate.update("UPDATE challenges SET status = 'ACTIVE' WHERE id = ?", challenge.getId());
+        jdbcTemplate.update("UPDATE challenge_members SET status = 'LEFT' WHERE challenge_id = ?", challenge.getId());
+        extensionReminders.sendReminders();
+        assertThat(notifications.count()).isZero();
+    }
+
+    @Autowired
+    com.gommit.domain.challenge.service.ChallengeLifecycleService lifecycle;
+
+    @Test
+    void seasonStartNotifiesOnlyNewSeasonActiveMembersOnce() {
+        var next = challenges.saveAndFlush(Challenge.builder()
+                .groupId(challenge.getGroupId())
+                .seqNo(2)
+                .startDate(today)
+                .endDate(today.plusDays(7))
+                .frequencyType(FrequencyType.DAILY)
+                .dailyCheckInCount(3)
+                .requiredDayCount(8)
+                .allowPhoto(true)
+                .build());
+        members.saveAndFlush(ChallengeMember.builder()
+                .challenge(next)
+                .userId(senderId)
+                .role(ChallengeMemberRole.OWNER)
+                .build());
+        // Receiver belongs only to the previous season.
+        loginAs("third@example.com", "새멤버");
+        Long thirdId =
+                jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = ?", Long.class, "third@example.com");
+        members.saveAndFlush(ChallengeMember.builder()
+                .challenge(next)
+                .userId(thirdId)
+                .role(ChallengeMemberRole.MEMBER)
+                .build());
+        loginAs("left@example.com", "탈퇴멤버");
+        Long leftId =
+                jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = ?", Long.class, "left@example.com");
+        members.saveAndFlush(ChallengeMember.builder()
+                .challenge(next)
+                .userId(leftId)
+                .role(ChallengeMemberRole.MEMBER)
+                .build());
+        jdbcTemplate.update(
+                "UPDATE challenge_members SET status = 'LEFT' WHERE challenge_id = ? AND user_id = ?",
+                next.getId(),
+                leftId);
+        lifecycle.activateChallengesDueToday();
+        assertThat(challenges.findById(next.getId()).orElseThrow().getStatus()).isEqualTo(ChallengeStatus.ACTIVE);
+        assertThat(notifications.findAll()).hasSize(2).allSatisfy(n -> {
+            assertThat(n.getType()).isEqualTo(NotificationType.SEASON_STARTED);
+            assertThat(n.getRefId()).isEqualTo(next.getId());
+            assertThat(n.getBody()).isEqualTo("새 시즌이 시작됐어요! 오늘부터 다시 인증을 시작해보세요 🔥");
+        });
+        assertThat(notifications.findAll()).extracting(n -> n.getUserId()).containsExactlyInAnyOrder(senderId, thirdId);
+        jdbcTemplate.update("UPDATE notifications SET read_at = ?", today.atTime(5, 0));
+        lifecycle.activateChallengesDueToday();
+        assertThat(notifications.count()).isEqualTo(2);
+        // Even if activation is retried from READY, read notifications still prevent duplicates.
+        jdbcTemplate.update("UPDATE challenges SET status = 'READY' WHERE id = ?", next.getId());
+        lifecycle.activateChallengesDueToday();
+        assertThat(notifications.count()).isEqualTo(2);
+    }
+
+    @Test
+    void seasonStartSkipsExistingActiveAndFutureReadyChallenges() {
+        lifecycle.activateChallengesDueToday();
+        assertThat(notifications.count()).isZero();
+        jdbcTemplate.update(
+                "UPDATE challenges SET status = 'READY', start_date = ? WHERE id = ?",
+                today.plusDays(1),
+                challenge.getId());
+        lifecycle.activateChallengesDueToday();
+        assertThat(notifications.count()).isZero();
+        assertThat(challenges.findById(challenge.getId()).orElseThrow().getStatus())
+                .isEqualTo(ChallengeStatus.READY);
+    }
+
+    @Test
+    void seasonEndNotifiesActiveMembersIncludingDeclineOnlyOnce() {
+        jdbcTemplate.update(
+                "UPDATE challenges SET start_date = ?, end_date = ? WHERE id = ?",
+                today.minusDays(7),
+                today.minusDays(1),
+                challenge.getId());
+        jdbcTemplate.update("UPDATE challenge_members SET extension_choice = 'DECLINE' WHERE user_id = ?", receiverId);
+        // The current season must notify even when there is a next season.
+        challenges.saveAndFlush(Challenge.builder()
+                .groupId(challenge.getGroupId())
+                .seqNo(2)
+                .startDate(today)
+                .endDate(today.plusDays(7))
+                .frequencyType(FrequencyType.DAILY)
+                .dailyCheckInCount(3)
+                .requiredDayCount(8)
+                .allowPhoto(true)
+                .build());
+        lifecycle.endChallengesDueToday();
+        assertThat(challenges.findById(challenge.getId()).orElseThrow().getStatus())
+                .isEqualTo(ChallengeStatus.ENDED);
+        assertThat(notifications.findAll()).hasSize(2).allSatisfy(n -> {
+            assertThat(n.getType()).isEqualTo(NotificationType.SEASON_ENDED);
+            assertThat(n.getRefId()).isEqualTo(challenge.getId());
+            assertThat(n.getBody()).isEqualTo("이번 시즌이 종료됐어요! 기록을 확인해보세요 🎉");
+        });
+        assertThat(notifications.findAll())
+                .extracting(n -> n.getUserId())
+                .containsExactlyInAnyOrder(senderId, receiverId);
+        jdbcTemplate.update("UPDATE notifications SET read_at = ?", today.atTime(5, 0));
+        lifecycle.endChallengesDueToday();
+        assertThat(notifications.count()).isEqualTo(2);
+        jdbcTemplate.update("UPDATE challenges SET status = 'ACTIVE' WHERE id = ?", challenge.getId());
+        lifecycle.endChallengesDueToday();
+        assertThat(notifications.count()).isEqualTo(2);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"LEFT", "KICKED"})
+    void seasonEndExcludesDepartedMembers(String status) {
+        jdbcTemplate.update(
+                "UPDATE challenges SET start_date = ?, end_date = ? WHERE id = ?",
+                today.minusDays(7),
+                today.minusDays(1),
+                challenge.getId());
+        jdbcTemplate.update("UPDATE challenge_members SET status = ? WHERE user_id = ?", status, receiverId);
+        lifecycle.endChallengesDueToday();
+        assertThat(notifications.findAll()).hasSize(1);
+        assertThat(notifications.findAll().getFirst().getUserId()).isEqualTo(senderId);
+    }
+
+    @Test
+    void seasonEndSkipsFutureEndDate() {
+        lifecycle.endChallengesDueToday();
+        assertThat(notifications.count()).isZero();
+        assertThat(challenges.findById(challenge.getId()).orElseThrow().getStatus())
+                .isEqualTo(ChallengeStatus.ACTIVE);
+    }
 }

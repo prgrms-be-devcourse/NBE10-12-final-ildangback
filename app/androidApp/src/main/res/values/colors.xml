@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- front/public/icon-512-maskable.png 의 바탕색 -->
+    <color name="ic_launcher_background">#D1C0ED</color>
+
+    <!-- front 의 background_color. 웹뷰가 뜨기 전 한 프레임에 보인다 -->
+    <color name="window_background">#FFFFFF</color>
+</resources>

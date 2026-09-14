@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
     List<Notification> findAllByUserIdAndReadAtIsNullOrderByCreatedAtDescIdDesc(Long userId);
 
+    boolean existsByUserIdAndTypeAndRefId(Long userId, NotificationType type, Long refId);
+
     Optional<Notification> findByIdAndUserId(Long id, Long userId);
 
     boolean existsByUserIdAndTypeAndRefIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(

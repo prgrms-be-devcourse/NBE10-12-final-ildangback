@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  lint 이 이 폴더를 mipmap-anydpi 로 합치라고 경고한다. 합치면 aapt2 가
+  mipmap/ic_launcher 를 못 찾아 빌드가 깨진다. -v26 을 유지한다.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <!-- 원본이 마스커블용이라 이미 여백이 있다. 8% 더 밀어 안전 영역(가운데 66.7%) 안에 넣는다 -->
+    <foreground>
+        <inset
+            android:drawable="@mipmap/ic_launcher_foreground"
+            android:inset="8%" />
+    </foreground>
+    <!-- 테마 아이콘용. 원본에서 어두운 픽셀만 남긴 실루엣이고 알파만 쓰인다 -->
+    <monochrome>
+        <inset
+            android:drawable="@mipmap/ic_launcher_monochrome"
+            android:inset="8%" />
+    </monochrome>
+</adaptive-icon>
