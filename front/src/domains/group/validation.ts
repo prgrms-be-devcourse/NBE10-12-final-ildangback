@@ -43,9 +43,10 @@ export const groupCreateSchema = z
         .int()
         .min(1, "하루 최소 1회 인증해야 합니다.")
         .max(4, "하루 최대 4회까지 설정할 수 있어요."),
+      // 라이브는 별도 서브시스템(아직 없음) — 사진/영상 중 하나만 고른다.
       allowedTypes: z
-        .array(z.literal("PHOTO"))
-        .length(1, "사진 인증을 선택해주세요."),
+        .array(z.enum(["PHOTO", "VIDEO"]))
+        .length(1, "인증 방식을 선택해주세요."),
     }),
   })
   .superRefine((values, ctx) => {

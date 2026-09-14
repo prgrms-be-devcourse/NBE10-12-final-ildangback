@@ -9,8 +9,7 @@ interface Props {
 
 /**
  * 인증 유형 필터 칩 (전체 / 사진 / 영상 / 라이브). 시안이 4개를 명시한다.
- * `CheckInType` enum 은 `PHOTO` 만이라 영상·라이브는 회색 + 탭 시 안내 토스트.
- * VIDEO enum 이 들어오면 두 칩을 활성화만 하면 된다.
+ * 라이브는 `CheckInType` 에 없어(별도 서브시스템, 이번 스코프 아님) 회색 + 탭 시 안내 토스트로 남긴다.
  */
 export function CheckInTypeChips({ value, onChange }: Props) {
   const { showToast } = useToast();
@@ -23,21 +22,16 @@ export function CheckInTypeChips({ value, onChange }: Props) {
       <Chip active={value === "PHOTO"} onClick={() => onChange("PHOTO")}>
         사진
       </Chip>
-      {UNSUPPORTED_TYPES.map(({ label, message }) => (
-        <button
-          key={label}
-          type="button"
-          onClick={() => showToast(message)}
-          className="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-[13px] font-medium text-gray-300"
-        >
-          {label}
-        </button>
-      ))}
+      <Chip active={value === "VIDEO"} onClick={() => onChange("VIDEO")}>
+        영상
+      </Chip>
+      <button
+        type="button"
+        onClick={() => showToast("라이브 인증은 아직 지원하지 않아요")}
+        className="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-[13px] font-medium text-gray-300"
+      >
+        라이브
+      </button>
     </div>
   );
 }
-
-const UNSUPPORTED_TYPES = [
-  { label: "영상", message: "영상 인증은 아직 지원하지 않아요" },
-  { label: "라이브", message: "라이브 인증은 아직 지원하지 않아요" },
-];

@@ -104,7 +104,8 @@ export interface GroupCreateRequest {
   visibility: Visibility;
   maxMembers: number;
   challenge: Omit<ChallengeSettings, "allowedTypes"> & {
-    allowedTypes: "PHOTO"[];
+    // LIVE 는 별도 서브시스템(아직 없음) — 생성/설정 화면은 PHOTO/VIDEO 중 하나만 고른다.
+    allowedTypes: ("PHOTO" | "VIDEO")[];
   };
 }
 

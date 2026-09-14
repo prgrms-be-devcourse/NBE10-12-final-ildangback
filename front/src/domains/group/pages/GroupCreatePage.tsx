@@ -26,7 +26,7 @@ const DESCRIPTIONS = [
   "그룹에서 함께 달성할 주제를 골라주세요.",
   "함께할 목표와 진행 기간을 정해주세요.",
   "챌린지에 맞는 반복 주기를 설정해주세요.",
-  "사진으로 일상의 실천을 기록해요.",
+  "사진이나 영상으로 일상의 실천을 기록해요.",
   "공개 여부와 함께할 인원을 선택해주세요.",
   "설정을 확인하고 챌린지를 시작하세요.",
 ];
@@ -109,7 +109,7 @@ export function GroupCreatePage() {
             values.challenge.frequencyType === "DAYS_OF_WEEK"
               ? values.challenge.daysOfWeek
               : [],
-          allowedTypes: ["PHOTO"],
+          allowedTypes: values.challenge.allowedTypes,
         },
       });
       showToast("그룹을 만들었어요.");

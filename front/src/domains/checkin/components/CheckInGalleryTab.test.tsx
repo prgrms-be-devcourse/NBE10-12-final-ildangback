@@ -21,6 +21,7 @@ function checkIn(over: Partial<CheckIn> = {}): CheckIn {
     checkInType: "PHOTO",
     mediaUrl: "https://cdn/1.jpg",
     mediaType: "IMAGE",
+    posterUrl: null,
     memo: null,
     createdAt: "2026-09-02T09:00:00",
     ...over,
@@ -62,6 +63,23 @@ describe("CheckInGalleryTab", () => {
     // 닉네임 뱃지는 뜨지만 memo 는 타일에 안 나온다
     expect(screen.getByText("Noah", { selector: "span" })).toBeInTheDocument();
     expect(screen.queryByText("30분 러닝")).not.toBeInTheDocument();
+  });
+
+  it("renders a video check-in's poster thumbnail, not the raw video url", async () => {
+    vi.mocked(getChallengeGallery).mockResolvedValue(
+      pageOf([
+        checkIn({
+          mediaType: "VIDEO",
+          mediaUrl: "https://cdn/1.mp4",
+          posterUrl: "https://cdn/1-poster.jpg",
+        }),
+      ]),
+    );
+
+    render(<CheckInGalleryTab challengeId={1} />);
+
+    const thumbnail = await screen.findByRole("img", { name: /인증/ });
+    expect(thumbnail).toHaveAttribute("src", "https://cdn/1-poster.jpg");
   });
 
   it("opens the lightbox with time and memo when a tile is tapped", async () => {

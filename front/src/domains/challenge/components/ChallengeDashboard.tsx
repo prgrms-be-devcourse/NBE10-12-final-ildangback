@@ -251,11 +251,15 @@ export function ChallengeDashboard({
         status={{
           currentCount: data.myCurrentCount,
           targetCount: challenge.dailyCheckInCount,
-          allowedTypes: challenge.allowedTypes.includes("PHOTO")
-            ? ["PHOTO"]
-            : [],
+          // 챌린지 도메인의 CheckInType 은 LIVE 도 포함(아직 별도 서브시스템, 이번 스코프 아님).
+          allowedTypes: challenge.allowedTypes.filter(
+            (t): t is "PHOTO" | "VIDEO" => t === "PHOTO" || t === "VIDEO",
+          ),
         }}
         onSelectPhoto={() => navigate(`/challenges/${challenge.id}/check-in`)}
+        onSelectVideo={() =>
+          navigate(`/challenges/${challenge.id}/check-in?type=video`)
+        }
       />
     </>
   );

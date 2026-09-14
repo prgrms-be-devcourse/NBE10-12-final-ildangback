@@ -10,13 +10,14 @@ const openStatus: TodayCheckInStatus = {
   currentCount: 0,
   targetCount: 1,
   completed: false,
-  allowedTypes: ["PHOTO"],
+  allowedTypes: ["PHOTO", "VIDEO"],
 };
 
 function renderSheet(
   overrides: Partial<Parameters<typeof CheckInMethodSheet>[0]> = {},
 ) {
   const onSelectPhoto = vi.fn();
+  const onSelectVideo = vi.fn();
   const onClose = vi.fn();
   render(
     <CheckInMethodSheet
@@ -25,10 +26,11 @@ function renderSheet(
       loading={false}
       status={openStatus}
       onSelectPhoto={onSelectPhoto}
+      onSelectVideo={onSelectVideo}
       {...overrides}
     />,
   );
-  return { onSelectPhoto, onClose };
+  return { onSelectPhoto, onSelectVideo, onClose };
 }
 
 describe("CheckInMethodSheet", () => {
@@ -44,16 +46,20 @@ describe("CheckInMethodSheet", () => {
     expect(onSelectPhoto).toHaveBeenCalledOnce();
   });
 
+  it("selects video check-in when the video option is tapped", async () => {
+    const { onSelectVideo } = renderSheet();
+    await userEvent.click(screen.getByRole("button", { name: /영상 인증/ }));
+    expect(onSelectVideo).toHaveBeenCalledOnce();
+  });
+
   it("disables the photo option when the challenge does not allow photos", () => {
-    renderSheet({ status: { ...openStatus, allowedTypes: [] } });
+    renderSheet({ status: { ...openStatus, allowedTypes: ["VIDEO"] } });
     expect(screen.getByRole("button", { name: /사진 인증/ })).toBeDisabled();
   });
 
-  it("shows the video option as disabled with a coming-soon note", () => {
-    renderSheet();
-    const video = screen.getByRole("button", { name: /영상 인증/ });
-    expect(video).toBeDisabled();
-    expect(screen.getByText(/추후|준비 중/)).toBeInTheDocument();
+  it("disables the video option when the challenge does not allow video", () => {
+    renderSheet({ status: { ...openStatus, allowedTypes: ["PHOTO"] } });
+    expect(screen.getByRole("button", { name: /영상 인증/ })).toBeDisabled();
   });
 
   it("does not offer live check-in", () => {

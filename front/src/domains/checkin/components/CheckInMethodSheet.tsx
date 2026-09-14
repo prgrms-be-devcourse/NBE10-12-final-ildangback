@@ -13,11 +13,12 @@ interface Props {
     "currentCount" | "targetCount" | "allowedTypes"
   > | null;
   onSelectPhoto: () => void;
+  onSelectVideo: () => void;
 }
 
 /**
  * 와이어프레임 1번 — "오늘 인증하기" 방법 선택 시트.
- * 라이브는 이번 스코프에서 제외, 영상은 비활성(추후 구현).
+ * 라이브는 이번 스코프에서 제외.
  */
 export function CheckInMethodSheet({
   isOpen,
@@ -26,8 +27,10 @@ export function CheckInMethodSheet({
   error = false,
   status,
   onSelectPhoto,
+  onSelectVideo,
 }: Props) {
   const photoAllowed = status?.allowedTypes.includes("PHOTO") ?? false;
+  const videoAllowed = status?.allowedTypes.includes("VIDEO") ?? false;
 
   return (
     <BottomSheet isOpen={isOpen} onClose={onClose} title="오늘 인증하기">
@@ -64,8 +67,9 @@ export function CheckInMethodSheet({
             <MethodRow
               icon={<VideoCameraIcon size={26} weight="fill" />}
               title="영상 인증"
-              subtitle="추후 구현 예정이에요"
-              disabled
+              subtitle="2초 영상으로 오늘의 인증을 해요"
+              disabled={!videoAllowed}
+              onClick={onSelectVideo}
             />
           </div>
         </>

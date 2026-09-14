@@ -32,6 +32,21 @@ const schema = groupCreateSchema.shape.challenge.superRefine((value, ctx) => {
     });
 });
 type SettingsForm = z.infer<typeof schema>;
+
+/**
+ * 챌린지 도메인의 `CheckInType` 은 LIVE 도 포함(별도 서브시스템, 아직 없음) — 이 폼은
+ * PHOTO/VIDEO 중 하나만 다룬다. 기존 값에 LIVE 만 있는 이상 상태는 없으니 필터 결과가
+ * 비면 PHOTO 로 되돌린다.
+ */
+function toSupportedAllowedTypeOrDefault(
+  allowedTypes: ChallengeDetail["allowedTypes"],
+): SettingsForm["allowedTypes"] {
+  const supported = allowedTypes.filter(
+    (t): t is "PHOTO" | "VIDEO" => t === "PHOTO" || t === "VIDEO",
+  );
+  return supported.length ? [supported[0]] : ["PHOTO"];
+}
+
 const FIELDS = [
   "startDate",
   "endDate",
@@ -59,12 +74,16 @@ export function ChallengeSettingsEditor({
       ...challenge,
       daysOfWeek: challenge.daysOfWeek ?? [],
       frequencyValue: challenge.frequencyValue ?? 2,
-      allowedTypes: ["PHOTO"],
+      allowedTypes: toSupportedAllowedTypeOrDefault(challenge.allowedTypes),
     },
   });
   const frequencyType = useWatch({
     control: form.control,
     name: "frequencyType",
+  });
+  const allowedTypes = useWatch({
+    control: form.control,
+    name: "allowedTypes",
   });
   const days = useWatch({ control: form.control, name: "daysOfWeek" });
   const { errors, isSubmitting } = form.formState;
@@ -80,7 +99,6 @@ export function ChallengeSettingsEditor({
         frequencyValue:
           frequencyType === "EVERY_N_DAYS" ? values.frequencyValue : null,
         daysOfWeek: frequencyType === "DAYS_OF_WEEK" ? values.daysOfWeek : [],
-        allowedTypes: ["PHOTO"],
       });
       showToast("챌린지 설정을 저장했어요.");
       onSaved();
@@ -185,7 +203,30 @@ export function ChallengeSettingsEditor({
           error={errors.dailyCheckInCount?.message}
           {...form.register("dailyCheckInCount", { valueAsNumber: true })}
         />
-        <p className="text-sm text-gray-500">인증 방식: 사진</p>
+        <label className="block text-sm font-semibold">
+          인증 방식
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {(["PHOTO", "VIDEO"] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                aria-pressed={allowedTypes.includes(type)}
+                onClick={() =>
+                  form.setValue("allowedTypes", [type], {
+                    shouldValidate: true,
+                  })
+                }
+                className={`min-h-11 rounded-xl border text-sm font-medium ${
+                  allowedTypes.includes(type)
+                    ? "border-purple-500 bg-purple-50 text-purple-700"
+                    : "border-purple-200 text-gray-500"
+                }`}
+              >
+                {type === "PHOTO" ? "사진" : "영상"}
+              </button>
+            ))}
+          </div>
+        </label>
         <FormAlert message={errors.allowedTypes?.message ?? null} />
       </fieldset>
       <FormAlert message={error} />

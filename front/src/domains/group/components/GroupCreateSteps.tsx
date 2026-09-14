@@ -315,69 +315,75 @@ export function GroupCreateSteps({ step }: { step: number }) {
     return (
       <div>
         <div className="space-y-3">
-          {[
-            {
-              label: "사진",
-              icon: cameraIcon,
-              description: "사진을 바로 촬영하여 인증",
-              available: true,
-            },
-            {
-              label: "영상",
-              icon: camcorderIcon,
-              description: "짧은 영상으로 인증",
-              available: false,
-            },
-            {
-              label: "라이브",
-              icon: liveIcon,
-              description: "멤버들과 실시간으로 인증",
-              available: false,
-            },
-          ].map(({ label, icon, description, available }) => (
-            <button
-              key={label}
-              type="button"
-              aria-pressed={
-                available && settings.allowedTypes.includes("PHOTO")
-              }
-              onClick={() => {
-                if (!available) {
-                  showToast("준비중입니다.");
-                  return;
-                }
-                setValue("challenge.allowedTypes", ["PHOTO"], {
-                  shouldValidate: true,
-                });
-              }}
-              className={`flex min-h-24 w-full items-center gap-4 rounded-2xl border p-4 text-left ${available && settings.allowedTypes.includes("PHOTO") ? SELECTED : NORMAL}`}
-            >
-              <img
-                src={icon}
-                alt=""
-                width={36}
-                height={36}
-                className="shrink-0 object-contain"
-              />
-              <span className="min-w-0 flex-1">
-                <span className="block text-lg font-bold">{label}</span>
-                <span className="mt-1 block text-sm text-gray-500">
-                  {description}
-                </span>
-              </span>
-              <span
-                aria-hidden="true"
-                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${available && settings.allowedTypes.includes("PHOTO") ? "border-purple-500 bg-purple-500" : "border-purple-200 bg-white"}`}
+          {(
+            [
+              {
+                value: "PHOTO",
+                label: "사진",
+                icon: cameraIcon,
+                description: "사진을 바로 촬영하여 인증",
+                available: true,
+              },
+              {
+                value: "VIDEO",
+                label: "영상",
+                icon: camcorderIcon,
+                description: "2초 영상으로 인증",
+                available: true,
+              },
+              {
+                value: "LIVE",
+                label: "라이브",
+                icon: liveIcon,
+                description: "멤버들과 실시간으로 인증",
+                available: false,
+              },
+            ] as const
+          ).map(({ value, label, icon, description, available }) => {
+            const selected = available && settings.allowedTypes.includes(value);
+            return (
+              <button
+                key={label}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => {
+                  if (!available) {
+                    showToast("준비중입니다.");
+                    return;
+                  }
+                  setValue("challenge.allowedTypes", [value], {
+                    shouldValidate: true,
+                  });
+                }}
+                className={`flex min-h-24 w-full items-center gap-4 rounded-2xl border p-4 text-left ${selected ? SELECTED : NORMAL}`}
               >
-                {available && settings.allowedTypes.includes("PHOTO") && (
-                  <CheckIcon size={18} weight="bold" className="text-white" />
-                )}
-              </span>
-            </button>
-          ))}
+                <img
+                  src={icon}
+                  alt=""
+                  width={36}
+                  height={36}
+                  className="shrink-0 object-contain"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-lg font-bold">{label}</span>
+                  <span className="mt-1 block text-sm text-gray-500">
+                    {description}
+                  </span>
+                </span>
+                <span
+                  aria-hidden="true"
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${selected ? "border-purple-500 bg-purple-500" : "border-purple-200 bg-white"}`}
+                >
+                  {selected && (
+                    <CheckIcon size={18} weight="bold" className="text-white" />
+                  )}
+                </span>
+              </button>
+            );
+          })}
         </div>
         <p className="mt-5 text-xs text-purple-700">
-          현재는 사진 인증 방식으로만 그룹을 만들 수 있어요.
+          인증 방식은 그룹 생성 후에도 시즌 설정에서 바꿀 수 있어요.
         </p>
         <FieldError message={errors.challenge?.allowedTypes?.message} />
       </div>
