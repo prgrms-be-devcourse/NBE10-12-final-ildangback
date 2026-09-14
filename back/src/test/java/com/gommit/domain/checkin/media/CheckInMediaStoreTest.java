@@ -118,14 +118,6 @@ class CheckInMediaStoreTest {
     }
 
     @Test
-    @DisplayName("delete: MediaRole.CHECKIN 을 고정해서 storageService.delete 에 위임한다")
-    void deleteDelegatesWithCheckInRole() {
-        adapter.delete("check-ins/2026/09/a.png");
-
-        verify(storageService).delete("check-ins/2026/09/a.png", MediaRole.CHECKIN);
-    }
-
-    @Test
     @DisplayName("load: MediaRole.CHECKIN 을 고정해서 storageService.load 에 위임한다")
     void loadDelegatesWithCheckInRole() {
         Resource resource = new ByteArrayResource(new byte[] {1, 2, 3});

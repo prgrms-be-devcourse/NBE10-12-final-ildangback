@@ -50,10 +50,6 @@ public class CheckInMediaStore {
         }
     }
 
-    public void delete(String storageKey) {
-        delete(storageKey, null);
-    }
-
     public void delete(String storageKey, String posterKey) {
         storageService.delete(storageKey, MediaRole.CHECKIN);
         if (posterKey != null) {
