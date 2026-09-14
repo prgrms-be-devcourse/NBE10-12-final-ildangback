@@ -84,7 +84,7 @@ public class CheckInService {
 
     @Transactional
     public CheckInResultResponse submit(Long userId, Long challengeId, SubmitCheckInRequest form, MultipartFile media) {
-        Challenge challenge = preconditions.getActiveChallengeForActiveMember(challengeId, userId);
+        Challenge challenge = preconditions.getActiveChallengeForActiveMemberForUpdate(challengeId, userId);
 
         String memo = (form.memo() == null || form.memo().isBlank()) ? null : form.memo();
 
@@ -110,11 +110,13 @@ public class CheckInService {
         try {
             checkInRepository.saveAndFlush(checkIn);
         } catch (DataIntegrityViolationException | CannotAcquireLockException e) {
+            // uk 위반 + 잔여 갭락 데드락 모두 "회차 선점됨"으로 동일 처리
             log.atInfo()
-                    .setMessage("uk_check_ins 위반(같은 회차 선점됨)")
+                    .setMessage("uk_check_ins 위반 또는 락 경합(같은 회차 선점됨)")
                     .addKeyValue("challengeId", challengeId)
                     .addKeyValue("userId", userId)
                     .addKeyValue("roundNo", roundNo)
+                    .setCause(e)
                     .log();
             deleteQuietly(mediaKey); // 방금 쓴 orphan을 best-effort로 정리
             throw new BusinessException(ErrorCode.DAILY_LIMIT_EXCEEDED);
