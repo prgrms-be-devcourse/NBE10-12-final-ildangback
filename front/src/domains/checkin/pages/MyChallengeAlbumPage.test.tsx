@@ -74,6 +74,26 @@ describe("MyChallengeAlbumPage", () => {
     );
   });
 
+  it("clamps the initial month into the challenge's period once summary loads, instead of starting on an empty current month", async () => {
+    vi.mocked(getChallengeAlbumSummary).mockResolvedValue({
+      challengeId: 3,
+      name: "8월 독서 챌린지",
+      category: "독서",
+      active: false,
+      startDate: "2026-07-01",
+      endDate: "2026-08-15",
+    });
+
+    renderAt(3);
+
+    await screen.findByText("8월 독서 챌린지 앨범");
+    expect(await screen.findByText(/2026년 8월/)).toBeInTheDocument();
+    expect(screen.queryByText(/2026년 9월/)).not.toBeInTheDocument();
+    expect(getMyCheckIns).toHaveBeenLastCalledWith(
+      expect.objectContaining({ month: "2026-08" }),
+    );
+  });
+
   it("toasts instead of filtering on the unsupported video chip", async () => {
     renderAt(2);
     await screen.findByText("매일 독서 30분 앨범");
