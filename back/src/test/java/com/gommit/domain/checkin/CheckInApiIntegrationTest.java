@@ -298,8 +298,11 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
         }
 
         // MockMvc 는 스레드 안전이 아니므로 서비스를 직접 호출한다 (signup 동시성 테스트와 동일 패턴).
+        // #97 회귀 테스트도 겸한다: ChallengeMember 행 비관적 락으로 줄 세우기 전엔 이 테스트가 CI에서
+        // 간헐적으로 CannotAcquireLockException(데드락)으로 실패했다. 지금은 락이 요청을 직렬화하므로
+        // 예상 못한 예외(BusinessException 이외)가 새면 아래 invokeAll 결과 수집부에서 곧바로 터진다.
         @Test
-        @DisplayName("동시 제출은 uk_check_ins 로 걸러지고 저장 수 = check_ins 행 수 (orphan 없음)")
+        @DisplayName("동시 제출은 목표 회차를 넘지 않고 저장 수 = check_ins 행 수, 데드락 없이 처리됨 (#97)")
         void concurrentSubmitsRespectDailyLimit() throws Exception {
             loginAs(EMAIL, NICKNAME);
             long userId = userIdOf(EMAIL);
@@ -348,7 +351,8 @@ class CheckInApiIntegrationTest extends IntegrationTestSupport {
                     userId);
             long mediaFiles = countMediaFiles();
 
-            // 락은 없다. 동시 버스트는 uk_check_ins 로 걸러져 목표 회차(2) 를 넘지 않고,
+            // ChallengeMember 행 락이 요청을 줄 세워 목표 회차(2) 를 넘지 않는다(uk_check_ins 는 락이
+            // 못 미치는 경합을 걸러내는 백업 방어선으로만 남음).
             // 성공 수 == 저장된 행 수 == 디스크 파일 수 (실패한 요청은 파일을 남기지 않는다).
             assertThat(succeeded).isBetween(1L, 2L);
             assertThat(rows).isEqualTo((int) succeeded);

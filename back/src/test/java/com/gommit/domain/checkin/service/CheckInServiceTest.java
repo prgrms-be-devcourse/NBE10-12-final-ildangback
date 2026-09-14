@@ -138,7 +138,7 @@ class CheckInServiceTest {
     }
 
     private void givenActiveMemberAndValidDay(Challenge challenge) {
-        when(preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
+        when(preconditions.getActiveChallengeForActiveMemberForUpdate(CHALLENGE_ID, USER_ID))
                 .thenReturn(challenge);
         lenient().when(progressCalculator.isCheckInDay(challenge, TODAY)).thenReturn(true);
     }
@@ -224,7 +224,7 @@ class CheckInServiceTest {
         @Test
         @DisplayName("진행 중이 아닌 챌린지면 CHALLENGE_NOT_ACTIVE")
         void rejectsInactiveChallenge() {
-            when(preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
+            when(preconditions.getActiveChallengeForActiveMemberForUpdate(CHALLENGE_ID, USER_ID))
                     .thenThrow(new BusinessException(ErrorCode.CHALLENGE_NOT_ACTIVE));
 
             assertBusiness(
@@ -235,7 +235,7 @@ class CheckInServiceTest {
         @Test
         @DisplayName("참여자가 아니거나 이탈했으면 CHALLENGE_NOT_MEMBER")
         void rejectsNonMember() {
-            when(preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
+            when(preconditions.getActiveChallengeForActiveMemberForUpdate(CHALLENGE_ID, USER_ID))
                     .thenThrow(new BusinessException(ErrorCode.CHALLENGE_NOT_MEMBER));
 
             assertBusiness(
@@ -247,7 +247,7 @@ class CheckInServiceTest {
         @DisplayName("인증 대상일이 아니면 NOT_CHECK_IN_DAY")
         void rejectsNonCheckInDay() {
             Challenge challenge = dailyChallenge(CHALLENGE_ID, 1);
-            when(preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
+            when(preconditions.getActiveChallengeForActiveMemberForUpdate(CHALLENGE_ID, USER_ID))
                     .thenReturn(challenge);
             when(progressCalculator.isCheckInDay(challenge, TODAY)).thenReturn(false);
 
@@ -260,7 +260,7 @@ class CheckInServiceTest {
         void rejectsDisallowedType() {
             // allowPhoto=false → 허용 방식 목록이 비어 PHOTO 제출이 거부된다.
             Challenge challenge = challenge(CHALLENGE_ID, FrequencyType.DAILY, null, null, 1, false);
-            when(preconditions.getActiveChallengeForActiveMember(CHALLENGE_ID, USER_ID))
+            when(preconditions.getActiveChallengeForActiveMemberForUpdate(CHALLENGE_ID, USER_ID))
                     .thenReturn(challenge);
             when(progressCalculator.isCheckInDay(challenge, TODAY)).thenReturn(true);
 
