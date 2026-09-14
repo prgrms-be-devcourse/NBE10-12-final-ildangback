@@ -18,6 +18,7 @@ import com.gommit.domain.challenge.entity.ChallengeStatus;
 import com.gommit.domain.challenge.entity.FrequencyType;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
+import com.gommit.domain.challenge.service.ChallengeProgressCalculator;
 import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.checkin.repository.CheckInRepository.UserBusinessDate;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
@@ -116,6 +117,7 @@ class RecordBatchServiceTest {
                 pointProperties,
                 new ChallengeMergeCycleCalculator(),
                 new RecordCompletionCalculator(),
+                new ChallengeProgressCalculator(),
                 businessClock,
                 clock);
         // 프록시 없이 만든 인스턴스라 self는 자기 자신으로 채워야 self.xxx() 호출이 동작한다
@@ -150,6 +152,26 @@ class RecordBatchServiceTest {
                 .daysOfWeek(null)
                 .dailyCheckInCount(1)
                 .requiredDayCount((int) (endDate.toEpochDay() - startDate.toEpochDay() + 1))
+                .groupCurrentStreak(0)
+                .groupBestStreak(0)
+                .allowPhoto(true)
+                .build();
+        challenge.activate();
+        setBaseFields(challenge, id);
+        return challenge;
+    }
+
+    private Challenge challengeEveryNDays(Long id, LocalDate startDate, LocalDate endDate, int frequencyValue) {
+        Challenge challenge = Challenge.builder()
+                .groupId(12L)
+                .seqNo(1)
+                .startDate(startDate)
+                .endDate(endDate)
+                .frequencyType(FrequencyType.EVERY_N_DAYS)
+                .frequencyValue(frequencyValue)
+                .daysOfWeek(null)
+                .dailyCheckInCount(1)
+                .requiredDayCount((int) ((endDate.toEpochDay() - startDate.toEpochDay()) / frequencyValue) + 1)
                 .groupCurrentStreak(0)
                 .groupBestStreak(0)
                 .allowPhoto(true)
@@ -418,6 +440,41 @@ class RecordBatchServiceTest {
 
             verify(personalPointService).reward(100L, 1L, 150, UserPointReason.CHALLENGE_BONUS, "오운완 모임");
             verify(personalPointService, never()).reward(eq(200L), any(), anyInt(), any(), any());
+        }
+
+        @Test
+        @DisplayName("매일 인증이 아닌 챌린지는 완료율을 달력 일수가 아니라 실제 인증 예정일 수로 계산한다")
+        void completionRateUsesRequiredDayCountNotCalendarDaysForNonDailyChallenge() {
+            // given: 3일마다 인증하는 10일짜리 챌린지 - 인증 예정일은 4일(0,3,6,9일차)뿐이다.
+            // 달력 일수(10일)를 분모로 쓰면 40%가 되지만, 예정일 4일 다 채웠으니 100%여야 한다.
+            LocalDate startDate = TODAY.minusDays(20);
+            LocalDate endDate = startDate.plusDays(9);
+            Challenge challenge = challengeEveryNDays(1L, startDate, endDate, 3);
+            ChallengeMember member = member(10L, challenge, 100L);
+            when(finalMergeRepository.existsByChallengeId(1L)).thenReturn(false);
+            when(challengeRepository.findById(1L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findAllByChallengeIdAndStatus(1L, ChallengeMemberStatus.ACTIVE))
+                    .thenReturn(List.of(member));
+            List<UserBusinessDate> dates = List.of(
+                    businessDate(100L, startDate),
+                    businessDate(100L, startDate.plusDays(3)),
+                    businessDate(100L, startDate.plusDays(6)),
+                    businessDate(100L, startDate.plusDays(9)));
+            when(checkInRepository.findBusinessDatesByChallengeIdAndUserIdInAndBusinessDateBetween(
+                            eq(1L), anyList(), eq(startDate), eq(endDate)))
+                    .thenReturn(dates);
+            when(userPointHistoryRepository.sumEarnedByChallengeIdAndUserIdInBetween(eq(1L), anyList(), any(), any()))
+                    .thenReturn(List.of());
+            when(challengeGroupRepository.findNameById(12L)).thenReturn(Optional.of("오운완 모임"));
+
+            // when
+            recordBatchService.generateFinalMerge(1L);
+
+            // then
+            ArgumentCaptor<List<FinalMergeResult>> resultCaptor = ArgumentCaptor.forClass(List.class);
+            verify(finalMergeResultRepository).saveAll(resultCaptor.capture());
+            FinalMergeResult result = resultCaptor.getValue().get(0);
+            assertThat(result.getCompletionRate()).isEqualTo(100);
         }
 
         @Test

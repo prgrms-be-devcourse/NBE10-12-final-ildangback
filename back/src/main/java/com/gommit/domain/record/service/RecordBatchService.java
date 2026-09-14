@@ -6,6 +6,7 @@ import com.gommit.domain.challenge.entity.ChallengeMemberStatus;
 import com.gommit.domain.challenge.entity.ChallengeStatus;
 import com.gommit.domain.challenge.repository.ChallengeMemberRepository;
 import com.gommit.domain.challenge.repository.ChallengeRepository;
+import com.gommit.domain.challenge.service.ChallengeProgressCalculator;
 import com.gommit.domain.checkin.repository.CheckInRepository;
 import com.gommit.domain.checkin.repository.CheckInRepository.UserBusinessDate;
 import com.gommit.domain.group.repository.ChallengeGroupRepository;
@@ -29,10 +30,12 @@ import com.gommit.global.exception.BusinessException;
 import com.gommit.global.exception.ErrorCode;
 import com.gommit.global.time.BusinessClock;
 import com.gommit.global.time.BusinessDayCutoff;
+import com.gommit.global.time.DaysOfWeek;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +74,7 @@ public class RecordBatchService {
     private final PointProperties pointProperties;
     private final ChallengeMergeCycleCalculator cycleCalculator;
     private final RecordCompletionCalculator completionCalculator;
+    private final ChallengeProgressCalculator progressCalculator;
     private final BusinessClock businessClock;
     private final Clock clock;
 
@@ -124,7 +128,7 @@ public class RecordBatchService {
             return;
         }
         MergeInputs inputs = collectMergeInputs(challenge, members, periodStart, periodEnd);
-        List<MemberStat> stats = buildMemberStats(members, inputs, periodStart, inputs.totalDays);
+        List<MemberStat> stats = buildMemberStats(members, inputs, periodStart, inputs.requiredDayCount);
 
         MonthlyMerge merge = MonthlyMerge.create(
                 challenge.getId(),
@@ -188,7 +192,7 @@ public class RecordBatchService {
         LocalDate periodStart = challenge.getStartDate();
         LocalDate periodEnd = challenge.getEndDate();
         MergeInputs inputs = collectMergeInputs(challenge, members, periodStart, periodEnd);
-        List<MemberStat> stats = buildMemberStats(members, inputs, periodStart, inputs.totalDays);
+        List<MemberStat> stats = buildMemberStats(members, inputs, periodStart, inputs.requiredDayCount);
 
         FinalMerge merge = FinalMerge.create(
                 challengeId,
@@ -259,20 +263,33 @@ public class RecordBatchService {
         Map<Long, Map<ItemSlot, String>> characterSlotsByUserId = userItemService.getCharacters(userIds);
 
         int totalDays = totalDays(periodStart, periodEnd);
+        int requiredDayCount = progressCalculator.calculateRequiredDayCount(
+                periodStart,
+                periodEnd,
+                challenge.getFrequencyType(),
+                challenge.getFrequencyValue(),
+                parseDaysOfWeek(challenge));
         int totalCheckInCount =
                 checkInDatesByUserId.values().stream().mapToInt(List::size).sum();
         return new MergeInputs(
-                checkInDatesByUserId, earnedPointsByUserId, characterSlotsByUserId, totalDays, totalCheckInCount);
+                checkInDatesByUserId,
+                earnedPointsByUserId,
+                characterSlotsByUserId,
+                totalDays,
+                requiredDayCount,
+                totalCheckInCount);
     }
 
+    // "매일" 이 아닌 챌린지는 기간의 달력 일수가 아니라 실제 인증 예정일 수를 완료율
+    // 분모로 써야 한다 - 안 그러면 주 3회 챌린지 같은 게 완료율이 실제보다 낮게 나온다.
     private List<MemberStat> buildMemberStats(
-            List<ChallengeMember> members, MergeInputs inputs, LocalDate periodStart, int totalDays) {
+            List<ChallengeMember> members, MergeInputs inputs, LocalDate periodStart, int requiredDayCount) {
         List<MemberStat> stats = new ArrayList<>();
         for (ChallengeMember member : members) {
             Long userId = member.getUserId();
             List<LocalDate> checkInDates = inputs.checkInDatesByUserId.getOrDefault(userId, List.of());
             int completedDayCount = completionCalculator.completedDayCount(checkInDates);
-            int completionRate = completionCalculator.completionRate(completedDayCount, totalDays);
+            int completionRate = completionCalculator.completionRate(completedDayCount, requiredDayCount);
             int totalCheckInCount = checkInDates.size();
             stats.add(new MemberStat(
                     userId,
@@ -318,6 +335,17 @@ public class RecordBatchService {
         return (int) cycleCalculator.totalDays(periodStart, periodEnd);
     }
 
+    private List<DaysOfWeek> parseDaysOfWeek(Challenge challenge) {
+        String csv = challenge.getDaysOfWeek();
+        if (csv == null || csv.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(csv.split(","))
+                .map(String::trim)
+                .map(DaysOfWeek::valueOf)
+                .toList();
+    }
+
     private String joinLabels(TrendData trend) {
         return String.join(",", trend.labels());
     }
@@ -332,6 +360,7 @@ public class RecordBatchService {
             Map<Long, Integer> earnedPointsByUserId,
             Map<Long, Map<ItemSlot, String>> characterSlotsByUserId,
             int totalDays,
+            int requiredDayCount,
             int totalCheckInCount) {}
 
     // 참여자 한 명의 계산된 통계. ranking은 assignRankings에서 정렬 후 채워 넣어야 해서 가변이다.
