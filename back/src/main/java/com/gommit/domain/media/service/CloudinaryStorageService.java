@@ -16,6 +16,7 @@ import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.boot.http.client.HttpClientSettings;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -48,10 +49,25 @@ public class CloudinaryStorageService implements StorageService {
 
     public CloudinaryStorageService(
             Cloudinary cloudinary, MediaStorageProperties properties, RestClient.Builder restClientBuilder) {
+        this(cloudinary, properties, restClientBuilder, CONNECT_TIMEOUT, REQUEST_TIMEOUT);
+    }
+
+    // 테스트 전용 — 특성화 테스트가 느린 응답 케이스를 30초 실측 대기 없이 짧은 타임아웃으로 검증할 수 있게 함.
+    // 운영 경로(2-arg/3-arg 생성자)는 항상 위 CONNECT_TIMEOUT/REQUEST_TIMEOUT(5s/30s)을 강제 적용한다 —
+    // 이 메서드가 주입받은 RestClient.Builder 의 requestFactory 를 그대로 덮어써서 강제하는 것이라,
+    // 3-arg 생성자에 타임아웃 없는 빌더를 넘겨도(Boot 오토컨피그 기본 빌더 등) 무제한 대기로 새지 않는다.
+    // (반대로 이 성질 때문에 3-arg 생성자로는 테스트가 원하는 "더 짧은" 타임아웃을 못 넣는다 — 그래서
+    // 이 package-private 오버로드가 따로 필요하다.)
+    CloudinaryStorageService(
+            Cloudinary cloudinary,
+            MediaStorageProperties properties,
+            RestClient.Builder restClientBuilder,
+            Duration connectTimeout,
+            Duration requestTimeout) {
         this.cloudinary = cloudinary;
         this.properties = properties;
         this.restClient = restClientBuilder
-                .requestFactory(requestFactory(CONNECT_TIMEOUT, REQUEST_TIMEOUT))
+                .requestFactory(requestFactory(connectTimeout, requestTimeout))
                 .build();
     }
 
@@ -117,25 +133,29 @@ public class CloudinaryStorageService implements StorageService {
     // res.cloudinary.com 도메인을 강제하기 때문에, 클라이언트 종류(HttpClient/RestClient)에
     // 안 가리는 와이어레벨 특성화 테스트가 임의 URL(로컬 HttpServer)을 직접 넣을 수 있도록
     // package-private 으로 뺀 것.
+    // 5xx(Cloudinary 쪽 실패)는 MEDIA_STORAGE_FAILED, 그 외 200이 아닌 상태코드(404 등, 리소스가
+    // 실제로 없거나 서명이 잘못된 경우)는 MEDIA_NOT_FOUND, 타임아웃/연결 실패 같은 RestClientException 은
+    // MEDIA_STORAGE_FAILED — HttpClient 시절엔 200 아니면 전부 NOT_FOUND였는데, 500까지 NOT_FOUND로
+    // 뭉뚱그리는 게 부정확해서 바로잡음(단순 클라이언트 교체가 아니라 의도적 동작 변경).
     Resource fetchResource(String url, String filename) {
-        return fetchResource(url, filename, restClient);
-    }
-
-    // 테스트 전용 — 특성화 테스트가 느린 응답 케이스를 30초 실측 대기 없이 짧은 타임아웃의
-    // RestClient 를 직접 넣어 검증할 수 있게 함. 운영 경로는 항상 위 2-arg 오버로드(필드 restClient)로 들어옴.
-    // 상태코드 != 200 은 전부 MEDIA_NOT_FOUND, 그 외 RestClientException(타임아웃/연결 실패 등
-    // I/O 실패)은 MEDIA_STORAGE_FAILED — HttpClient 시절 시맨틱 그대로(회귀 아님, docs/media-restclient-migration.md 보강 5번).
-    Resource fetchResource(String url, String filename, RestClient client) {
         byte[] body;
         try {
-            body = client.get()
+            body = restClient
+                    .get()
                     .uri(url)
                     .retrieve()
+                    .onStatus(HttpStatusCode::is5xxServerError, (req, res) -> {
+                        throw new BusinessException(ErrorCode.MEDIA_STORAGE_FAILED);
+                    })
                     .onStatus(status -> status.value() != 200, (req, res) -> {
                         throw new BusinessException(ErrorCode.MEDIA_NOT_FOUND);
                     })
                     .body(byte[].class);
         } catch (RestClientException e) {
+            throw new BusinessException(ErrorCode.MEDIA_STORAGE_FAILED);
+        }
+        // RestClient 는 응답 바디가 없으면 null 을 돌려주지만 ByteArrayResource 는 null을 못 받아 가드
+        if (body == null) {
             throw new BusinessException(ErrorCode.MEDIA_STORAGE_FAILED);
         }
         return new ByteArrayResource(body) {
