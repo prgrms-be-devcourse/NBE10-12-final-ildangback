@@ -11,6 +11,7 @@ import type {
   MyGroupSummary,
   SliceResponse,
   SeasonSummary,
+  KickVoteStatusResponse,
 } from "./types";
 
 export function getPublicGroups(query: PublicGroupQuery, cursor?: number) {
@@ -56,6 +57,27 @@ export function kickGroupMember(id: number, userId: number) {
   return apiFetch<void>(`/api/groups/${id}/members/${userId}`, {
     method: "DELETE",
   });
+}
+
+export function getOwnerKickVoteStatus(groupId: number) {
+  return apiFetch<KickVoteStatusResponse>(
+    `/api/groups/${groupId}/ownerKickVotes`,
+  );
+}
+export function initiateOwnerKickVote(groupId: number) {
+  return apiFetch<KickVoteStatusResponse>(
+    `/api/groups/${groupId}/ownerKickVotes`,
+    { method: "POST" },
+  );
+}
+export function castOwnerKickVote(
+  groupId: number,
+  choice: "AGREE" | "DISAGREE",
+) {
+  return apiFetch<KickVoteStatusResponse>(
+    `/api/groups/${groupId}/ownerKickVotes/cast`,
+    { method: "POST", body: { choice } },
+  );
 }
 
 export async function getGroupChallenges(groupId: number) {

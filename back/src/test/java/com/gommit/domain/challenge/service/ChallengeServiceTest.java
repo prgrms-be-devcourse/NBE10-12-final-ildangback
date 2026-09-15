@@ -560,7 +560,7 @@ class ChallengeServiceTest {
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(requester));
             when(challengeMemberRepository.findAllByChallengeIdAndStatus(50L, ChallengeMemberStatus.ACTIVE))
                     .thenReturn(List.of(requester, member));
-            when(userRepository.findAllByIdIn(List.of(1L, 2L))).thenReturn(List.of(user(1L, "방장"), user(2L, "멤버")));
+            when(userRepository.findAllByIdIn(List.of(1L, 2L))).thenReturn(List.of(user(1L, "그룹장"), user(2L, "멤버")));
 
             when(businessClock.today()).thenReturn(LocalDate.of(2026, 9, 10));
             member.changeExtensionChoice(choice);
@@ -574,7 +574,7 @@ class ChallengeServiceTest {
 
             // then
             assertThat(response).hasSize(2);
-            assertThat(response.get(0).nickname()).isEqualTo("방장");
+            assertThat(response.get(0).nickname()).isEqualTo("그룹장");
             assertThat(response.get(0).todayCheckInCount()).isZero();
             assertThat(response.get(1).nickname()).isEqualTo("멤버");
             assertThat(response.get(1).todayCheckInCount()).isEqualTo(2);
@@ -883,7 +883,7 @@ class ChallengeServiceTest {
             when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(currentOwner));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(targetMember));
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.of(group));
+            when(challengeGroupRepository.findByIdWithLock(12L)).thenReturn(Optional.of(group));
 
             // when
             var response = challengeService.delegateOwner(50L, 1L, new OwnerDelegationRequest(2L));
@@ -995,9 +995,11 @@ class ChallengeServiceTest {
             ReflectionTestUtils.setField(challenge, "seqNo", 2);
             ChallengeMember currentOwner = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
             ChallengeMember targetMember = challengeMember(71L, challenge, 2L, ChallengeMemberRole.MEMBER);
+            ChallengeGroup group = group(12L, 1L);
             when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(currentOwner));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(targetMember));
+            when(challengeGroupRepository.findByIdWithLock(12L)).thenReturn(Optional.of(group));
 
             // when
             challengeService.delegateOwner(50L, 1L, new OwnerDelegationRequest(2L));
@@ -1005,7 +1007,27 @@ class ChallengeServiceTest {
             // then
             assertThat(currentOwner.getRole()).isEqualTo(ChallengeMemberRole.MEMBER);
             assertThat(targetMember.getRole()).isEqualTo(ChallengeMemberRole.OWNER);
-            verify(challengeGroupRepository, never()).findById(any());
+            assertThat(group.getOwnerId()).isEqualTo(1L); // seqNo=2 READY → 그룹 그룹장 변경 없음
+        }
+
+        @Test
+        @DisplayName("강퇴 투표 진행 중이면 KICK_VOTE_ALREADY_IN_PROGRESS")
+        void throwsWhenKickVoteInProgress() {
+            // given
+            Challenge challenge = challenge(50L, ChallengeStatus.ACTIVE);
+            ChallengeMember currentOwner = challengeMember(70L, challenge, 1L, ChallengeMemberRole.OWNER);
+            ChallengeMember targetMember = challengeMember(71L, challenge, 2L, ChallengeMemberRole.MEMBER);
+            ChallengeGroup group = group(12L, 1L);
+            group.startKickVote();
+            when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(currentOwner));
+            when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(targetMember));
+            when(challengeGroupRepository.findByIdWithLock(12L)).thenReturn(Optional.of(group));
+
+            // when & then
+            assertBusinessException(
+                    () -> challengeService.delegateOwner(50L, 1L, new OwnerDelegationRequest(2L)),
+                    ErrorCode.KICK_VOTE_ALREADY_IN_PROGRESS);
         }
 
         @Test
@@ -1018,7 +1040,7 @@ class ChallengeServiceTest {
             when(challengeRepository.findById(50L)).thenReturn(Optional.of(challenge));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 1L)).thenReturn(Optional.of(currentOwner));
             when(challengeMemberRepository.findByChallengeIdAndUserId(50L, 2L)).thenReturn(Optional.of(targetMember));
-            when(challengeGroupRepository.findById(12L)).thenReturn(Optional.empty());
+            when(challengeGroupRepository.findByIdWithLock(12L)).thenReturn(Optional.empty());
 
             // when & then
             assertBusinessException(

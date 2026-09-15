@@ -433,6 +433,10 @@ public class GroupService {
         if (group.getOwnerId().equals(targetUserId)) {
             throw new BusinessException(ErrorCode.GROUP_OWNER_CANNOT_BE_KICKED);
         }
+        if (group.hasActiveKickVote()) {
+            throw new BusinessException(ErrorCode.KICK_VOTE_ALREADY_IN_PROGRESS);
+        }
+
         Challenge activeChallenge = challengeRepository
                 .findFirstByGroupIdAndStatus(groupId, ChallengeStatus.ACTIVE)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GROUP_MEMBER_KICK_NOT_ALLOWED));
@@ -444,6 +448,9 @@ public class GroupService {
         }
         targetMember.kick();
         kickChallengeMember(activeChallenge.getId(), targetUserId, group.getName());
+        challengeRepository
+                .findFirstByGroupIdAndStatus(groupId, ChallengeStatus.READY)
+                .ifPresent(ready -> kickChallengeMember(ready.getId(), targetUserId, group.getName()));
 
         backgroundPurchaseService.recountVotes(groupId);
     }
@@ -477,11 +484,15 @@ public class GroupService {
                 group.end();
             } else {
                 group.changeOwner(newOwnerId);
+                if (group.hasActiveKickVote()) {
+                    group.endKickVote();
+                    groupMemberRepository.resetAllKickVoteChoices(group.getId());
+                }
             }
         }
     }
 
-    // 새 방장 선정
+    // 새 그룹장 선정
     private Long pickNewOwner(Long groupId, Long userId) {
         List<GroupMember> remainingMembers =
                 groupMemberRepository.findAllByGroupIdAndStatus(groupId, GroupMemberStatus.ACTIVE).stream()

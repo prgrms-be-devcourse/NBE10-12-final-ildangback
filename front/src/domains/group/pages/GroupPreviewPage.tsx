@@ -24,6 +24,7 @@ import {
 import type { ChallengeDetail } from "../../challenge/types";
 import { getGroup, joinPublicGroup, kickGroupMember } from "../api";
 import { ConfirmActionDialog } from "../components/ConfirmActionDialog";
+import { OwnerKickVoteDialog } from "../components/OwnerKickVoteDialog";
 import { GroupInvite } from "../components/GroupInvite";
 import { CATEGORY_LABEL } from "../constants";
 import { groupErrorMessage } from "../errors";
@@ -210,6 +211,7 @@ function SeasonManagement({
   const { showToast } = useToast();
   const [editing, setEditing] = useState(false);
   const [delegating, setDelegating] = useState(false);
+  const [kickVoteOpen, setKickVoteOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState<{
     userId: number;
     nickname: string;
@@ -241,6 +243,7 @@ function SeasonManagement({
   const canKick =
     detail.group.ownerId === user?.id &&
     detail.currentChallenge?.status === "ACTIVE";
+  const canVoteKick = !owner && season?.status === "ACTIVE";
   return (
     <>
       {canEdit &&
@@ -276,7 +279,7 @@ function SeasonManagement({
         memberCharacters={memberCharacters}
         characters={characters}
         action={
-          canDelegate && (
+          canDelegate ? (
             <button
               type="button"
               onClick={() => setDelegating((value) => !value)}
@@ -289,7 +292,15 @@ function SeasonManagement({
             >
               {delegating ? "위임 취소" : "그룹장 위임"}
             </button>
-          )
+          ) : canVoteKick ? (
+            <button
+              type="button"
+              onClick={() => setKickVoteOpen(true)}
+              className="min-h-8 shrink-0 rounded-full border border-red-200 bg-white px-3 text-xs font-semibold whitespace-nowrap text-red-600 transition-colors hover:bg-red-50"
+            >
+              그룹장 강퇴 투표
+            </button>
+          ) : undefined
         }
         note={
           delegating ? (
@@ -378,6 +389,16 @@ function SeasonManagement({
           시즌 참여자를 불러오지 못했어요. 위임은 잠시 뒤 다시 시도해주세요.
         </p>
       )}
+      <OwnerKickVoteDialog
+        groupId={detail.group.id}
+        isOpen={kickVoteOpen}
+        onClose={() => setKickVoteOpen(false)}
+        onVoteConcludes={() => {
+          challenge.retry();
+          seasonMembers.retry();
+          onChanged();
+        }}
+      />
       {action && (
         <ConfirmActionDialog
           title={

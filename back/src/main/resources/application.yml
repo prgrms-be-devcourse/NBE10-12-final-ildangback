@@ -66,6 +66,10 @@ point: # [임시값] 기획 확정 시 조정. 없으면 PointProperties 의 @De
   group-daily-all-complete: 5  # 그룹 ACTIVE 전원이 그날 목표 달성
   merge-bonus: 150             # 챌린지 최종 완주(완료율 50% 이상) 시 개인에게 1회 지급
 
+group: # 그룹장 강퇴 투표 설정
+  kick-vote:     # 24 → 24시간 후 만료. 나중에 이 값만 수정하면 됨
+    expiry-hours: 24
+
 auth-token:
   access-token:
     expiration: 15m

@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -48,6 +49,9 @@ public class ChallengeGroup extends BaseEntity {
     @Column(name = "invite_code", length = 6, unique = true)
     private String inviteCode;
 
+    @Column
+    private LocalDateTime kickVoteStartedAt;
+
     @Builder
     private ChallengeGroup(
             String name,
@@ -79,5 +83,22 @@ public class ChallengeGroup extends BaseEntity {
 
     public void end() {
         this.status = GroupStatus.ENDED;
+    }
+
+    public void startKickVote() {
+        this.kickVoteStartedAt = LocalDateTime.now();
+    }
+
+    public void endKickVote() {
+        this.kickVoteStartedAt = null;
+    }
+
+    public boolean hasActiveKickVote() {
+        return this.kickVoteStartedAt != null;
+    }
+
+    public boolean isKickVoteExpired(int expiryHours) {
+        return kickVoteStartedAt != null
+                && kickVoteStartedAt.plusHours(expiryHours).isBefore(LocalDateTime.now());
     }
 }

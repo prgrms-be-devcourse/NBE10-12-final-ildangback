@@ -1,5 +1,6 @@
 package com.gommit.domain.group.controller;
 
+import com.gommit.domain.group.dto.request.CastVoteRequest;
 import com.gommit.domain.group.dto.request.GroupCreateRequest;
 import com.gommit.domain.group.dto.request.GroupJoinRequest;
 import com.gommit.domain.group.dto.response.*;
@@ -7,6 +8,7 @@ import com.gommit.domain.group.entity.GroupCategory;
 import com.gommit.domain.group.entity.GroupSort;
 import com.gommit.domain.group.entity.GroupStatus;
 import com.gommit.domain.group.service.GroupService;
+import com.gommit.domain.group.service.OwnerKickVoteService;
 import com.gommit.global.dto.SliceResponse;
 import com.gommit.global.security.CurrentUser;
 import com.gommit.global.security.SecurityUser;
@@ -29,6 +31,7 @@ import org.springframework.web.bind.annotation.*;
 @Validated
 public class GroupController {
     private final GroupService groupService;
+    private final OwnerKickVoteService ownerKickVoteService;
 
     @Operation(summary = "그룹 생성", description = "새로운 그룹을 생성하고 그룹 생성자를 첫 번째 멤버로 등록. 그룹 생성과 동시에 첫 번째 READY 챌린지가 생성")
     @PostMapping
@@ -118,5 +121,31 @@ public class GroupController {
     public ResponseEntity<List<SeasonSummary>> getGroupChallenges(
             @PathVariable Long groupId, @CurrentUser SecurityUser actor) {
         return ResponseEntity.ok(groupService.getGroupChallenges(groupId, actor.getId()));
+    }
+
+    @Operation(
+            summary = "그룹장 강퇴 투표",
+            description = "ACTIVE 챌린지가 진행 중인 그룹에서 그룹장이 아닌 그룹원이 그룹장 강퇴 투표를 시작. 개시자는 자동으로 AGREE 처리, 과반수 이상 찬성이면 결과 확정")
+    @PostMapping("/{groupId}/ownerKickVotes")
+    public ResponseEntity<KickVoteStatusResponse> initiateVote(
+            @PathVariable Long groupId, @CurrentUser SecurityUser actor) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ownerKickVoteService.initiateVote(groupId, actor.getId()));
+    }
+
+    @Operation(
+            summary = "그룹장 강퇴 투표 참여(AGREE 또는 DISAGREE)",
+            description = "그룹장 강퇴 투표에 AGREE 또는 DISAGREE로 참여. 그룹장은 참여 불가하며 중복 투표와 NONE 선택은 허용하지 않음.")
+    @PostMapping("/{groupId}/ownerKickVotes/cast")
+    public ResponseEntity<KickVoteStatusResponse> castVote(
+            @PathVariable Long groupId, @Valid @RequestBody CastVoteRequest request, @CurrentUser SecurityUser actor) {
+        return ResponseEntity.ok(ownerKickVoteService.castVote(groupId, actor.getId(), request.choice()));
+    }
+
+    @Operation(summary = "그룹장 강퇴 투표 현황 조회", description = "현재 진행 중인 그룹장 강퇴 투표의 찬성과 반대 수. 만료 시각, 본인의 투표 여부를 조회.")
+    @GetMapping("/{groupId}/ownerKickVotes")
+    public ResponseEntity<KickVoteStatusResponse> getVoteStatus(
+            @PathVariable Long groupId, @CurrentUser SecurityUser actor) {
+        return ResponseEntity.ok(ownerKickVoteService.getVoteStatus(groupId, actor.getId()));
     }
 }
