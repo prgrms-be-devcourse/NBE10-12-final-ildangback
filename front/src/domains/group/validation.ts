@@ -43,8 +43,6 @@ export const groupCreateSchema = z
         .int()
         .min(1, "하루 최소 1회 인증해야 합니다.")
         .max(4, "하루 최대 4회까지 설정할 수 있어요."),
-      // 라이브는 별도 서브시스템(아직 없음). 사진/영상은 동시에 허용할 수 있다 —
-      // 같은 회차라도 멤버마다 사진으로도, 영상으로도 인증할 수 있다.
       allowedTypes: z
         .array(z.enum(["PHOTO", "VIDEO"]))
         .min(1, "인증 방식을 하나 이상 선택해주세요."),
@@ -99,6 +97,17 @@ export const STEP_FIELDS = [
   ["visibility", "maxMembers"],
 ] as const;
 export const CREATE_FIELDS = STEP_FIELDS.flat();
+
+/**
+ * 날짜 인풋의 `min` 속성용. 서버가 '내일'과 영업일 경계의 최종 판단자이고
+ * START_DATE_INVALID 도 서버가 내려주니, 이건 그 정책의 재구현이 아니라
+ * 브라우저 달력에서 당일/과거를 미리 안 보여주는 UI 편의일 뿐이다.
+ */
+export function tomorrowDate(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 /** A duration shortcut for user input only, never a progress/business-day calculation. */
 export function endDateForDuration(start: string, days: number): string | null {

@@ -2,7 +2,12 @@ import { NotePencilIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import { formatMonthDayWeekday } from "../../../shared/lib/date";
 import { Button } from "../../../shared/ui/Button";
-import { currentMonth } from "../lib/month";
+import {
+  clampToRange,
+  currentMonth,
+  monthRangeOf,
+  type DatePeriod,
+} from "../lib/month";
 import { useDailyLogs } from "../lib/useDailyLogs";
 import { DailyLogPlayer } from "./DailyLogPlayer";
 import { DailyLogTile } from "./DailyLogTile";
@@ -15,8 +20,18 @@ import { MonthNav } from "./MonthNav";
  * 월 네비 + 이번 달 기록일수/평균 달성률 배너 + 타임라인(하루 = 타일 1개).
  * 활동이 있던 날만 row 가 있어, 인증이 없던 날은 타임라인에 아예 안 나온다.
  */
-export function DailyLogTimeline({ challengeId }: { challengeId: number }) {
-  const [month, setMonth] = useState(currentMonth);
+export function DailyLogTimeline({
+  challengeId,
+  period,
+}: {
+  challengeId: number;
+  /** 챌린지 시작·종료일. 기록이 없는 달로 못 넘어가게 월 네비 범위를 좁히고, 초기 진입 달도 그 범위 안으로 당겨온다. */
+  period?: DatePeriod;
+}) {
+  const { minMonth, maxMonth } = monthRangeOf(period);
+  const [month, setMonth] = useState(() =>
+    clampToRange(currentMonth(), minMonth, maxMonth),
+  );
   // 재생할 영상의 objectURL. 타일이 이미 받아둔 것을 그대로 넘겨받아 다시 안 내려받는다.
   const [playingSrc, setPlayingSrc] = useState<string | null>(null);
 
@@ -33,7 +48,12 @@ export function DailyLogTimeline({ challengeId }: { challengeId: number }) {
 
   return (
     <div className="pt-2">
-      <MonthNav month={month} onChange={setMonth} />
+      <MonthNav
+        month={month}
+        onChange={setMonth}
+        minMonth={minMonth}
+        maxMonth={maxMonth}
+      />
 
       {meta && (
         <div className="mt-3 flex items-center gap-2 rounded-xl bg-purple-50 px-4 py-2.5 text-[13px] text-gray-600">

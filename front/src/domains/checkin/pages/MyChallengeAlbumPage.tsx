@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
 import { TopBar } from "../../../shared/ui/TopBar";
 import { CheckInGridSection } from "../components/CheckInGridSection";
 import { CheckInLightbox } from "../components/CheckInLightbox";
 import { CheckInTypeChips } from "../components/CheckInTypeChips";
 import { MonthNav } from "../components/MonthNav";
-import { currentMonth } from "../lib/month";
+import { clampToRange, currentMonth, monthRangeOf } from "../lib/month";
 import { useChallengeAlbumSummary } from "../lib/useChallengeAlbumSummary";
 import { useMyCheckIns } from "../lib/useMyCheckIns";
 import type { CheckInType, MyCheckIn } from "../types";
@@ -21,6 +21,17 @@ export function MyChallengeAlbumPage() {
   const [selected, setSelected] = useState<MyCheckIn | null>(null);
 
   const summary = useChallengeAlbumSummary(challengeId);
+  const { minMonth, maxMonth } = monthRangeOf(summary ?? undefined);
+
+  // summary는 비동기로 로드돼 useState 초기화 시점엔 시작·종료일을 모른다.
+  // 로드가 끝나면 그 범위 안으로 한 번만 당겨온다(그 뒤 사용자가 옮긴 달은 건드리지 않음).
+  const clampedOnce = useRef(false);
+  useEffect(() => {
+    if (clampedOnce.current || !summary) return;
+    clampedOnce.current = true;
+    setMonth((m) => clampToRange(m, minMonth, maxMonth));
+  }, [summary, minMonth, maxMonth]);
+
   const result = useMyCheckIns({
     month,
     challengeId,
@@ -53,7 +64,12 @@ export function MyChallengeAlbumPage() {
         )}
 
         <div className="mt-4">
-          <MonthNav month={month} onChange={setMonth} />
+          <MonthNav
+            month={month}
+            onChange={setMonth}
+            minMonth={minMonth}
+            maxMonth={maxMonth}
+          />
           {summary && (
             <p className="mt-1 text-center text-[12px] text-gray-400">
               {periodLabel(summary.startDate, summary.endDate)}
